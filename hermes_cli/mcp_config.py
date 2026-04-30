@@ -1,11 +1,7 @@
-"""
-MCP Server Management CLI — ``hermes mcp`` subcommand.
+"""MCP server management CLI.
 
-Implements ``hermes mcp add/remove/list/test/configure`` for interactive
-MCP server lifecycle management (issue #690 Phase 2).
-
-Relies on tools/mcp_tool.py for connection/discovery and keeps
-configuration in ~/.hermes/config.yaml under the ``mcp_servers`` key.
+Talaria ships with zero bundled MCP servers. Users add each server manually
+with interactive prompts or explicit CLI flags.
 """
 
 import asyncio
@@ -30,8 +26,6 @@ logger = logging.getLogger(__name__)
 
 _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
-
-_MCP_PRESETS: Dict[str, Dict[str, Any]] = {}
 
 
 # ─── UI Helpers ───────────────────────────────────────────────────────────────
@@ -64,6 +58,32 @@ def _confirm(question: str, default: bool = True) -> bool:
 def _prompt(question: str, *, password: bool = False, default: str = "") -> str:
     from hermes_cli.cli_output import prompt as _shared_prompt
     return _shared_prompt(question, default=default, password=password)
+
+
+def _interactive_transport_details() -> tuple[Optional[str], Optional[str], List[str]]:
+    """Prompt the user for MCP transport details when omitted on the CLI."""
+    print()
+    _info("Talaria does not ship with bundled MCP presets.")
+    _info("Enter the connection details for the MCP server you want to add.")
+    print()
+
+    while True:
+        choice = _prompt("Transport type (http/stdio)", default="http").strip().lower()
+        if choice in {"http", "https", "url"}:
+            url = _prompt("MCP endpoint URL").strip()
+            if url:
+                return url, None, []
+            _warning("Endpoint URL is required for HTTP MCP servers.")
+            continue
+        if choice in {"stdio", "command", "cmd"}:
+            command = _prompt("Stdio command (for example: npx)").strip()
+            if not command:
+                _warning("A stdio command is required.")
+                continue
+            raw_args = _prompt("Command args (space separated, optional)").strip()
+            cmd_args = raw_args.split() if raw_args else []
+            return None, command, cmd_args
+        _warning("Please enter 'http' or 'stdio'.")
 
 
 # ─── Config Helpers ───────────────────────────────────────────────────────────
@@ -120,40 +140,6 @@ def _parse_env_assignments(raw_env: Optional[List[str]]) -> Dict[str, str]:
             raise ValueError(f"Invalid --env variable name '{key}'")
         parsed[key] = value
     return parsed
-
-
-def _apply_mcp_preset(
-    name: str,
-    *,
-    preset_name: Optional[str],
-    url: Optional[str],
-    command: Optional[str],
-    cmd_args: List[str],
-    server_config: Dict[str, Any],
-) -> tuple[Optional[str], Optional[str], List[str], bool]:
-    """Apply a known MCP preset when transport details were omitted."""
-    if not preset_name:
-        return url, command, cmd_args, False
-
-    preset = _MCP_PRESETS.get(preset_name)
-    if not preset:
-        raise ValueError(f"Unknown MCP preset: {preset_name}")
-
-    if url or command:
-        return url, command, cmd_args, False
-
-    url = preset.get("url")
-    command = preset.get("command")
-    cmd_args = list(preset.get("args") or [])
-
-    if url:
-        server_config["url"] = url
-    if command:
-        server_config["command"] = command
-    if cmd_args:
-        server_config["args"] = cmd_args
-
-    return url, command, cmd_args, True
 
 
 # ─── Discovery (temporary connect) ───────────────────────────────────────────
@@ -224,23 +210,17 @@ def cmd_mcp_add(args):
     command = getattr(args, "command", None)
     cmd_args = getattr(args, "args", None) or []
     auth_type = getattr(args, "auth", None)
-    preset_name = getattr(args, "preset", None)
     raw_env = getattr(args, "env", None)
 
     server_config: Dict[str, Any] = {}
     try:
         explicit_env = _parse_env_assignments(raw_env)
-        url, command, cmd_args, _preset_applied = _apply_mcp_preset(
-            name,
-            preset_name=preset_name,
-            url=url,
-            command=command,
-            cmd_args=list(cmd_args),
-            server_config=server_config,
-        )
     except ValueError as exc:
         _error(str(exc))
         return
+
+    if not url and not command:
+        url, command, cmd_args = _interactive_transport_details()
 
     if url and explicit_env:
         _error("--env is only supported for stdio MCP servers (--command or stdio presets)")
@@ -248,11 +228,7 @@ def cmd_mcp_add(args):
 
     # Validate transport
     if not url and not command:
-        _error("Must specify --url <endpoint>, --command <cmd>, or --preset <name>")
-        _info("Examples:")
-        _info('  hermes mcp add ink --url "https://mcp.ml.ink/mcp"')
-        _info('  hermes mcp add github --command npx --args @modelcontextprotocol/server-github')
-        _info('  hermes mcp add myserver --preset mypreset')
+        _error("Could not determine MCP transport details.")
         return
 
     # Check if server already exists
@@ -337,7 +313,7 @@ def cmd_mcp_add(args):
             server_config["enabled"] = False
             _save_mcp_server(name, server_config)
             _success(f"Saved '{name}' to config (disabled)")
-            _info("Fix the issue, then: hermes mcp test " + name)
+            _info("Fix the issue, then: talaria mcp test " + name)
         return
 
     if not tools:
@@ -449,10 +425,11 @@ def cmd_mcp_list(args=None):
     if not servers:
         print()
         _info("No MCP servers configured.")
+        _info("Talaria ships with zero bundled MCP servers by default.")
         print()
         _info("Add one with:")
-        _info('  hermes mcp add <name> --url <endpoint>')
-        _info('  hermes mcp add <name> --command <cmd> --args <args...>')
+        _info('  talaria mcp add <name> --url <endpoint>')
+        _info('  talaria mcp add <name> --command <cmd> --args <args...>')
         print()
         return
 
@@ -611,7 +588,7 @@ def cmd_mcp_login(args):
         return
     if server_config.get("auth") != "oauth":
         _error(f"Server '{name}' is not configured for OAuth (auth={server_config.get('auth')})")
-        _info("Use `hermes mcp remove` + `hermes mcp add` to reconfigure auth.")
+        _info("Use `talaria mcp remove` + `talaria mcp add` to reconfigure auth.")
         return
 
     # Wipe both disk and in-memory cache so the next probe forces a fresh
@@ -766,13 +743,12 @@ def mcp_command(args):
         # No subcommand — show list
         cmd_mcp_list()
         print(color("  Commands:", Colors.CYAN))
-        _info("hermes mcp serve                              Run as MCP server")
-        _info("hermes mcp add <name> --url <endpoint>        Add an MCP server")
-        _info("hermes mcp add <name> --command <cmd>         Add a stdio server")
-        _info("hermes mcp add <name> --preset <preset>       Add from a known preset")
-        _info("hermes mcp remove <name>                      Remove a server")
-        _info("hermes mcp list                               List servers")
-        _info("hermes mcp test <name>                        Test connection")
-        _info("hermes mcp configure <name>                   Toggle tools")
-        _info("hermes mcp login <name>                       Re-authenticate OAuth")
+        _info("talaria mcp serve                              Run as MCP server")
+        _info("talaria mcp add <name> --url <endpoint>        Add an MCP server")
+        _info("talaria mcp add <name> --command <cmd>         Add a stdio server")
+        _info("talaria mcp remove <name>                      Remove a server")
+        _info("talaria mcp list                               List servers")
+        _info("talaria mcp test <name>                        Test connection")
+        _info("talaria mcp configure <name>                   Toggle tools")
+        _info("talaria mcp login <name>                       Re-authenticate OAuth")
         print()

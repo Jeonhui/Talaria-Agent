@@ -88,7 +88,7 @@ TIPS = [
     "hermes skills check scans installed hub skills for upstream updates.",
     "hermes skills tap add myorg/skills-repo adds a custom GitHub skill source.",
     "hermes skills snapshot export setup.json exports your skill configuration for backup or sharing.",
-    "hermes mcp add github --command npx adds MCP servers from the command line.",
+    "talaria mcp add lets you register MCP servers with your own URL or stdio command.",
     "hermes mcp serve runs Hermes itself as an MCP server for other agents.",
     "hermes auth add lets you add multiple API keys for credential pool rotation.",
     "hermes completion bash >> ~/.bashrc enables tab completion for all commands and profiles.",
@@ -224,7 +224,7 @@ TIPS = [
     "browser_vision with annotate=true overlays numbered labels on interactive elements.",
 
     # --- MCP ---
-    "MCP servers are configured in config.yaml — both stdio and HTTP transports supported.",
+    "Talaria ships with zero bundled MCP servers — add your own in config.yaml or via talaria mcp add.",
     "Per-server tool filtering: tools.include whitelists and tools.exclude blacklists specific tools.",
     "MCP servers auto-generate toolsets at runtime — hermes tools can toggle them per platform.",
     "MCP OAuth support: auth: oauth enables browser-based authorization with PKCE.",

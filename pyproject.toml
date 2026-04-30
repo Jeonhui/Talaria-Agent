@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "talaria-agent"
 version = "0.11.0"
-description = "A slim Hermes-derived agent focused on Discord, Slack, Telegram, and a reduced provider set"
+description = "A lean personal assistant for Discord, Slack, Telegram, CLI, and optional MCP"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Jeonhui" }]
@@ -62,15 +62,10 @@ termux = [
 ]
 all = [
   "talaria-agent[messaging]",
-  "talaria-agent[cron]",
   "talaria-agent[cli]",
-  "talaria-agent[dev]",
-  "talaria-agent[tts-premium]",
-  "talaria-agent[slack]",
   "talaria-agent[pty]",
   "talaria-agent[mcp]",
   "talaria-agent[acp]",
-  "talaria-agent[voice]",
 ]
 
 [project.scripts]
@@ -85,7 +80,7 @@ py-modules = ["run_agent", "model_tools", "toolsets", "batch_runner", "trajector
 hermes_cli = ["web_dist/**/*"]
 
 [tool.setuptools.packages.find]
-include = ["agent", "agent.*", "tools", "tools.*", "hermes_cli", "gateway", "gateway.*", "tui_gateway", "tui_gateway.*", "cron", "acp_adapter", "plugins", "plugins.*"]
+include = ["agent", "agent.*", "tools", "tools.*", "hermes_cli", "gateway", "gateway.*", "tui_gateway", "tui_gateway.*", "cron", "acp_adapter"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
