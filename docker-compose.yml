@@ -10,18 +10,15 @@
 # usermod/groupmod + gosu.
 #
 # Security notes:
-#   - The dashboard service binds to 127.0.0.1 by default. It stores API
-#     keys; exposing it on LAN without auth is unsafe. If you want remote
-#     access, use an SSH tunnel or put it behind a reverse proxy that
-#     adds authentication — do NOT pass --insecure --host 0.0.0.0.
-#   - The gateway's API server is off unless you uncomment API_SERVER_KEY
-#     and API_SERVER_HOST. See docs/user-guide/api-server.md before doing
-#     this on an internet-facing host.
+#   - Bot tokens and provider API keys live in ~/.talaria/.env on the host
+#     and are bind-mounted in. Treat that file like any other secret file.
+#   - The gateway's OpenAI-compatible API server is OFF by default. If you
+#     uncomment API_SERVER_HOST=0.0.0.0 below, API_SERVER_KEY is mandatory.
 #
 services:
   gateway:
     build: .
-    image: talaria-agent
+    image: talaria-agent:0.1.0
     container_name: talaria
     restart: unless-stopped
     network_mode: host
@@ -30,30 +27,8 @@ services:
     environment:
       - TALARIA_UID=${TALARIA_UID:-10000}
       - TALARIA_GID=${TALARIA_GID:-10000}
-      # To expose the OpenAI-compatible API server beyond localhost,
-      # uncomment BOTH lines (API_SERVER_KEY is mandatory for auth):
+      # Optional: expose the OpenAI-compatible API server beyond localhost.
+      # Uncomment BOTH lines (API_SERVER_KEY is mandatory for non-loopback).
       # - API_SERVER_HOST=0.0.0.0
       # - API_SERVER_KEY=${API_SERVER_KEY}
-      # Microsoft Teams — uncomment and fill in to enable Teams gateway.
-      # Register your bot at https://dev.botframework.com/ to get these values.
-      # - TEAMS_CLIENT_ID=${TEAMS_CLIENT_ID}
-      # - TEAMS_CLIENT_SECRET=${TEAMS_CLIENT_SECRET}
-      # - TEAMS_TENANT_ID=${TEAMS_TENANT_ID}
-      # - TEAMS_ALLOWED_USERS=${TEAMS_ALLOWED_USERS}
-      # - TEAMS_PORT=3978
     command: ["gateway", "run"]
-
-  dashboard:
-    image: talaria-agent
-    container_name: talaria-dashboard
-    restart: unless-stopped
-    network_mode: host
-    depends_on:
-      - gateway
-    volumes:
-      - ~/.talaria:/opt/data
-    environment:
-      - TALARIA_UID=${TALARIA_UID:-10000}
-      - TALARIA_GID=${TALARIA_GID:-10000}
-    # Localhost-only. For remote access, tunnel via `ssh -L 9119:localhost:9119`.
-    command: ["dashboard", "--host", "127.0.0.1", "--no-open"]
