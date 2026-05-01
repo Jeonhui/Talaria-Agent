@@ -866,7 +866,7 @@ DEFAULT_CONFIG = {
         "require_mention": True,       # Require @mention to respond in server channels
         "free_response_channels": "",  # Comma-separated channel IDs where bot responds without mention
         "allowed_channels": "",        # If set, bot ONLY responds in these channel IDs (whitelist)
-        "auto_thread": True,           # Auto-create threads on @mention in channels (like Slack)
+        "auto_thread": False,          # Auto-create threads on @mention in channels — disabled by default; set to true to mirror Slack-style threading
         "reactions": True,             # Add 👀/✅/❌ reactions to messages during processing
         "channel_prompts": {},         # Per-channel ephemeral system prompts (forum parents apply to child threads)
         # discord / discord_admin tools: restrict which actions the agent may call.
