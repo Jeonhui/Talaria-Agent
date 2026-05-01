@@ -2306,21 +2306,22 @@ def run_setup_wizard(args):
     if not (migration_ran and _skip_configured_section(config, "terminal", "Terminal Backend")):
         setup_terminal_backend(config)
 
-    # Section 3: Agent Settings
-    if not (migration_ran and _skip_configured_section(config, "agent", "Agent Settings")):
-        setup_agent_settings(config)
-
-    # Section 4: Messaging Platforms
+    # Section 3: Messaging Platforms
     if not (migration_ran and _skip_configured_section(config, "gateway", "Messaging Platforms")):
         setup_gateway(config)
 
-    # Section 5: Tools
-    if not (migration_ran and _skip_configured_section(config, "tools", "Tools")):
-        setup_tools(config, first_install=not is_existing)
+    # Apply sensible defaults for advanced sections (tools, agent settings).
+    # Configure them explicitly with: talaria setup tools | agent.
+    _apply_default_agent_settings(config)
 
     # Save and show summary
     save_config(config)
     _print_setup_summary(config, talaria_home)
+
+    print()
+    print_info("Advanced configuration (optional):")
+    print_info("  talaria setup tools  — pick toolsets per platform")
+    print_info("  talaria setup agent  — tune iterations / compression / display")
 
     _offer_launch_chat()
 

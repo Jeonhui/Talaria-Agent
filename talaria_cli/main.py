@@ -6115,12 +6115,12 @@ def main():
         "setup",
         help="Interactive setup wizard",
         description="Configure Talaria Agent with an interactive wizard. "
-        "Run a specific section: talaria setup model|tts|terminal|gateway|tools|agent",
+        "Run a specific section: talaria setup model|terminal|gateway|tools|agent",
     )
     setup_parser.add_argument(
         "section",
         nargs="?",
-        choices=["model", "tts", "terminal", "gateway", "tools", "agent"],
+        choices=["model", "terminal", "gateway", "tools", "agent"],
         default=None,
         help="Run a specific setup section instead of the full wizard",
     )
