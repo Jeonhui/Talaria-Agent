@@ -4,7 +4,7 @@ This document outlines the security protocols, trust model, and deployment harde
 
 ## 1. Vulnerability Reporting
 
-Talaria Agent does **not** operate a bug bounty program. Security issues should be reported via [GitHub Security Advisories (GHSA)](https://github.com/Jeonhui/Talaria-Agent/security/advisories/new) or by emailing **security@nousresearch.com**. Do not open public issues for security vulnerabilities.
+Talaria Agent does **not** operate a bug bounty program. Security issues should be reported via [GitHub Security Advisories (GHSA)](https://github.com/Jeonhui/Talaria-Agent/security/advisories/new). Do not open public issues for security vulnerabilities.
 
 ### Required Submission Details
 - **Title & Severity:** Concise description and CVSS score/rating.
@@ -22,7 +22,7 @@ The core assumption is that Talaria is a **personal agent** with one trusted ope
 ### Operator & Session Trust
 - **Single Tenant:** The system protects the operator from LLM actions, not from malicious co-tenants. Multi-user isolation must happen at the OS/host level.
 - **Gateway Security:** Authorized callers (Telegram, Discord, Slack, etc.) receive equal trust. Session keys are used for routing, not as authorization boundaries.
-- **Execution:** Defaults to `terminal.backend: local` (direct host execution). Container isolation (Docker, Modal, Daytona) is opt-in for sandboxing.
+- **Execution:** Defaults to `terminal.backend: local` (direct host execution). Container isolation via Docker, or remote isolation via SSH, is opt-in for sandboxing.
 
 ### Dangerous Command Approval
 The approval system (`tools/approval.py`) is a core security boundary. Terminal commands, file operations, and other potentially destructive actions are gated behind explicit user confirmation before execution. The approval mode is configurable via `approvals.mode` in `config.yaml`:
