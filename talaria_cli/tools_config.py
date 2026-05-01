@@ -55,7 +55,6 @@ CONFIGURABLE_TOOLSETS = [
     ("terminal",        "💻 Terminal",                 "processes and shell execution"),
     ("file",            "📁 Files",                    "read, write, patch, search"),
     ("vision",          "👁️ Vision",                   "image analysis"),
-    ("tts",             "🔊 TTS",                      "text to speech"),
     ("todo",            "📋 Planning",                 "task planning"),
     ("memory",          "💾 Memory",                   "persistent memory"),
     ("messaging",       "📨 Messaging",                "send messages across connected platforms"),
@@ -66,7 +65,7 @@ CONFIGURABLE_TOOLSETS = [
 # Toolsets that are OFF by default for new installs.
 # They're still in _TALARIA_CORE_TOOLS (available at runtime if enabled),
 # but the setup checklist won't pre-select them for first-time users.
-_DEFAULT_OFF_TOOLSETS = {"browser", "tts", "discord", "discord_admin"}
+_DEFAULT_OFF_TOOLSETS = {"browser", "discord", "discord_admin"}
 
 # Platform-scoped toolsets: only appear in the `talaria tools` checklist for
 # these platforms, and only resolve/save for these platforms.  A toolset
@@ -116,81 +115,6 @@ PLATFORMS = {
 # Toolsets not in this map either need no config or use the simple fallback.
 
 TOOL_CATEGORIES = {
-    "tts": {
-        "name": "Text-to-Speech",
-        "icon": "🔊",
-        "providers": [
-            {
-                "name": "Nous Subscription",
-                "badge": "subscription",
-                "tag": "Managed OpenAI TTS billed to your subscription",
-                "env_vars": [],
-                "tts_provider": "openai",
-                "requires_nous_auth": True,
-                "managed_nous_feature": "tts",
-                "override_env_vars": ["VOICE_TOOLS_OPENAI_KEY", "OPENAI_API_KEY"],
-            },
-            {
-                "name": "Microsoft Edge TTS",
-                "badge": "★ recommended · free",
-                "tag": "Good quality, no API key needed",
-                "env_vars": [],
-                "tts_provider": "edge",
-            },
-            {
-                "name": "OpenAI TTS",
-                "badge": "paid",
-                "tag": "High quality voices",
-                "env_vars": [
-                    {"key": "VOICE_TOOLS_OPENAI_KEY", "prompt": "OpenAI API key", "url": "https://platform.openai.com/api-keys"},
-                ],
-                "tts_provider": "openai",
-            },
-            {
-                "name": "xAI TTS",
-                "tag": "Grok voices - requires xAI API key",
-                "env_vars": [
-                    {"key": "XAI_API_KEY", "prompt": "xAI API key", "url": "https://console.x.ai/"},
-                ],
-                "tts_provider": "xai",
-            },
-            {
-                "name": "ElevenLabs",
-                "badge": "paid",
-                "tag": "Most natural voices",
-                "env_vars": [
-                    {"key": "ELEVENLABS_API_KEY", "prompt": "ElevenLabs API key", "url": "https://elevenlabs.io/app/settings/api-keys"},
-                ],
-                "tts_provider": "elevenlabs",
-            },
-            {
-                "name": "Mistral (Voxtral TTS)",
-                "badge": "paid",
-                "tag": "Multilingual, native Opus",
-                "env_vars": [
-                    {"key": "MISTRAL_API_KEY", "prompt": "Mistral API key", "url": "https://console.mistral.ai/"},
-                ],
-                "tts_provider": "mistral",
-            },
-            {
-                "name": "Google Gemini TTS",
-                "badge": "preview",
-                "tag": "30 prebuilt voices, controllable via prompts",
-                "env_vars": [
-                    {"key": "GEMINI_API_KEY", "prompt": "Gemini API key", "url": "https://aistudio.google.com/app/apikey"},
-                ],
-                "tts_provider": "gemini",
-            },
-            {
-                "name": "KittenTTS",
-                "badge": "local · free",
-                "tag": "Lightweight local ONNX TTS (~25MB), no API key",
-                "env_vars": [],
-                "tts_provider": "kittentts",
-                "post_setup": "kittentts",
-            },
-        ],
-    },
     "web": {
         "name": "Web Search & Extract",
         "setup_title": "Select Search Provider",

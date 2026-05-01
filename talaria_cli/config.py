@@ -718,68 +718,6 @@ DEFAULT_CONFIG = {
         "redact_pii": False,  # When True, hash user IDs and strip phone numbers from LLM context
     },
     
-    # Text-to-speech configuration
-    # Each provider supports an optional `max_text_length:` override for the
-    # per-request input-character cap. Omit it to use the provider's documented
-    # limit (OpenAI 4096, xAI 15000, MiniMax 10000, ElevenLabs 5k-40k model-aware,
-    # Gemini 5000, Edge 5000, Mistral 4000, NeuTTS/KittenTTS 2000).
-    "tts": {
-        "provider": "edge",  # "edge" (free) | "elevenlabs" (premium) | "openai" | "xai" | "minimax" | "mistral" | "neutts" (local)
-        "edge": {
-            "voice": "en-US-AriaNeural",
-            # Popular: AriaNeural, JennyNeural, AndrewNeural, BrianNeural, SoniaNeural
-        },
-        "elevenlabs": {
-            "voice_id": "pNInz6obpgDQGcFmaJgB",  # Adam
-            "model_id": "eleven_multilingual_v2",
-        },
-        "openai": {
-            "model": "gpt-4o-mini-tts",
-            "voice": "alloy",
-            # Voices: alloy, echo, fable, onyx, nova, shimmer
-        },
-        "xai": {
-            "voice_id": "eve",
-            "language": "en",
-            "sample_rate": 24000,
-            "bit_rate": 128000,
-        },
-        "mistral": {
-            "model": "voxtral-mini-tts-2603",
-            "voice_id": "c69964a6-ab8b-4f8a-9465-ec0925096ec8",  # Paul - Neutral
-        },
-        "neutts": {
-            "ref_audio": "",  # Path to reference voice audio (empty = bundled default)
-            "ref_text": "",   # Path to reference voice transcript (empty = bundled default)
-            "model": "neuphonic/neutts-air-q4-gguf",  # HuggingFace model repo
-            "device": "cpu",  # cpu, cuda, or mps
-        },
-    },
-    
-    "stt": {
-        "enabled": True,
-        "provider": "local",  # "local" (free, faster-whisper) | "groq" | "openai" (Whisper API) | "mistral" (Voxtral Transcribe)
-        "local": {
-            "model": "base",  # tiny, base, small, medium, large-v3
-            "language": "",  # auto-detect by default; set to "en", "es", "fr", etc. to force
-        },
-        "openai": {
-            "model": "whisper-1",  # whisper-1, gpt-4o-mini-transcribe, gpt-4o-transcribe
-        },
-        "mistral": {
-            "model": "voxtral-mini-latest",  # voxtral-mini-latest, voxtral-mini-2602
-        },
-    },
-
-    "voice": {
-        "record_key": "ctrl+b",
-        "max_recording_seconds": 120,
-        "auto_tts": False,
-        "beep_enabled": True,         # Play record start/stop beeps in CLI voice mode
-        "silence_threshold": 200,     # RMS below this = silence (0-32767)
-        "silence_duration": 3.0,      # Seconds of silence before auto-stop
-    },
-    
     "human_delay": {
         "mode": "off",
         "min_ms": 800,
@@ -803,9 +741,8 @@ DEFAULT_CONFIG = {
         "memory_char_limit": 2200,   # ~800 tokens at 2.75 chars/token
         "user_char_limit": 1375,     # ~500 tokens at 2.75 chars/token
         # External memory provider plugin (empty = built-in only).
-        # Set to a provider name to activate: "openviking", "mem0",
-        # "hindsight", "holographic", "retaindb", "byterover".
-        # Only ONE external provider is allowed at a time.
+        # Add user-installed plugins under ~/.talaria/plugins/memory/<name>/
+        # to activate them via this field.
         "provider": "",
     },
 
