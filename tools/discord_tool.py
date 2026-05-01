@@ -79,7 +79,7 @@ def _discord_request(
         headers={
             "Authorization": f"Bot {token}",
             "Content-Type": "application/json",
-            "User-Agent": "Talaria-Agent (https://github.com/NousResearch/talaria-agent)",
+            "User-Agent": "Talaria-Agent (https://github.com/Jeonhui/Talaria-Agent)",
         },
     )
 

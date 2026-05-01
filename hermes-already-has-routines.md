@@ -153,7 +153,7 @@ Full automation templates gallery: [talaria-agent.nousresearch.com/docs/guides/a
 
 Documentation: [talaria-agent.nousresearch.com](https://talaria-agent.nousresearch.com)
 
-GitHub: [github.com/NousResearch/talaria-agent](https://github.com/NousResearch/talaria-agent)
+GitHub: [github.com/Jeonhui/Talaria-Agent](https://github.com/Jeonhui/Talaria-Agent)
 
 ---
 
