@@ -118,6 +118,11 @@ def get_pricing_for_provider(
     return {}
 
 
+def _format_price_per_mtok(_per_token_str: str) -> str:
+    """Talaria does not display live pricing in the model picker."""
+    return ""
+
+
 class ProviderEntry(NamedTuple):
     slug: str
     label: str
