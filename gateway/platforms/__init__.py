@@ -6,16 +6,16 @@ Each adapter handles:
 - Sending messages/responses back
 - Platform-specific authentication
 - Message formatting and media handling
+
+Talaria ships Discord, Slack, and Telegram adapters; they are loaded by
+gateway/run.py based on the credentials present in ~/.talaria/.env, not
+imported eagerly here.
 """
 
 from .base import BasePlatformAdapter, MessageEvent, SendResult
-from .qqbot import QQAdapter
-from .yuanbao import YuanbaoAdapter
 
 __all__ = [
     "BasePlatformAdapter",
     "MessageEvent",
     "SendResult",
-    "QQAdapter",
-    "YuanbaoAdapter",
 ]
