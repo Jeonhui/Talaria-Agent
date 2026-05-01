@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-SWE Runner with Hermes Trajectory Format
+SWE Runner with Talaria Trajectory Format
 
-A runner that uses Hermes-Agent's built-in execution environments
-(local, docker, modal) and outputs trajectories in the Hermes-Agent format
+A runner that uses Talaria-Agent's built-in execution environments
+(local, docker, modal) and outputs trajectories in the Talaria-Agent format
 compatible with batch_runner.py and trajectory_compressor.py.
 
 Features:
-- Uses Hermes-Agent's Docker, Modal, or Local environments for command execution
-- Outputs trajectories in Hermes format (from/value pairs with <tool_call>/<tool_response> XML)
+- Uses Talaria-Agent's Docker, Modal, or Local environments for command execution
+- Outputs trajectories in Talaria format (from/value pairs with <tool_call>/<tool_response> XML)
 - Compatible with the trajectory compression pipeline
 - Supports batch processing from JSONL prompt files
 
@@ -65,7 +65,7 @@ def _effective_temperature_for_model(
 
 
 # ============================================================================
-# Terminal Tool Definition (matches Hermes-Agent format)
+# Terminal Tool Definition (matches Talaria-Agent format)
 # ============================================================================
 
 TERMINAL_TOOL_DEFINITION = {
@@ -125,7 +125,7 @@ def create_environment(
     **kwargs
 ):
     """
-    Create an execution environment using Hermes-Agent's built-in backends.
+    Create an execution environment using Talaria-Agent's built-in backends.
     
     Args:
         env_type: One of "local", "docker", "modal"
@@ -145,22 +145,18 @@ def create_environment(
         from tools.environments.docker import DockerEnvironment
         return DockerEnvironment(image=image, cwd=cwd, timeout=timeout, **kwargs)
     
-    elif env_type == "modal":
-        from tools.environments.modal import ModalEnvironment
-        return ModalEnvironment(image=image, cwd=cwd, timeout=timeout, **kwargs)
-    
     else:
-        raise ValueError(f"Unknown environment type: {env_type}. Use 'local', 'docker', or 'modal'")
+        raise ValueError(f"Unknown environment type: {env_type}. Use 'local' or 'docker'.")
 
 
 # ============================================================================
-# Mini-SWE Runner with Hermes Trajectory Format
+# Mini-SWE Runner with Talaria Trajectory Format
 # ============================================================================
 
 class MiniSWERunner:
     """
-    Agent runner that uses Hermes-Agent's built-in execution environments
-    and outputs trajectories in Hermes-Agent format.
+    Agent runner that uses Talaria-Agent's built-in execution environments
+    and outputs trajectories in Talaria-Agent format.
     """
     
     def __init__(
@@ -304,14 +300,14 @@ class MiniSWERunner:
             })
         return json.dumps(formatted_tools, ensure_ascii=False)
     
-    def _convert_to_hermes_format(
+    def _convert_to_talaria_format(
         self,
         messages: List[Dict[str, Any]],
         user_query: str,
         completed: bool
     ) -> List[Dict[str, Any]]:
         """
-        Convert internal message format to Hermes trajectory format.
+        Convert internal message format to Talaria trajectory format.
         
         This produces the exact format used by batch_runner.py.
         """
@@ -567,8 +563,8 @@ Complete the user's task step by step."""
             # Cleanup environment
             self._cleanup_env()
         
-        # Convert to Hermes trajectory format
-        trajectory = self._convert_to_hermes_format(messages, task, completed)
+        # Convert to Talaria trajectory format
+        trajectory = self._convert_to_talaria_format(messages, task, completed)
         
         return {
             "conversations": trajectory,
@@ -653,7 +649,7 @@ def main(
     verbose: bool = False,
 ):
     """
-    Run SWE tasks with Hermes trajectory format output.
+    Run SWE tasks with Talaria trajectory format output.
     
     Args:
         task: Single task to run (use this OR prompts_file)
@@ -679,7 +675,7 @@ def main(
         # Batch from file
         python mini_swe_runner.py --prompts_file tasks.jsonl --output_file results.jsonl
     """
-    print("🚀 Mini-SWE Runner with Hermes Trajectory Format")
+    print("🚀 Mini-SWE Runner with Talaria Trajectory Format")
     print("=" * 60)
     
     # Initialize runner

@@ -56,12 +56,12 @@ _SENSITIVE_BODY_KEYS = frozenset({
 })
 
 # Snapshot at import time so runtime env mutations (e.g. LLM-generated
-# `export HERMES_REDACT_SECRETS=true`) cannot enable/disable redaction
+# `export TALARIA_REDACT_SECRETS=true`) cannot enable/disable redaction
 # mid-session.  OFF by default — user must opt in via
 # `security.redact_secrets: true` in config.yaml (bridged to this env var
-# in hermes_cli/main.py and gateway/run.py) or `HERMES_REDACT_SECRETS=true`
-# in ~/.hermes/.env.
-_REDACT_ENABLED = os.getenv("HERMES_REDACT_SECRETS", "").lower() in ("1", "true", "yes", "on")
+# in talaria_cli/main.py and gateway/run.py) or `TALARIA_REDACT_SECRETS=true`
+# in ~/.talaria/.env.
+_REDACT_ENABLED = os.getenv("TALARIA_REDACT_SECRETS", "").lower() in ("1", "true", "yes", "on")
 
 # Known API key prefixes -- match the prefix + contiguous token chars
 _PREFIX_PATTERNS = [
@@ -195,8 +195,8 @@ def mask_secret(
 ) -> str:
     """Mask a secret for display, preserving ``head`` and ``tail`` characters.
 
-    Canonical helper for display-time redaction across Hermes — used by
-    ``hermes config``, ``hermes status``, ``hermes dump``, and anywhere
+    Canonical helper for display-time redaction across Talaria — used by
+    ``talaria config``, ``talaria status``, ``talaria dump``, and anywhere
     a secret needs to be shown truncated for debuggability while still
     keeping the bulk hidden.
 

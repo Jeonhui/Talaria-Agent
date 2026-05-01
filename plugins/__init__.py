@@ -1,1 +1,1 @@
-# Hermes plugins package
+# Talaria plugins package

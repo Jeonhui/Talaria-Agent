@@ -1,0 +1,2174 @@
+"""
+Canonical model catalogs and lightweight validation helpers.
+
+Add, remove, or reorder entries here — both `talaria setup` and
+`talaria` provider-selection will pick up the change automatically.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import urllib.request
+import urllib.error
+import time
+from difflib import get_close_matches
+from pathlib import Path
+from typing import Any, NamedTuple, Optional
+
+from talaria_cli import __version__ as _TALARIA_VERSION
+
+# Identify ourselves so endpoints fronted by Cloudflare's Browser Integrity
+# Check (error 1010) don't reject the default ``Python-urllib/*`` signature.
+_TALARIA_USER_AGENT = f"talaria-cli/{_TALARIA_VERSION}"
+
+COPILOT_BASE_URL = "https://api.githubcopilot.com"
+COPILOT_MODELS_URL = f"{COPILOT_BASE_URL}/models"
+COPILOT_EDITOR_VERSION = "vscode/1.104.1"
+COPILOT_REASONING_EFFORTS_GPT5 = ["minimal", "low", "medium", "high"]
+COPILOT_REASONING_EFFORTS_O_SERIES = ["low", "medium", "high"]
+
+
+# Fallback OpenRouter snapshot used when the live catalog is unavailable.
+# (model_id, display description shown in menus)
+OPENROUTER_MODELS: list[tuple[str, str]] = [
+    ("moonshotai/kimi-k2.6",            "recommended"),
+    ("anthropic/claude-opus-4.7",       ""),
+    ("anthropic/claude-opus-4.6",       ""),
+    ("anthropic/claude-sonnet-4.6",     ""),
+    ("qwen/qwen3.6-plus",               ""),
+    ("anthropic/claude-sonnet-4.5",     ""),
+    ("anthropic/claude-haiku-4.5",      ""),
+    ("openrouter/elephant-alpha",       "free"),
+    ("openai/gpt-5.5",                  ""),
+    ("openai/gpt-5.4-mini",             ""),
+    ("xiaomi/mimo-v2.5-pro",             ""),
+    ("xiaomi/mimo-v2.5",                 ""),
+    ("tencent/hy3-preview:free",         "free"),
+    ("openai/gpt-5.3-codex",            ""),
+    ("google/gemini-3-pro-image-preview", ""),
+    ("google/gemini-3-flash-preview",   ""),
+    ("google/gemini-3.1-pro-preview",     ""),
+    ("google/gemini-3.1-flash-lite-preview",   ""),
+    ("qwen/qwen3.5-plus-02-15",         ""),
+    ("qwen/qwen3.5-35b-a3b",            ""),
+    ("stepfun/step-3.5-flash",          ""),
+    ("minimax/minimax-m2.7",            ""),
+    ("minimax/minimax-m2.5",            ""),
+    ("minimax/minimax-m2.5:free",       "free"),
+    ("z-ai/glm-5.1",                    ""),
+    ("z-ai/glm-5v-turbo",               ""),
+    ("z-ai/glm-5-turbo",                ""),
+    ("x-ai/grok-4.20",                  ""),
+    ("nvidia/nemotron-3-super-120b-a12b",      ""),
+    ("nvidia/nemotron-3-super-120b-a12b:free", "free"),
+    ("arcee-ai/trinity-large-preview:free", "free"),
+    ("arcee-ai/trinity-large-thinking",  ""),
+    ("openai/gpt-5.5-pro",              ""),
+    ("openai/gpt-5.4-nano",             ""),
+]
+
+_openrouter_catalog_cache: list[tuple[str, str]] | None = None
+
+
+# Fallback Vercel AI Gateway snapshot used when the live catalog is unavailable.
+
+def _codex_curated_models() -> list[str]:
+    """Derive the openai-codex curated list from codex_models.py.
+
+    Single source of truth: DEFAULT_CODEX_MODELS + forward-compat synthesis.
+    This keeps the gateway /model picker in sync with the CLI `talaria model`
+    flow without maintaining a separate static list.
+    """
+    from talaria_cli.codex_models import DEFAULT_CODEX_MODELS, _add_forward_compat_models
+    return _add_forward_compat_models(list(DEFAULT_CODEX_MODELS))
+
+
+
+
+_PROVIDER_MODELS: dict[str, list[str]] = {
+    # Talaria supports: anthropic / openai / openai-codex / xiaomi-mimo / local / custom.
+    "anthropic": [
+        "claude-opus-4-7",
+        "claude-opus-4-6",
+        "claude-sonnet-4-6",
+        "claude-opus-4-5-20251101",
+        "claude-sonnet-4-5-20250929",
+        "claude-opus-4-20250514",
+        "claude-sonnet-4-20250514",
+        "claude-haiku-4-5-20251001",
+    ],
+    "openai": [
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5-mini",
+        "gpt-5.3-codex",
+        "gpt-5.2-codex",
+        "gpt-4.1",
+        "gpt-4o",
+        "gpt-4o-mini",
+    ],
+    "openai-codex": _codex_curated_models(),
+    "xiaomi": [
+        "mimo-v2.5-pro",
+        "mimo-v2.5",
+        "mimo-v2-pro",
+        "mimo-v2-omni",
+        "mimo-v2-flash",
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# Nous Portal free-model helper
+# ---------------------------------------------------------------------------
+# The Nous Portal models endpoint is the source of truth for which models
+# are currently offered (free or paid). We trust whatever it returns and
+# surface it to users as-is — no local allowlist filtering.
+
+
+
+def check_nous_free_tier() -> bool:
+    """Talaria does not check Nous tier — always returns False."""
+    return False
+
+
+def partition_nous_models_by_tier(
+    model_ids: list[str], _free_tier: bool = False
+) -> tuple[list[str], list[str]]:
+    """Talaria does not partition by Nous tier — returns (ids, [])."""
+    return list(model_ids), []
+
+
+def ai_gateway_model_ids(*, force_refresh: bool = False) -> list[str]:
+    """Talaria does not use the Vercel AI Gateway."""
+    return []
+
+
+def get_curated_nous_model_ids() -> list[str]:
+    """Talaria does not curate a Nous catalog."""
+    return []
+
+
+def get_pricing_for_provider(
+    _provider: str, *, force_refresh: bool = False
+) -> dict[str, dict[str, str]]:
+    """Talaria does not fetch live pricing tables."""
+    return {}
+
+
+class ProviderEntry(NamedTuple):
+    slug: str
+    label: str
+    tui_desc: str   # detailed description for `talaria model` TUI
+
+CANONICAL_PROVIDERS: list[ProviderEntry] = [
+    ProviderEntry("anthropic", "Anthropic", "Anthropic (Claude models)"),
+    ProviderEntry("openai", "OpenAI", "OpenAI (GPT models)"),
+    ProviderEntry("openai-codex", "OpenAI Codex", "OpenAI Codex"),
+    ProviderEntry("xiaomi", "Xiaomi MiMo", "Xiaomi MiMo (MiMo models)"),
+    ProviderEntry("lmstudio", "LM Studio", "LM Studio (local desktop model server)"),
+]
+
+# Derived dicts — used throughout the codebase
+_PROVIDER_LABELS = {p.slug: p.label for p in CANONICAL_PROVIDERS}
+_PROVIDER_LABELS["custom"] = "Custom endpoint"  # special case: not a named provider
+
+
+_PROVIDER_ALIASES = {
+    "claude": "anthropic",
+    "claude-code": "anthropic",
+    "openai": "openai",
+    "gpt": "openai",
+    "chatgpt": "openai",
+    "codex": "openai-codex",
+    "mimo": "xiaomi",
+    "xiaomi-mimo": "xiaomi",
+    "lmstudio": "lmstudio",
+    "lm-studio": "lmstudio",
+    "lm_studio": "lmstudio",
+    "local": "lmstudio",
+    "ollama": "custom",
+}
+
+
+
+def get_default_model_for_provider(provider: str) -> str:
+    """Return the default model for a provider, or empty string if unknown.
+
+    Uses the first entry in _PROVIDER_MODELS as the default.  This is the
+    model a user would be offered first in the ``talaria model`` picker.
+
+    Used as a fallback when the user has configured a provider but never
+    selected a model (e.g. ``talaria auth add openai-codex`` without
+    ``talaria model``).
+    """
+    models = _PROVIDER_MODELS.get(provider, [])
+    return models[0] if models else ""
+
+
+def list_available_providers() -> list[dict[str, str]]:
+    """Return info about all providers the user could use with ``provider:model``.
+
+    Each dict has ``id``, ``label``, and ``aliases``.
+    Checks which providers have valid credentials configured.
+
+    Derives the provider list from :data:`CANONICAL_PROVIDERS` (single
+    source of truth shared with ``talaria model``, ``/model``, etc.).
+    """
+    # Derive display order from canonical list + custom
+    provider_order = [p.slug for p in CANONICAL_PROVIDERS] + ["custom"]
+
+    # Build reverse alias map
+    aliases_for: dict[str, list[str]] = {}
+    for alias, canonical in _PROVIDER_ALIASES.items():
+        aliases_for.setdefault(canonical, []).append(alias)
+
+    result = []
+    for pid in provider_order:
+        label = _PROVIDER_LABELS.get(pid, pid)
+        alias_list = aliases_for.get(pid, [])
+        # Check if this provider has credentials available
+        has_creds = False
+        try:
+            from talaria_cli.auth import get_auth_status, has_usable_secret
+            if pid == "custom":
+                custom_base_url = _get_custom_base_url() or ""
+                has_creds = bool(custom_base_url.strip())
+            elif pid == "openrouter":
+                has_creds = has_usable_secret(os.getenv("OPENROUTER_API_KEY", ""))
+            else:
+                status = get_auth_status(pid)
+                has_creds = bool(status.get("logged_in") or status.get("configured"))
+        except Exception:
+            pass
+        result.append({
+            "id": pid,
+            "label": label,
+            "aliases": alias_list,
+            "authenticated": has_creds,
+        })
+    return result
+
+
+def parse_model_input(raw: str, current_provider: str) -> tuple[str, str]:
+    """Parse ``/model`` input into ``(provider, model)``.
+
+    Supports ``provider:model`` syntax to switch providers at runtime::
+
+        openrouter:anthropic/claude-sonnet-4.5  →  ("openrouter", "anthropic/claude-sonnet-4.5")
+        nous:talaria-3                           →  ("nous", "talaria-3")
+        anthropic/claude-sonnet-4.5             →  (current_provider, "anthropic/claude-sonnet-4.5")
+        gpt-5.4                                 →  (current_provider, "gpt-5.4")
+
+    The colon is only treated as a provider delimiter if the left side is a
+    recognized provider name or alias.  This avoids misinterpreting model names
+    that happen to contain colons (e.g. ``anthropic/claude-3.5-sonnet:beta``).
+
+    Returns ``(provider, model)`` where *provider* is either the explicit
+    provider from the input or *current_provider* if none was specified.
+    """
+    stripped = raw.strip()
+    colon = stripped.find(":")
+    if colon > 0:
+        provider_part = stripped[:colon].strip().lower()
+        model_part = stripped[colon + 1:].strip()
+        if provider_part and model_part and provider_part in _KNOWN_PROVIDER_NAMES:
+            # Support custom:name:model triple syntax for named custom
+            # providers.  ``custom:local:qwen`` → ("custom:local", "qwen").
+            # Single colon ``custom:qwen`` → ("custom", "qwen") as before.
+            if provider_part == "custom" and ":" in model_part:
+                second_colon = model_part.find(":")
+                custom_name = model_part[:second_colon].strip()
+                actual_model = model_part[second_colon + 1:].strip()
+                if custom_name and actual_model:
+                    return (f"custom:{custom_name}", actual_model)
+            return (normalize_provider(provider_part), model_part)
+    return (current_provider, stripped)
+
+
+def _get_custom_base_url() -> str:
+    """Get the custom endpoint base_url from config.yaml."""
+    try:
+        from talaria_cli.config import load_config
+        config = load_config()
+        model_cfg = config.get("model", {})
+        if isinstance(model_cfg, dict):
+            return str(model_cfg.get("base_url", "")).strip()
+    except Exception:
+        pass
+    return ""
+
+
+def curated_models_for_provider(
+    provider: Optional[str],
+    *,
+    force_refresh: bool = False,
+) -> list[tuple[str, str]]:
+    """Return ``(model_id, description)`` tuples for a provider's model list.
+
+    Tries to fetch the live model list from the provider's API first,
+    falling back to the static ``_PROVIDER_MODELS`` catalog if the API
+    is unreachable.
+    """
+    normalized = normalize_provider(provider)
+    if normalized == "openrouter":
+        return fetch_openrouter_models(force_refresh=force_refresh)
+
+    # Try live API first (Codex, Nous, etc. all support /models)
+    live = provider_model_ids(normalized)
+    if live:
+        return [(m, "") for m in live]
+
+    # Fallback to static catalog
+    models = _PROVIDER_MODELS.get(normalized, [])
+    return [(m, "") for m in models]
+
+
+def _provider_keys(provider: str) -> set[str]:
+    key = (provider or "").strip().lower()
+    normalized = normalize_provider(provider)
+    return {k for k in (key, normalized) if k}
+
+
+def _model_in_provider_catalog(name_lower: str, providers: set[str]) -> bool:
+    return any(
+        name_lower == model.lower()
+        for provider in providers
+        for model in _PROVIDER_MODELS.get(provider, [])
+    )
+
+
+_AGGREGATOR_PROVIDERS = frozenset(
+    {"nous", "openrouter", "ai-gateway", "copilot", "kilocode"}
+)
+
+
+def _resolve_static_model_alias(
+    name_lower: str,
+    current_keys: set[str],
+) -> Optional[tuple[str, str]]:
+    """Resolve short aliases (e.g. sonnet/opus) using static catalogs only."""
+    try:
+        from talaria_cli.model_switch import MODEL_ALIASES
+    except Exception:
+        return None
+
+    identity = MODEL_ALIASES.get(name_lower)
+    if identity is None:
+        return None
+
+    vendor = identity.vendor
+    family = identity.family
+
+    def _match(provider: str) -> Optional[str]:
+        models = _PROVIDER_MODELS.get(provider, [])
+        if not models:
+            return None
+        prefix = (
+            f"{vendor}/{family}"
+            if provider in _AGGREGATOR_PROVIDERS
+            else family
+        ).lower()
+        for model in models:
+            if model.lower().startswith(prefix):
+                return model
+        return None
+
+    for provider in current_keys:
+        if matched := _match(provider):
+            return provider, matched
+
+    for provider in _PROVIDER_MODELS:
+        if provider in current_keys or provider in _AGGREGATOR_PROVIDERS:
+            continue
+        if matched := _match(provider):
+            return provider, matched
+
+    for provider in _AGGREGATOR_PROVIDERS:
+        if provider in current_keys and (matched := _match(provider)):
+            return provider, matched
+
+    return None
+
+
+def detect_static_provider_for_model(
+    model_name: str,
+    current_provider: str,
+) -> Optional[tuple[str, str]]:
+    """Auto-detect a provider from static catalogs only.
+
+    Returns ``(provider_id, model_name)``. The model name may be remapped
+    when a static alias or bare provider name resolves to a catalog default.
+    Returns ``None`` when no confident match is found.
+    """
+    name = (model_name or "").strip()
+    if not name:
+        return None
+
+    name_lower = name.lower()
+    current_keys = _provider_keys(current_provider)
+
+    alias_match = _resolve_static_model_alias(name_lower, current_keys)
+    if alias_match:
+        return alias_match
+
+    # --- Step 0: bare provider name typed as model ---
+    # If someone types `/model nous` or `/model anthropic`, treat it as a
+    # provider switch and pick the first model from that provider's catalog.
+    # Skip "custom" and "openrouter" — custom has no model catalog, and
+    # openrouter requires an explicit model name to be useful.
+    resolved_provider = _PROVIDER_ALIASES.get(name_lower, name_lower)
+    if resolved_provider not in {"custom", "openrouter"}:
+        default_models = _PROVIDER_MODELS.get(resolved_provider, [])
+        if (
+            resolved_provider in _PROVIDER_LABELS
+            and default_models
+            and resolved_provider not in current_keys
+        ):
+            return (resolved_provider, default_models[0])
+
+    # Aggregators list other providers' models — never auto-switch TO them
+    # If the model belongs to the current provider's catalog, don't suggest switching
+    if _model_in_provider_catalog(name_lower, current_keys):
+        return None
+
+    # --- Step 1: check static provider catalogs for a direct match ---
+    for pid, models in _PROVIDER_MODELS.items():
+        if pid in current_keys or pid in _AGGREGATOR_PROVIDERS:
+            continue
+        if any(name_lower == m.lower() for m in models):
+            return (pid, name)
+
+    return None
+
+
+def detect_provider_for_model(
+    model_name: str,
+    current_provider: str,
+) -> Optional[tuple[str, str]]:
+    """Auto-detect the best provider for a model name.
+
+    Returns ``(provider_id, model_name)`` — the model name may be remapped
+    (e.g. bare ``deepseek-chat`` → ``deepseek/deepseek-chat`` for OpenRouter).
+    Returns ``None`` when no confident match is found.
+
+    Priority:
+    0. Bare provider name → switch to that provider's default model
+    1. Direct provider static catalog match
+    2. OpenRouter catalog match
+    """
+    name = (model_name or "").strip()
+    if not name:
+        return None
+
+    static_match = detect_static_provider_for_model(name, current_provider)
+    if static_match:
+        return static_match
+    if _model_in_provider_catalog(name.lower(), _provider_keys(current_provider)):
+        return None
+
+    # --- Step 2: check OpenRouter catalog ---
+    # First try exact match (handles provider/model format)
+    or_slug = _find_openrouter_slug(name)
+    if or_slug:
+        if current_provider != "openrouter":
+            return ("openrouter", or_slug)
+        # Already on openrouter, just return the resolved slug
+        if or_slug != name:
+            return ("openrouter", or_slug)
+        return None  # already on openrouter with matching name
+
+    return None
+
+
+def _find_openrouter_slug(model_name: str) -> Optional[str]:
+    """Find the full OpenRouter model slug for a bare or partial model name.
+
+    Handles:
+    - Exact match: ``anthropic/claude-opus-4.6`` → as-is
+    - Bare name: ``deepseek-chat`` → ``deepseek/deepseek-chat``
+    - Bare name: ``claude-opus-4.6`` → ``anthropic/claude-opus-4.6``
+    """
+    name_lower = model_name.strip().lower()
+    if not name_lower:
+        return None
+
+    # Exact match (already has provider/ prefix)
+    for mid in model_ids():
+        if name_lower == mid.lower():
+            return mid
+
+    # Try matching just the model part (after the /)
+    for mid in model_ids():
+        if "/" in mid:
+            _, model_part = mid.split("/", 1)
+            if name_lower == model_part.lower():
+                return mid
+
+    return None
+
+
+def normalize_provider(provider: Optional[str]) -> str:
+    """Normalize provider aliases to Talaria' canonical provider ids.
+
+    Note: ``"auto"`` passes through unchanged — use
+    ``talaria_cli.auth.resolve_provider()`` to resolve it to a concrete
+    provider based on credentials and environment.
+    """
+    normalized = (provider or "openrouter").strip().lower()
+    return _PROVIDER_ALIASES.get(normalized, normalized)
+
+
+def provider_label(provider: Optional[str]) -> str:
+    """Return a human-friendly label for a provider id or alias."""
+    original = (provider or "openrouter").strip()
+    normalized = original.lower()
+    if normalized == "auto":
+        return "Auto"
+    normalized = normalize_provider(normalized)
+    return _PROVIDER_LABELS.get(normalized, original or "OpenRouter")
+
+
+# Models that support OpenAI Priority Processing (service_tier="priority").
+# See https://openai.com/api-priority-processing/ for the canonical list.
+#
+# Pattern-based matching — any OpenAI flagship model (gpt-*, o1*, o3*, o4*)
+# is assumed to support Priority Processing. service_tier=priority is silently
+# ignored by non-OpenAI endpoints (OpenRouter/Copilot/opencode-zen proxies
+# strip the field), so false positives are harmless. Codex-series models
+# (gpt-5-codex, gpt-5.3-codex, etc.) are excluded — they don't expose the
+# service_tier parameter through the Codex Responses API.
+_OPENAI_FAST_MODE_PREFIXES: tuple[str, ...] = (
+    "gpt-",
+    "o1",
+    "o3",
+    "o4",
+)
+
+
+def _is_openai_fast_model(model_id: Optional[str]) -> bool:
+    """Return True if the model is an OpenAI flagship eligible for Priority Processing."""
+    raw = _strip_vendor_prefix(str(model_id or ""))
+    base = raw.split(":")[0]
+    if not base:
+        return False
+    # Exclude Codex-series — they route through the Codex Responses API
+    # which doesn't accept service_tier.
+    if "codex" in base:
+        return False
+    return any(base.startswith(prefix) for prefix in _OPENAI_FAST_MODE_PREFIXES)
+
+
+# Models that support Anthropic Fast Mode (speed="fast").
+# See https://platform.claude.com/docs/en/build-with-claude/fast-mode
+#
+# Pattern-based matching — any claude-* model is eligible. The anthropic
+# adapter gates speed=fast on native Anthropic endpoints only (see
+# _is_third_party_anthropic_endpoint in agent/anthropic_adapter.py), so
+# third-party proxies that would reject the beta header are protected.
+
+
+def _strip_vendor_prefix(model_id: str) -> str:
+    """Strip vendor/ prefix from a model ID (e.g. 'anthropic/claude-opus-4-6' -> 'claude-opus-4-6')."""
+    raw = str(model_id or "").strip().lower()
+    if "/" in raw:
+        raw = raw.split("/", 1)[1]
+    return raw
+
+
+def model_supports_fast_mode(model_id: Optional[str]) -> bool:
+    """Return whether Talaria should expose the /fast toggle for this model."""
+    return _is_anthropic_fast_model(model_id) or _is_openai_fast_model(model_id)
+
+
+def _is_anthropic_fast_model(model_id: Optional[str]) -> bool:
+    """Return True if the model is a Claude model eligible for Anthropic Fast Mode."""
+    raw = _strip_vendor_prefix(str(model_id or ""))
+    base = raw.split(":")[0]
+    return base.startswith("claude-")
+
+
+def resolve_fast_mode_overrides(model_id: Optional[str]) -> dict[str, Any] | None:
+    """Return request_overrides for fast/priority mode, or None if unsupported.
+
+    Returns provider-appropriate overrides:
+    - OpenAI models: ``{"service_tier": "priority"}`` (Priority Processing)
+    - Anthropic models: ``{"speed": "fast"}`` (Anthropic Fast Mode beta)
+
+    The overrides are injected into the API request kwargs by
+    ``_build_api_kwargs`` in run_agent.py — each API path handles its own
+    keys (service_tier for OpenAI/Codex, speed for Anthropic Messages).
+    """
+    if not model_supports_fast_mode(model_id):
+        return None
+    if _is_anthropic_fast_model(model_id):
+        return {"speed": "fast"}
+    return {"service_tier": "priority"}
+
+
+def _resolve_copilot_catalog_api_key() -> str:
+    """Best-effort GitHub token for fetching the Copilot model catalog.
+
+    Resolution order:
+      1. ``resolve_api_key_provider_credentials("copilot")`` — env vars
+         (``COPILOT_GITHUB_TOKEN`` / ``GH_TOKEN`` / ``GITHUB_TOKEN``) plus
+         the ``gh auth token`` CLI fallback.
+      2. ``read_credential_pool("copilot")`` — a token (typically a
+         ``gho_*`` from device-code login, or a fine-grained PAT) stored in
+         ``auth.json`` under ``credential_pool.copilot[]``. The pool is
+         populated by ``talaria auth add copilot`` and by ``_seed_from_env``
+         when the env var is set in ``~/.talaria/.env``.
+
+    Without (2), users whose only Copilot credential is in the pool see
+    the ``/model`` picker fall back to a stale hardcoded list because the
+    live catalog fetch silently 401s. To avoid wedging on a malformed pool
+    entry, each candidate is exchanged via ``exchange_copilot_token`` —
+    only entries that actually exchange successfully are returned, so a
+    later valid entry is reachable when an earlier one is unsupported.
+    """
+    try:
+        from talaria_cli.auth import resolve_api_key_provider_credentials
+
+        creds = resolve_api_key_provider_credentials("copilot")
+        api_key = str(creds.get("api_key") or "").strip()
+        if api_key:
+            return api_key
+    except Exception:
+        pass
+
+    try:
+        from talaria_cli.auth import read_credential_pool
+        from talaria_cli.copilot_auth import (
+            exchange_copilot_token,
+            validate_copilot_token,
+        )
+
+        for entry in read_credential_pool("copilot"):
+            if not isinstance(entry, dict):
+                continue
+            raw = str(entry.get("access_token") or "").strip()
+            if not raw:
+                continue
+            valid, _ = validate_copilot_token(raw)
+            if not valid:
+                continue
+            try:
+                api_token, _expires_at = exchange_copilot_token(raw)
+            except Exception:
+                continue
+            if api_token:
+                return api_token
+    except Exception:
+        pass
+
+    return ""
+
+
+# Providers where models.dev is treated as authoritative: curated static
+# lists are kept only as an offline fallback and to capture custom additions
+# the registry doesn't publish yet. Adding a provider here causes its
+# curated list to be merged with fresh models.dev entries (fresh first, any
+# curated-only names appended) for both the CLI and the gateway /model picker.
+#
+# DELIBERATELY EXCLUDED:
+#   - "openrouter": curated list is already a hand-picked agentic subset of
+#     OpenRouter's 400+ catalog. Blindly merging would dump everything.
+#   - "nous": curated list and Portal /models endpoint are the source of
+#     truth for the subscription tier.
+# Also excluded: providers that already have dedicated live-endpoint
+# branches below (copilot, anthropic, ai-gateway, ollama-cloud, custom,
+# stepfun, openai-codex) — those paths handle freshness themselves.
+_MODELS_DEV_PREFERRED: frozenset[str] = frozenset({
+    "opencode-go",
+    "opencode-zen",
+    "deepseek",
+    "kilocode",
+    "fireworks",
+    "mistral",
+    "togetherai",
+    "cohere",
+    "perplexity",
+    "groq",
+    "nvidia",
+    "huggingface",
+    "zai",
+    "gemini",
+    "google",
+})
+
+
+def _merge_with_models_dev(provider: str, curated: list[str]) -> list[str]:
+    """Merge curated list with fresh models.dev entries for a preferred provider.
+
+    Returns models.dev entries first (in models.dev order), then any
+    curated-only entries appended. Preserves case for curated fallbacks
+    (e.g. ``MiniMax-M2.7``) while trusting models.dev for newer variants.
+
+    If models.dev is unreachable or returns nothing, the curated list is
+    returned unchanged — this is the offline/CI fallback path.
+    """
+    try:
+        from agent.models_dev import list_agentic_models
+        mdev = list_agentic_models(provider)
+    except Exception:
+        mdev = []
+
+    if not mdev:
+        return list(curated)
+
+    # Case-insensitive dedup while preserving order and curated casing.
+    seen_lower: set[str] = set()
+    merged: list[str] = []
+    for mid in mdev:
+        key = str(mid).lower()
+        if key in seen_lower:
+            continue
+        seen_lower.add(key)
+        merged.append(mid)
+    for mid in curated:
+        key = str(mid).lower()
+        if key in seen_lower:
+            continue
+        seen_lower.add(key)
+        merged.append(mid)
+    return merged
+
+
+def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) -> list[str]:
+    """Return the best known model catalog for a provider.
+
+    Tries live API endpoints for providers that support them (Codex, Nous),
+    falling back to static lists. For providers in ``_MODELS_DEV_PREFERRED``
+    (opencode-go/zen, xiaomi, deepseek, smaller inference providers, etc.),
+    models.dev entries are merged on top of curated so new models released
+    on the platform appear in ``/model`` without a Talaria release.
+    """
+    normalized = normalize_provider(provider)
+    if normalized == "openrouter":
+        return model_ids(force_refresh=force_refresh)
+    if normalized == "openai-codex":
+        from talaria_cli.codex_models import get_codex_model_ids
+
+        # Pass the live OAuth access token so the picker matches whatever
+        # ChatGPT lists for this account right now (new models appear without
+        # a Talaria release). Falls back to the hardcoded catalog if no token
+        # or the endpoint is unreachable.
+        access_token = None
+        try:
+            from talaria_cli.auth import resolve_codex_runtime_credentials
+
+            creds = resolve_codex_runtime_credentials(refresh_if_expiring=True)
+            access_token = creds.get("api_key")
+        except Exception:
+            access_token = None
+        return get_codex_model_ids(access_token=access_token)
+    if normalized in {"copilot", "copilot-acp"}:
+        try:
+            live = _fetch_github_models(_resolve_copilot_catalog_api_key())
+            if live:
+                return live
+        except Exception:
+            pass
+        if normalized == "copilot-acp":
+            return list(_PROVIDER_MODELS.get("copilot", []))
+    if normalized == "nous":
+        # Try live Nous Portal /models endpoint
+        try:
+            from talaria_cli.auth import fetch_nous_models, resolve_nous_runtime_credentials
+            creds = resolve_nous_runtime_credentials()
+            if creds:
+                live = fetch_nous_models(api_key=creds.get("api_key", ""), inference_base_url=creds.get("base_url", ""))
+                if live:
+                    return live
+        except Exception:
+            pass
+    if normalized == "stepfun":
+        try:
+            from talaria_cli.auth import resolve_api_key_provider_credentials
+
+            creds = resolve_api_key_provider_credentials("stepfun")
+            api_key = str(creds.get("api_key") or "").strip()
+            base_url = str(creds.get("base_url") or "").strip()
+            if api_key and base_url:
+                live = fetch_api_models(api_key, base_url)
+                if live:
+                    return live
+        except Exception:
+            pass
+    if normalized == "anthropic":
+        live = _fetch_anthropic_models()
+        if live:
+            return live
+    if normalized == "openai":
+        api_key = os.getenv("OPENAI_API_KEY", "").strip()
+        if api_key:
+            base_raw = os.getenv("OPENAI_BASE_URL", "").strip().rstrip("/")
+            base = base_raw or "https://api.openai.com/v1"
+            try:
+                live = fetch_api_models(api_key, base)
+                if live:
+                    return live
+            except Exception:
+                pass
+    if normalized == "gmi":
+        try:
+            from talaria_cli.auth import resolve_api_key_provider_credentials
+
+            creds = resolve_api_key_provider_credentials("gmi")
+            api_key = str(creds.get("api_key") or "").strip()
+            base_url = str(creds.get("base_url") or "").strip()
+            if api_key and base_url:
+                live = fetch_api_models(api_key, base_url)
+                if live:
+                    return live
+        except Exception:
+            pass
+    if normalized == "custom":
+        base_url = _get_custom_base_url()
+        if base_url:
+            # Try common API key env vars for custom endpoints
+            api_key = (
+                os.getenv("CUSTOM_API_KEY", "")
+                or os.getenv("OPENAI_API_KEY", "")
+                or os.getenv("OPENROUTER_API_KEY", "")
+            )
+            live = fetch_api_models(api_key, base_url)
+            if live:
+                return live
+    # Bedrock uses live discovery keyed by the resolved AWS region so that
+    # EU/AP users see eu.*/ap.* model IDs instead of the static us.* list.
+    # Note: early return intentionally skips _MODELS_DEV_PREFERRED merge
+    # below — bedrock is not expected to appear in that table.
+    if normalized == "bedrock":
+        try:
+            from agent.bedrock_adapter import bedrock_model_ids_or_none
+            ids = bedrock_model_ids_or_none()
+            if ids is not None:
+                return ids
+        except Exception:
+            pass
+    curated_static = list(_PROVIDER_MODELS.get(normalized, []))
+    if normalized in _MODELS_DEV_PREFERRED:
+        return _merge_with_models_dev(normalized, curated_static)
+    return curated_static
+
+
+def _fetch_anthropic_models(timeout: float = 5.0) -> Optional[list[str]]:
+    """Fetch available models from the Anthropic /v1/models endpoint.
+
+    Uses resolve_anthropic_token() to find credentials (env vars or
+    Claude Code auto-discovery).  Returns sorted model IDs or None.
+    """
+    try:
+        from agent.anthropic_adapter import resolve_anthropic_token, _is_oauth_token
+    except ImportError:
+        return None
+
+    token = resolve_anthropic_token()
+    if not token:
+        return None
+
+    headers: dict[str, str] = {"anthropic-version": "2023-06-01"}
+    is_oauth = _is_oauth_token(token)
+    if is_oauth:
+        headers["Authorization"] = f"Bearer {token}"
+        from agent.anthropic_adapter import _COMMON_BETAS, _OAUTH_ONLY_BETAS, _CONTEXT_1M_BETA
+        headers["anthropic-beta"] = ",".join(_COMMON_BETAS + _OAUTH_ONLY_BETAS)
+    else:
+        headers["x-api-key"] = token
+
+    def _do_request(h: dict[str, str]):
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/models",
+            headers=h,
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode())
+
+    try:
+        try:
+            data = _do_request(headers)
+        except urllib.error.HTTPError as http_err:
+            # Reactive recovery for OAuth subscriptions that reject the 1M
+            # context beta with 400 "long context beta is not yet available
+            # for this subscription". Retry once without the beta; re-raise
+            # anything else so the outer except logs it.
+            if (
+                is_oauth
+                and http_err.code == 400
+            ):
+                try:
+                    body_text = http_err.read().decode(errors="ignore").lower()
+                except Exception:
+                    body_text = ""
+                if "long context beta" in body_text and "not yet available" in body_text:
+                    headers["anthropic-beta"] = ",".join(
+                        [b for b in _COMMON_BETAS if b != _CONTEXT_1M_BETA]
+                        + list(_OAUTH_ONLY_BETAS)
+                    )
+                    data = _do_request(headers)
+                else:
+                    raise
+            else:
+                raise
+        models = [m["id"] for m in data.get("data", []) if m.get("id")]
+        # Sort: latest/largest first (opus > sonnet > haiku, higher version first)
+        return sorted(models, key=lambda m: (
+            "opus" not in m,      # opus first
+            "sonnet" not in m,    # then sonnet
+            "haiku" not in m,     # then haiku
+            m,                    # alphabetical within tier
+        ))
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).debug("Failed to fetch Anthropic models: %s", e)
+        return None
+
+
+def _payload_items(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        return [item for item in payload if isinstance(item, dict)]
+    if isinstance(payload, dict):
+        data = payload.get("data", [])
+        if isinstance(data, list):
+            return [item for item in data if isinstance(item, dict)]
+    return []
+
+
+def copilot_default_headers() -> dict[str, str]:
+    """Standard headers for Copilot API requests.
+
+    Includes Openai-Intent and x-initiator headers that opencode and the
+    Copilot CLI send on every request.
+    """
+    try:
+        from talaria_cli.copilot_auth import copilot_request_headers
+        return copilot_request_headers(is_agent_turn=True)
+    except ImportError:
+        return {
+            "Editor-Version": COPILOT_EDITOR_VERSION,
+            "User-Agent": "TalariaAgent/1.0",
+            "Openai-Intent": "conversation-edits",
+            "x-initiator": "agent",
+        }
+
+
+def _copilot_catalog_item_is_text_model(item: dict[str, Any]) -> bool:
+    model_id = str(item.get("id") or "").strip()
+    if not model_id:
+        return False
+
+    if item.get("model_picker_enabled") is False:
+        return False
+
+    capabilities = item.get("capabilities")
+    if isinstance(capabilities, dict):
+        model_type = str(capabilities.get("type") or "").strip().lower()
+        if model_type and model_type != "chat":
+            return False
+
+    supported_endpoints = item.get("supported_endpoints")
+    if isinstance(supported_endpoints, list):
+        normalized_endpoints = {
+            str(endpoint).strip()
+            for endpoint in supported_endpoints
+            if str(endpoint).strip()
+        }
+        if normalized_endpoints and not normalized_endpoints.intersection(
+            {"/chat/completions", "/responses", "/v1/messages"}
+        ):
+            return False
+
+    return True
+
+
+def fetch_github_model_catalog(
+    api_key: Optional[str] = None, timeout: float = 5.0
+) -> Optional[list[dict[str, Any]]]:
+    """Fetch the live GitHub Copilot model catalog for this account."""
+    attempts: list[dict[str, str]] = []
+    if api_key:
+        attempts.append({
+            **copilot_default_headers(),
+            "Authorization": f"Bearer {api_key}",
+        })
+    attempts.append(copilot_default_headers())
+
+    for headers in attempts:
+        req = urllib.request.Request(COPILOT_MODELS_URL, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+                items = _payload_items(data)
+                models: list[dict[str, Any]] = []
+                seen_ids: set[str] = set()
+                for item in items:
+                    if not _copilot_catalog_item_is_text_model(item):
+                        continue
+                    model_id = str(item.get("id") or "").strip()
+                    if not model_id or model_id in seen_ids:
+                        continue
+                    seen_ids.add(model_id)
+                    models.append(item)
+                if models:
+                    return models
+        except Exception:
+            continue
+    return None
+
+
+# ─── Copilot catalog context-window helpers ─────────────────────────────────
+
+# Module-level cache: {model_id: max_prompt_tokens}
+_copilot_context_cache: dict[str, int] = {}
+_copilot_context_cache_time: float = 0.0
+_COPILOT_CONTEXT_CACHE_TTL = 3600  # 1 hour
+
+
+def get_copilot_model_context(model_id: str, api_key: Optional[str] = None) -> Optional[int]:
+    """Look up max_prompt_tokens for a Copilot model from the live /models API.
+
+    Results are cached in-process for 1 hour to avoid repeated API calls.
+    Returns the token limit or None if not found.
+    """
+    global _copilot_context_cache, _copilot_context_cache_time
+
+    # Serve from cache if fresh
+    if _copilot_context_cache and (time.time() - _copilot_context_cache_time < _COPILOT_CONTEXT_CACHE_TTL):
+        if model_id in _copilot_context_cache:
+            return _copilot_context_cache[model_id]
+        # Cache is fresh but model not in it — don't re-fetch
+        return None
+
+    # Fetch and populate cache
+    catalog = fetch_github_model_catalog(api_key=api_key)
+    if not catalog:
+        return None
+
+    cache: dict[str, int] = {}
+    for item in catalog:
+        mid = str(item.get("id") or "").strip()
+        if not mid:
+            continue
+        caps = item.get("capabilities") or {}
+        limits = caps.get("limits") or {}
+        max_prompt = limits.get("max_prompt_tokens")
+        if isinstance(max_prompt, int) and max_prompt > 0:
+            cache[mid] = max_prompt
+
+    _copilot_context_cache = cache
+    _copilot_context_cache_time = time.time()
+
+    return cache.get(model_id)
+
+
+def _is_github_models_base_url(base_url: Optional[str]) -> bool:
+    normalized = (base_url or "").strip().rstrip("/").lower()
+    return (
+        normalized.startswith(COPILOT_BASE_URL)
+        or normalized.startswith("https://models.github.ai/inference")
+    )
+
+
+def _lmstudio_server_root(base_url: Optional[str]) -> Optional[str]:
+    """Strip ``/v1`` suffix from an LM Studio base URL to get the native API root.
+
+    Returns ``None`` when the base URL is empty/invalid.
+    """
+    root = (base_url or "").strip().rstrip("/")
+    if root.endswith("/v1"):
+        root = root[:-3].rstrip("/")
+    return root or None
+
+
+def _lmstudio_request_headers(api_key: Optional[str] = None) -> dict:
+    """Build HTTP headers for LM Studio native API requests."""
+    headers = {"User-Agent": _TALARIA_USER_AGENT}
+    token = str(api_key or "").strip()
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    return headers
+
+
+def _lmstudio_fetch_raw_models(
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    timeout: float = 5.0,
+) -> Optional[list[dict]]:
+    """Fetch the raw model list from LM Studio's ``/api/v1/models``.
+
+    Returns the ``models`` list of dicts on success, ``None`` on network
+    errors or malformed responses.  Raises ``AuthError`` on HTTP 401/403.
+    """
+    server_root = _lmstudio_server_root(base_url)
+    if not server_root:
+        return None
+
+    headers = _lmstudio_request_headers(api_key)
+    request = urllib.request.Request(server_root + "/api/v1/models", headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:
+            payload = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        if exc.code in (401, 403):
+            from talaria_cli.auth import AuthError
+            raise AuthError(
+                f"LM Studio rejected the request with HTTP {exc.code}.",
+                provider="lmstudio",
+                code="auth_rejected",
+            ) from exc
+        import logging
+        logging.getLogger(__name__).debug(
+            "LM Studio probe at %s failed with HTTP %s", server_root, exc.code,
+        )
+        return None
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).debug(
+            "LM Studio probe at %s failed: %s", server_root, exc,
+        )
+        return None
+
+    raw_models = payload.get("models") if isinstance(payload, dict) else None
+    if not isinstance(raw_models, list):
+        import logging
+        logging.getLogger(__name__).debug(
+            "LM Studio probe at %s returned malformed payload (no `models` list)",
+            server_root,
+        )
+        return None
+    return raw_models
+
+
+def probe_lmstudio_models(
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    timeout: float = 5.0,
+) -> Optional[list[str]]:
+    """Probe LM Studio's model listing.
+
+    Returns chat-capable model keys on success, including the valid empty-list
+    case when the server is reachable but has no non-embedding models.
+    Returns ``None`` on network errors, malformed responses, or empty/invalid
+    base URLs.
+
+    Raises ``AuthError`` on HTTP 401/403 so callers can surface token issues
+    separately from reachability problems.
+    """
+    raw_models = _lmstudio_fetch_raw_models(api_key=api_key, base_url=base_url, timeout=timeout)
+    if raw_models is None:
+        return None
+
+    keys: list[str] = []
+    for raw in raw_models:
+        if not isinstance(raw, dict):
+            continue
+        if str(raw.get("type") or "").strip().lower() == "embedding":
+            continue
+        key = str(raw.get("key") or raw.get("id") or "").strip()
+        if key and key not in keys:
+            keys.append(key)
+    return keys
+
+
+def fetch_lmstudio_models(
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    timeout: float = 5.0,
+) -> list[str]:
+    """Fetch LM Studio chat-capable model keys from native ``/api/v1/models``.
+
+    Returns a list of model keys (e.g. ``publisher/model-name``) with embedding
+    models filtered out. Returns an empty list on network errors, malformed
+    responses, or empty/invalid base URLs.
+
+    Raises ``AuthError`` on HTTP 401/403 so callers can distinguish a missing
+    or wrong ``LM_API_KEY`` from an unreachable server — the most common
+    LM Studio support case once auth-enabled mode is turned on.
+    """
+    models = probe_lmstudio_models(api_key=api_key, base_url=base_url, timeout=timeout)
+    return models or []
+
+
+def ensure_lmstudio_model_loaded(
+    model: str,
+    base_url: Optional[str],
+    api_key: Optional[str],
+    target_context_length: int,
+    timeout: float = 120.0,
+) -> Optional[int]:
+    """Ensure LM Studio has ``model`` loaded with at least ``target_context_length``.
+
+    No-op when an instance is already loaded with sufficient context. Otherwise
+    POSTs ``/api/v1/models/load`` to (re)load with the target context, capped
+    at the model's ``max_context_length``. Returns the resolved loaded context
+    length, or ``None`` when the probe / load failed.
+    """
+    server_root = _lmstudio_server_root(base_url)
+    if not server_root:
+        return None
+
+    headers = _lmstudio_request_headers(api_key)
+
+    try:
+        raw_models = _lmstudio_fetch_raw_models(api_key=api_key, base_url=base_url, timeout=10)
+    except Exception:
+        raw_models = None
+    if raw_models is None:
+        return None
+
+    target_entry = None
+    for raw in raw_models:
+        if not isinstance(raw, dict):
+            continue
+        if raw.get("key") == model or raw.get("id") == model:
+            target_entry = raw
+            break
+    if target_entry is None:
+        return None
+
+    max_ctx = target_entry.get("max_context_length")
+    if isinstance(max_ctx, int) and max_ctx > 0:
+        target_context_length = min(target_context_length, max_ctx)
+
+    for inst in target_entry.get("loaded_instances") or []:
+        cfg = inst.get("config") if isinstance(inst, dict) else None
+        loaded_ctx = cfg.get("context_length") if isinstance(cfg, dict) else None
+        if isinstance(loaded_ctx, int) and loaded_ctx >= target_context_length:
+            return loaded_ctx
+
+    body = json.dumps({
+        "model": model,
+        "context_length": target_context_length,
+    }).encode()
+    load_headers = dict(headers)
+    load_headers["Content-Type"] = "application/json"
+    try:
+        with urllib.request.urlopen(
+            urllib.request.Request(
+                server_root + "/api/v1/models/load",
+                data=body,
+                headers=load_headers,
+                method="POST",
+            ),
+            timeout=timeout,
+        ) as resp:
+            resp.read()
+    except Exception:
+        return None
+    return target_context_length
+
+
+def lmstudio_model_reasoning_options(
+    model: str,
+    base_url: Optional[str],
+    api_key: Optional[str] = None,
+    timeout: float = 5.0,
+) -> list[str]:
+    """Return the reasoning ``allowed_options`` LM Studio publishes for ``model``.
+
+    Pulls ``capabilities.reasoning.allowed_options`` from ``/api/v1/models``.
+    Returns ``[]`` when the model is unknown, the endpoint is unreachable,
+    or the model does not declare a reasoning capability.
+    """
+    try:
+        raw_models = _lmstudio_fetch_raw_models(api_key=api_key, base_url=base_url, timeout=timeout)
+    except Exception:
+        raw_models = None
+    if not raw_models:
+        return []
+
+    for raw in raw_models:
+        if not isinstance(raw, dict):
+            continue
+        if raw.get("key") != model and raw.get("id") != model:
+            continue
+        caps = raw.get("capabilities")
+        reasoning = caps.get("reasoning") if isinstance(caps, dict) else None
+        opts = reasoning.get("allowed_options") if isinstance(reasoning, dict) else None
+        if isinstance(opts, list):
+            return [str(o).strip().lower() for o in opts if isinstance(o, str)]
+        return []
+    return []
+
+
+def _fetch_github_models(api_key: Optional[str] = None, timeout: float = 5.0) -> Optional[list[str]]:
+    catalog = fetch_github_model_catalog(api_key=api_key, timeout=timeout)
+    if not catalog:
+        return None
+    return [item.get("id", "") for item in catalog if item.get("id")]
+
+
+_COPILOT_MODEL_ALIASES = {
+    "openai/gpt-5": "gpt-5-mini",
+    "openai/gpt-5-chat": "gpt-5-mini",
+    "openai/gpt-5-mini": "gpt-5-mini",
+    "openai/gpt-5-nano": "gpt-5-mini",
+    "openai/gpt-4.1": "gpt-4.1",
+    "openai/gpt-4.1-mini": "gpt-4.1",
+    "openai/gpt-4.1-nano": "gpt-4.1",
+    "openai/gpt-4o": "gpt-4o",
+    "openai/gpt-4o-mini": "gpt-4o-mini",
+    "openai/o1": "gpt-5.2",
+    "openai/o1-mini": "gpt-5-mini",
+    "openai/o1-preview": "gpt-5.2",
+    "openai/o3": "gpt-5.3-codex",
+    "openai/o3-mini": "gpt-5-mini",
+    "openai/o4-mini": "gpt-5-mini",
+    "anthropic/claude-opus-4.6": "claude-opus-4.6",
+    "anthropic/claude-sonnet-4.6": "claude-sonnet-4.6",
+    "anthropic/claude-sonnet-4": "claude-sonnet-4",
+    "anthropic/claude-sonnet-4.5": "claude-sonnet-4.5",
+    "anthropic/claude-haiku-4.5": "claude-haiku-4.5",
+    # Dash-notation fallbacks: Talaria' default Claude IDs elsewhere use
+    # hyphens (anthropic native format), but Copilot's API only accepts
+    # dot-notation.  Accept both so users who configure copilot + a
+    # default hyphenated Claude model don't hit HTTP 400
+    # "model_not_supported".  See issue #6879.
+    "claude-opus-4-6": "claude-opus-4.6",
+    "claude-sonnet-4-6": "claude-sonnet-4.6",
+    "claude-sonnet-4-0": "claude-sonnet-4",
+    "claude-sonnet-4-5": "claude-sonnet-4.5",
+    "claude-haiku-4-5": "claude-haiku-4.5",
+    "anthropic/claude-opus-4-6": "claude-opus-4.6",
+    "anthropic/claude-sonnet-4-6": "claude-sonnet-4.6",
+    "anthropic/claude-sonnet-4-0": "claude-sonnet-4",
+    "anthropic/claude-sonnet-4-5": "claude-sonnet-4.5",
+    "anthropic/claude-haiku-4-5": "claude-haiku-4.5",
+}
+
+
+def _copilot_catalog_ids(
+    catalog: Optional[list[dict[str, Any]]] = None,
+    api_key: Optional[str] = None,
+) -> set[str]:
+    if catalog is None and api_key:
+        catalog = fetch_github_model_catalog(api_key=api_key)
+    if not catalog:
+        return set()
+    return {
+        str(item.get("id") or "").strip()
+        for item in catalog
+        if str(item.get("id") or "").strip()
+    }
+
+
+def normalize_copilot_model_id(
+    model_id: Optional[str],
+    *,
+    catalog: Optional[list[dict[str, Any]]] = None,
+    api_key: Optional[str] = None,
+) -> str:
+    raw = str(model_id or "").strip()
+    if not raw:
+        return ""
+
+    catalog_ids = _copilot_catalog_ids(catalog=catalog, api_key=api_key)
+    alias = _COPILOT_MODEL_ALIASES.get(raw)
+    if alias:
+        return alias
+
+    candidates = [raw]
+    if "/" in raw:
+        candidates.append(raw.split("/", 1)[1].strip())
+
+    if raw.endswith("-mini"):
+        candidates.append(raw[:-5])
+    if raw.endswith("-nano"):
+        candidates.append(raw[:-5])
+    if raw.endswith("-chat"):
+        candidates.append(raw[:-5])
+
+    seen: set[str] = set()
+    for candidate in candidates:
+        if not candidate or candidate in seen:
+            continue
+        seen.add(candidate)
+        if candidate in _COPILOT_MODEL_ALIASES:
+            return _COPILOT_MODEL_ALIASES[candidate]
+        if candidate in catalog_ids:
+            return candidate
+
+    if "/" in raw:
+        return raw.split("/", 1)[1].strip()
+    return raw
+
+
+def _github_reasoning_efforts_for_model_id(model_id: str) -> list[str]:
+    raw = (model_id or "").strip().lower()
+    if raw.startswith(("openai/o1", "openai/o3", "openai/o4", "o1", "o3", "o4")):
+        return list(COPILOT_REASONING_EFFORTS_O_SERIES)
+    normalized = normalize_copilot_model_id(model_id).lower()
+    if normalized.startswith("gpt-5"):
+        return list(COPILOT_REASONING_EFFORTS_GPT5)
+    return []
+
+
+def _should_use_copilot_responses_api(model_id: str) -> bool:
+    """Decide whether a Copilot model should use the Responses API.
+
+    Replicates opencode's ``shouldUseCopilotResponsesApi`` logic:
+    GPT-5+ models use Responses API, except ``gpt-5-mini`` which uses
+    Chat Completions.  All non-GPT models (Claude, Gemini, etc.) use
+    Chat Completions.
+    """
+    import re
+
+    match = re.match(r"^gpt-(\d+)", model_id)
+    if not match:
+        return False
+    major = int(match.group(1))
+    return major >= 5 and not model_id.startswith("gpt-5-mini")
+
+
+def copilot_model_api_mode(
+    model_id: Optional[str],
+    *,
+    catalog: Optional[list[dict[str, Any]]] = None,
+    api_key: Optional[str] = None,
+) -> str:
+    """Determine the API mode for a Copilot model.
+
+    Uses the model ID pattern (matching opencode's approach) as the
+    primary signal.  Falls back to the catalog's ``supported_endpoints``
+    only for models not covered by the pattern check.
+    """
+    # Fetch the catalog once so normalize + endpoint check share it
+    # (avoids two redundant network calls for non-GPT-5 models).
+    if catalog is None and api_key:
+        catalog = fetch_github_model_catalog(api_key=api_key)
+
+    normalized = normalize_copilot_model_id(model_id, catalog=catalog, api_key=api_key)
+    if not normalized:
+        return "chat_completions"
+
+    # Primary: model ID pattern (matches opencode's shouldUseCopilotResponsesApi)
+    if _should_use_copilot_responses_api(normalized):
+        return "codex_responses"
+
+    # Secondary: check catalog for non-GPT-5 models (Claude via /v1/messages, etc.)
+    if catalog:
+        catalog_entry = next((item for item in catalog if item.get("id") == normalized), None)
+        if isinstance(catalog_entry, dict):
+            supported_endpoints = {
+                str(endpoint).strip()
+                for endpoint in (catalog_entry.get("supported_endpoints") or [])
+                if str(endpoint).strip()
+            }
+            # For non-GPT-5 models, check if they only support messages API
+            if "/v1/messages" in supported_endpoints and "/chat/completions" not in supported_endpoints:
+                return "anthropic_messages"
+
+    return "chat_completions"
+
+
+# Azure Foundry model families that require the Responses API.  Azure
+# rejects /chat/completions against these deployments with
+# ``400 "The requested operation is unsupported."`` — the same payload Bob
+# Dobolina hit in April 2026 on ``gpt-5.3-codex`` while ``gpt-4o-pure`` on
+# the same endpoint worked fine.  Keep the patterns broad enough to cover
+# vendor-renamed deployments (e.g. ``gpt-5.3-codex``, ``gpt-5-codex``,
+# ``gpt-5.4``, ``o1-preview``) but tight enough to leave GPT-4 / 3.5 / Llama /
+# Mistral / Grok deployments on chat completions.
+_AZURE_FOUNDRY_RESPONSES_PREFIXES = (
+    "codex",       # codex-*, codex-mini
+    "gpt-5",       # gpt-5, gpt-5.x, gpt-5-codex, gpt-5.x-codex
+    "o1",          # o1, o1-preview, o1-mini
+    "o3",          # o3, o3-mini
+    "o4",          # o4, o4-mini
+)
+
+
+def azure_foundry_model_api_mode(model_name: Optional[str]) -> Optional[str]:
+    """Infer Azure Foundry api_mode from a deployment/model name.
+
+    Returns ``"codex_responses"`` when the model name matches a family that
+    only accepts the Responses API on Azure Foundry (GPT-5.x, codex, o1/o3/o4
+    reasoning models).  Returns ``None`` otherwise — the caller should fall
+    back to the configured/default api_mode (typically ``chat_completions``)
+    so GPT-4o, GPT-4 Turbo, Llama, Mistral, etc. keep working.
+
+    Intentionally does NOT return ``anthropic_messages``; Anthropic-style
+    Azure endpoints are disambiguated by URL (``/anthropic`` suffix) in
+    ``runtime_provider._detect_api_mode_for_url`` and by the user setting
+    ``model.api_mode: anthropic_messages`` explicitly.
+    """
+    raw = str(model_name or "").strip().lower()
+    if not raw:
+        return None
+    # Strip any vendor/ prefix a user may have copied from OpenRouter / Copilot.
+    if "/" in raw:
+        raw = raw.rsplit("/", 1)[-1]
+    # gpt-5-mini speaks chat completions on Copilot but Azure Foundry deploys
+    # the full gpt-5 family uniformly on Responses API — don't carve an
+    # exception here.
+    for prefix in _AZURE_FOUNDRY_RESPONSES_PREFIXES:
+        if raw.startswith(prefix):
+            return "codex_responses"
+    return None
+
+
+def normalize_opencode_model_id(provider_id: Optional[str], model_id: Optional[str]) -> str:
+    """Normalize OpenCode config IDs to the bare model slug used in API requests."""
+    provider = normalize_provider(provider_id)
+    current = str(model_id or "").strip()
+    if not current or provider not in {"opencode-zen", "opencode-go"}:
+        return current
+
+    prefix = f"{provider}/"
+    if current.lower().startswith(prefix):
+        return current[len(prefix):]
+    return current
+
+
+def opencode_model_api_mode(provider_id: Optional[str], model_id: Optional[str]) -> str:
+    """Determine the API mode for an OpenCode Zen / Go model.
+
+    OpenCode routes different models behind different API surfaces:
+
+    - GPT-5 / Codex models on Zen use ``/v1/responses``
+    - Claude models on Zen use ``/v1/messages``
+    - MiniMax models on Go use ``/v1/messages``
+    - GLM / Kimi on Go use ``/v1/chat/completions``
+    - Other Zen models (Gemini, GLM, Kimi, MiniMax, Qwen, etc.) use
+      ``/v1/chat/completions``
+
+    This follows the published OpenCode docs for Zen and Go endpoints.
+    """
+    provider = normalize_provider(provider_id)
+    normalized = normalize_opencode_model_id(provider_id, model_id).lower()
+    if not normalized:
+        return "chat_completions"
+
+    if provider == "opencode-go":
+        if normalized.startswith("minimax-"):
+            return "anthropic_messages"
+        return "chat_completions"
+
+    if provider == "opencode-zen":
+        if normalized.startswith("claude-"):
+            return "anthropic_messages"
+        if normalized.startswith("gpt-"):
+            return "codex_responses"
+        return "chat_completions"
+
+    return "chat_completions"
+
+
+def github_model_reasoning_efforts(
+    model_id: Optional[str],
+    *,
+    catalog: Optional[list[dict[str, Any]]] = None,
+    api_key: Optional[str] = None,
+) -> list[str]:
+    """Return supported reasoning-effort levels for a Copilot-visible model."""
+    normalized = normalize_copilot_model_id(model_id, catalog=catalog, api_key=api_key)
+    if not normalized:
+        return []
+
+    catalog_entry = None
+    if catalog is not None:
+        catalog_entry = next((item for item in catalog if item.get("id") == normalized), None)
+    elif api_key:
+        fetched_catalog = fetch_github_model_catalog(api_key=api_key)
+        if fetched_catalog:
+            catalog_entry = next((item for item in fetched_catalog if item.get("id") == normalized), None)
+
+    if catalog_entry is not None:
+        capabilities = catalog_entry.get("capabilities")
+        if isinstance(capabilities, dict):
+            supports = capabilities.get("supports")
+            if isinstance(supports, dict):
+                efforts = supports.get("reasoning_effort")
+                if isinstance(efforts, list):
+                    normalized_efforts = [
+                        str(effort).strip().lower()
+                        for effort in efforts
+                        if str(effort).strip()
+                    ]
+                    return list(dict.fromkeys(normalized_efforts))
+            return []
+        legacy_capabilities = {
+            str(capability).strip().lower()
+            for capability in catalog_entry.get("capabilities", [])
+            if str(capability).strip()
+        }
+        if "reasoning" not in legacy_capabilities:
+            return []
+
+    return _github_reasoning_efforts_for_model_id(str(model_id or normalized))
+
+
+def probe_api_models(
+    api_key: Optional[str],
+    base_url: Optional[str],
+    timeout: float = 5.0,
+    api_mode: Optional[str] = None,
+) -> dict[str, Any]:
+    """Probe a ``/models`` endpoint with light URL heuristics.
+
+    For ``anthropic_messages`` mode, uses ``x-api-key`` and
+    ``anthropic-version`` headers (Anthropic's native auth) instead of
+    ``Authorization: Bearer``.  The response shape (``data[].id``) is
+    identical, so the same parser works for both.
+    """
+    normalized = (base_url or "").strip().rstrip("/")
+    if not normalized:
+        return {
+            "models": None,
+            "probed_url": None,
+            "resolved_base_url": "",
+            "suggested_base_url": None,
+            "used_fallback": False,
+        }
+
+    if _is_github_models_base_url(normalized):
+        models = _fetch_github_models(api_key=api_key, timeout=timeout)
+        return {
+            "models": models,
+            "probed_url": COPILOT_MODELS_URL,
+            "resolved_base_url": COPILOT_BASE_URL,
+            "suggested_base_url": None,
+            "used_fallback": False,
+        }
+
+    if normalized.endswith("/v1"):
+        alternate_base = normalized[:-3].rstrip("/")
+    else:
+        alternate_base = normalized + "/v1"
+
+    candidates: list[tuple[str, bool]] = [(normalized, False)]
+    if alternate_base and alternate_base != normalized:
+        candidates.append((alternate_base, True))
+
+    tried: list[str] = []
+    headers: dict[str, str] = {"User-Agent": _TALARIA_USER_AGENT}
+    if api_key and api_mode == "anthropic_messages":
+        headers["x-api-key"] = api_key
+        headers["anthropic-version"] = "2023-06-01"
+    elif api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    if normalized.startswith(COPILOT_BASE_URL):
+        headers.update(copilot_default_headers())
+
+    for candidate_base, is_fallback in candidates:
+        url = candidate_base.rstrip("/") + "/models"
+        tried.append(url)
+        req = urllib.request.Request(url, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+                return {
+                    "models": [m.get("id", "") for m in data.get("data", [])],
+                    "probed_url": url,
+                    "resolved_base_url": candidate_base.rstrip("/"),
+                    "suggested_base_url": alternate_base if alternate_base != candidate_base else normalized,
+                    "used_fallback": is_fallback,
+                }
+        except Exception:
+            continue
+
+    return {
+        "models": None,
+        "probed_url": tried[0] if tried else normalized.rstrip("/") + "/models",
+        "resolved_base_url": normalized,
+        "suggested_base_url": alternate_base if alternate_base != normalized else None,
+        "used_fallback": False,
+    }
+
+
+def fetch_api_models(
+    api_key: Optional[str],
+    base_url: Optional[str],
+    timeout: float = 5.0,
+    api_mode: Optional[str] = None,
+) -> Optional[list[str]]:
+    """Fetch the list of available model IDs from the provider's ``/models`` endpoint.
+
+    Returns a list of model ID strings, or ``None`` if the endpoint could not
+    be reached (network error, timeout, auth failure, etc.).
+    """
+    return probe_api_models(api_key, base_url, timeout=timeout, api_mode=api_mode).get("models")
+
+
+# ---------------------------------------------------------------------------
+# Ollama Cloud — merged model discovery with disk cache
+# ---------------------------------------------------------------------------
+
+
+
+_OLLAMA_CLOUD_CACHE_TTL = 3600  # 1 hour
+
+
+def validate_requested_model(
+    model_name: str,
+    provider: Optional[str],
+    *,
+    api_key: Optional[str] = None,
+    base_url: Optional[str] = None,
+    api_mode: Optional[str] = None,
+) -> dict[str, Any]:
+    """
+    Validate a ``/model`` value for the active provider.
+
+    Performs format checks first, then probes the live API to confirm
+    the model actually exists.
+
+    Returns a dict with:
+      - accepted: whether the CLI should switch to the requested model now
+      - persist: whether it is safe to save to config
+      - recognized: whether it matched a known provider catalog
+      - message: optional warning / guidance for the user
+    """
+    requested = (model_name or "").strip()
+    normalized = normalize_provider(provider)
+    if normalized == "openrouter" and base_url and "openrouter.ai" not in base_url:
+        normalized = "custom"
+    requested_for_lookup = requested
+    if normalized == "copilot":
+        requested_for_lookup = normalize_copilot_model_id(
+            requested,
+            api_key=api_key,
+        ) or requested
+
+    if not requested:
+        return {
+            "accepted": False,
+            "persist": False,
+            "recognized": False,
+            "message": "Model name cannot be empty.",
+        }
+
+    if any(ch.isspace() for ch in requested):
+        return {
+            "accepted": False,
+            "persist": False,
+            "recognized": False,
+            "message": "Model names cannot contain spaces.",
+        }
+
+    if normalized == "lmstudio":
+        from talaria_cli.auth import AuthError
+        # Use probe_lmstudio_models so we can distinguish None (unreachable
+        # / malformed response) from [] (reachable, but no chat-capable models
+        # are loaded). fetch_lmstudio_models collapses both to [].
+        try:
+            models = probe_lmstudio_models(api_key=api_key, base_url=base_url)
+        except AuthError as exc:
+            return {
+                "accepted": False, "persist": False, "recognized": False,
+                "message": (
+                    f"{exc} Set `LM_API_KEY` (or update it) to match the server's bearer token."
+                ),
+            }
+        if models is None:
+            return {
+                "accepted": False, "persist": False, "recognized": False,
+                "message": f"Could not reach LM Studio's `/api/v1/models` to validate `{requested}`.",
+            }
+        if not models:
+            return {
+                "accepted": False, "persist": False, "recognized": False,
+                "message": (
+                    f"LM Studio is reachable but no chat-capable models are loaded. "
+                    f"Load `{requested}` in LM Studio (Developer tab → Load Model) and try again."
+                ),
+            }
+        if requested_for_lookup in set(models):
+            return {"accepted": True, "persist": True, "recognized": True, "message": None}
+        return {
+            "accepted": False, "persist": False, "recognized": False,
+            "message": f"Model `{requested}` was not found in LM Studio's model listing.",
+        }
+
+    if normalized == "custom":
+        # Try probing with correct auth for the api_mode.
+        if api_mode == "anthropic_messages":
+            probe = probe_api_models(api_key, base_url, api_mode=api_mode)
+        else:
+            probe = probe_api_models(api_key, base_url)
+        api_models = probe.get("models")
+        if api_models is not None:
+            if requested_for_lookup in set(api_models):
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "message": None,
+                }
+
+            # Auto-correct if the top match is very similar (e.g. typo)
+            auto = get_close_matches(requested_for_lookup, api_models, n=1, cutoff=0.9)
+            if auto:
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "corrected_model": auto[0],
+                    "message": f"Auto-corrected `{requested}` → `{auto[0]}`",
+                }
+
+            suggestions = get_close_matches(requested, api_models, n=3, cutoff=0.5)
+            suggestion_text = ""
+            if suggestions:
+                suggestion_text = "\n  Similar models: " + ", ".join(f"`{s}`" for s in suggestions)
+
+            message = (
+                f"Note: `{requested}` was not found in this custom endpoint's model listing "
+                f"({probe.get('probed_url')}). It may still work if the server supports hidden or aliased models."
+                f"{suggestion_text}"
+            )
+            if probe.get("used_fallback"):
+                message += (
+                    f"\n  Endpoint verification succeeded after trying `{probe.get('resolved_base_url')}`. "
+                    f"Consider saving that as your base URL."
+                )
+
+            return {
+                "accepted": True,
+                "persist": True,
+                "recognized": False,
+                "message": message,
+            }
+
+        message = (
+            f"Note: could not reach this custom endpoint's model listing at `{probe.get('probed_url')}`. "
+            f"Talaria will still save `{requested}`, but the endpoint should expose `/models` for verification."
+        )
+        if api_mode == "anthropic_messages":
+            message += (
+                "\n  Many Anthropic-compatible proxies do not implement the Models API "
+                "(GET /v1/models).  The model name has been accepted without verification."
+            )
+        if probe.get("suggested_base_url"):
+            message += f"\n  If this server expects `/v1`, try base URL: `{probe.get('suggested_base_url')}`"
+
+        return {
+            "accepted": api_mode == "anthropic_messages",
+            "persist": True,
+            "recognized": False,
+            "message": message,
+        }
+
+    # OpenAI Codex has its own catalog path; /v1/models probing is not the right validation path.
+    if normalized == "openai-codex":
+        try:
+            codex_models = provider_model_ids("openai-codex")
+        except Exception:
+            codex_models = []
+        if codex_models:
+            if requested_for_lookup in set(codex_models):
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "message": None,
+                }
+            # Auto-correct if the top match is very similar (e.g. typo)
+            auto = get_close_matches(requested_for_lookup, codex_models, n=1, cutoff=0.9)
+            if auto:
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "corrected_model": auto[0],
+                    "message": f"Auto-corrected `{requested}` → `{auto[0]}`",
+                }
+            suggestions = get_close_matches(requested_for_lookup, codex_models, n=3, cutoff=0.5)
+            suggestion_text = ""
+            if suggestions:
+                suggestion_text = "\n  Similar models: " + ", ".join(f"`{s}`" for s in suggestions)
+            return {
+                "accepted": False,
+                "persist": False,
+                "recognized": False,
+                "message": (
+                    f"Model `{requested}` was not found in the OpenAI Codex model listing."
+                    f"{suggestion_text}"
+                ),
+            }
+
+    # MiniMax providers don't expose a /models endpoint — validate against
+    # the static catalog instead, similar to openai-codex.
+    if normalized in ("minimax", "minimax-cn"):
+        try:
+            catalog_models = provider_model_ids(normalized)
+        except Exception:
+            catalog_models = []
+        if catalog_models:
+            # Case-insensitive lookup (catalog uses mixed case like MiniMax-M2.7)
+            catalog_lower = {m.lower(): m for m in catalog_models}
+            if requested_for_lookup.lower() in catalog_lower:
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "message": None,
+                }
+            # Auto-correct close matches (case-insensitive)
+            catalog_lower_list = list(catalog_lower.keys())
+            auto = get_close_matches(requested_for_lookup.lower(), catalog_lower_list, n=1, cutoff=0.9)
+            if auto:
+                corrected = catalog_lower[auto[0]]
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "corrected_model": corrected,
+                    "message": f"Auto-corrected `{requested}` → `{corrected}`",
+                }
+            suggestions = get_close_matches(requested_for_lookup.lower(), catalog_lower_list, n=3, cutoff=0.5)
+            suggestion_text = ""
+            if suggestions:
+                suggestion_text = "\n  Similar models: " + ", ".join(f"`{catalog_lower[s]}`" for s in suggestions)
+            return {
+                "accepted": True,
+                "persist": True,
+                "recognized": False,
+                "message": (
+                    f"Note: `{requested}` was not found in the MiniMax catalog."
+                    f"{suggestion_text}"
+                    "\n  MiniMax does not expose a /models endpoint, so Talaria cannot verify the model name."
+                    "\n  The model may still work if it exists on the server."
+                ),
+            }
+
+    # Native Anthropic provider: /v1/models requires x-api-key (or Bearer for
+    # OAuth) plus anthropic-version headers.  The generic OpenAI-style probe
+    # below uses plain Bearer auth and 401s against Anthropic, so dispatch to
+    # the native fetcher which handles both API keys and Claude-Code OAuth
+    # tokens.  (The api_mode=="anthropic_messages" branch below handles the
+    # Messages-API transport case separately.)
+    if normalized == "anthropic":
+        anthropic_models = _fetch_anthropic_models()
+        if anthropic_models is not None:
+            if requested_for_lookup in set(anthropic_models):
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "message": None,
+                }
+            auto = get_close_matches(requested_for_lookup, anthropic_models, n=1, cutoff=0.9)
+            if auto:
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "corrected_model": auto[0],
+                    "message": f"Auto-corrected `{requested}` → `{auto[0]}`",
+                }
+            suggestions = get_close_matches(requested, anthropic_models, n=3, cutoff=0.5)
+            suggestion_text = ""
+            if suggestions:
+                suggestion_text = "\n  Similar models: " + ", ".join(f"`{s}`" for s in suggestions)
+            # Accept anyway — Anthropic sometimes gates newer/preview models
+            # (e.g. snapshot IDs, early-access releases) behind accounts
+            # even though they aren't listed on /v1/models.
+            return {
+                "accepted": True,
+                "persist": True,
+                "recognized": False,
+                "message": (
+                    f"Note: `{requested}` was not found in Anthropic's /v1/models listing. "
+                    f"It may still work if you have early-access or snapshot IDs."
+                    f"{suggestion_text}"
+                ),
+            }
+        # _fetch_anthropic_models returned None — no token resolvable or
+        # network failure.  Fall through to the generic warning below.
+
+    # Anthropic Messages API: many proxies don't implement /v1/models.
+    # Try probing with correct auth; if it fails, accept with a warning.
+    if api_mode == "anthropic_messages":
+        api_models = fetch_api_models(api_key, base_url, api_mode=api_mode)
+        if api_models is not None:
+            if requested_for_lookup in set(api_models):
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "message": None,
+                }
+            auto = get_close_matches(requested_for_lookup, api_models, n=1, cutoff=0.9)
+            if auto:
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "corrected_model": auto[0],
+                    "message": f"Auto-corrected `{requested}` → `{auto[0]}`",
+                }
+        # Probe failed or model not found — accept anyway (proxy likely
+        # doesn't implement the Anthropic Models API).
+        return {
+            "accepted": True,
+            "persist": True,
+            "recognized": False,
+            "message": (
+                f"Note: could not verify `{requested}` against this endpoint's "
+                f"model listing.  Many Anthropic-compatible proxies do not "
+                f"implement GET /v1/models.  The model name has been accepted "
+                f"without verification."
+            ),
+        }
+
+    # Probe the live API to check if the model actually exists
+    api_models = fetch_api_models(api_key, base_url)
+
+    if api_models is not None:
+        # Gemini's OpenAI-compat /v1beta/openai/models endpoint returns IDs
+        # prefixed with "models/" (e.g. "models/gemini-2.5-flash") — native
+        # Gemini-API convention.  Our curated list and user input both use
+        # the bare ID, so a direct set-membership check drops every known
+        # Gemini model.  Strip the prefix before comparison.  See #12532.
+        if normalized == "gemini":
+            api_models = [
+                m[len("models/"):] if isinstance(m, str) and m.startswith("models/") else m
+                for m in api_models
+            ]
+        if requested_for_lookup in set(api_models):
+            # API confirmed the model exists
+            return {
+                "accepted": True,
+                "persist": True,
+                "recognized": True,
+                "message": None,
+            }
+        else:
+            # API responded but model is not listed.  Accept anyway —
+            # the user may have access to models not shown in the public
+            # listing (e.g. Z.AI Pro/Max plans can use glm-5 on coding
+            # endpoints even though it's not in /models).  Warn but allow.
+
+            # Auto-correct if the top match is very similar (e.g. typo)
+            auto = get_close_matches(requested_for_lookup, api_models, n=1, cutoff=0.9)
+            if auto:
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "corrected_model": auto[0],
+                    "message": f"Auto-corrected `{requested}` → `{auto[0]}`",
+                }
+
+            suggestions = get_close_matches(requested, api_models, n=3, cutoff=0.5)
+            suggestion_text = ""
+            if suggestions:
+                suggestion_text = "\n  Similar models: " + ", ".join(f"`{s}`" for s in suggestions)
+
+        return {
+            "accepted": False,
+            "persist": False,
+            "recognized": False,
+            "message": (
+                f"Model `{requested}` was not found in this provider's model listing."
+                f"{suggestion_text}"
+            ),
+        }
+
+    # api_models is None — couldn't reach API.  Accept and persist,
+    # but warn so typos don't silently break things.
+
+    # Bedrock: use our own discovery instead of HTTP /models endpoint.
+    # Bedrock's bedrock-runtime URL doesn't support /models — it uses the
+    # AWS SDK control plane (ListFoundationModels + ListInferenceProfiles).
+    if normalized == "bedrock":
+        try:
+            from agent.bedrock_adapter import discover_bedrock_models, resolve_bedrock_region
+            region = resolve_bedrock_region()
+            discovered = discover_bedrock_models(region)
+            discovered_ids = {m["id"] for m in discovered}
+            if requested in discovered_ids:
+                return {
+                    "accepted": True,
+                    "persist": True,
+                    "recognized": True,
+                    "message": None,
+                }
+            # Not in discovered list — still accept (user may have custom
+            # inference profiles or cross-account access), but warn.
+            suggestions = get_close_matches(requested, list(discovered_ids), n=3, cutoff=0.4)
+            suggestion_text = ""
+            if suggestions:
+                suggestion_text = "\n  Similar models: " + ", ".join(f"`{s}`" for s in suggestions)
+            return {
+                "accepted": True,
+                "persist": True,
+                "recognized": False,
+                "message": (
+                    f"Note: `{requested}` was not found in Bedrock model discovery for {region}. "
+                    f"It may still work with custom inference profiles or cross-account access."
+                    f"{suggestion_text}"
+                ),
+            }
+        except Exception:
+            pass  # Fall through to generic warning
+
+    # Static-catalog fallback: when the /models probe was unreachable,
+    # validate against the curated list from provider_model_ids() — same
+    # pattern as the openai-codex and minimax branches above.  This fixes
+    # /model switches in the gateway for providers like opencode-go and
+    # opencode-zen whose /models endpoint returns 404 against the HTML
+    # marketing site.  Without this block, validate_requested_model would
+    # reject every model on such providers, switch_model() would return
+    # success=False, and the gateway would never write to
+    # _session_model_overrides.
+    provider_label = _PROVIDER_LABELS.get(normalized, normalized)
+    try:
+        catalog_models = provider_model_ids(normalized)
+    except Exception:
+        catalog_models = []
+
+    if catalog_models:
+        catalog_lower = {m.lower(): m for m in catalog_models}
+        if requested_for_lookup.lower() in catalog_lower:
+            return {
+                "accepted": True,
+                "persist": True,
+                "recognized": True,
+                "message": None,
+            }
+        catalog_lower_list = list(catalog_lower.keys())
+        auto = get_close_matches(
+            requested_for_lookup.lower(), catalog_lower_list, n=1, cutoff=0.9
+        )
+        if auto:
+            corrected = catalog_lower[auto[0]]
+            return {
+                "accepted": True,
+                "persist": True,
+                "recognized": True,
+                "corrected_model": corrected,
+                "message": f"Auto-corrected `{requested}` → `{corrected}`",
+            }
+        suggestions = get_close_matches(
+            requested_for_lookup.lower(), catalog_lower_list, n=3, cutoff=0.5
+        )
+        suggestion_text = ""
+        if suggestions:
+            suggestion_text = "\n  Similar models: " + ", ".join(
+                f"`{catalog_lower[s]}`" for s in suggestions
+            )
+        return {
+            "accepted": True,
+            "persist": True,
+            "recognized": False,
+            "message": (
+                f"Note: `{requested}` was not found in the {provider_label} curated catalog "
+                f"and the /models endpoint was unreachable.{suggestion_text}"
+                f"\n  The model may still work if it exists on the provider."
+            ),
+        }
+
+    # No catalog available — accept with a warning, matching the comment's
+    # stated intent ("Accept and persist, but warn").
+    return {
+        "accepted": True,
+        "persist": True,
+        "recognized": False,
+        "message": (
+            f"Note: could not reach the {provider_label} API to validate `{requested}`. "
+            f"If the service isn't down, this model may not be valid."
+        ),
+    }

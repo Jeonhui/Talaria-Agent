@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Canonical test runner for hermes-agent. Run this instead of calling
+# Canonical test runner for talaria-agent. Run this instead of calling
 # `pytest` directly to guarantee your local run matches CI behavior.
 #
 # What this script enforces:
@@ -27,7 +27,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Prefer a .venv in the current tree, fall back to the main checkout's venv
 # (useful for worktrees where we don't always duplicate the venv).
 VENV=""
-for candidate in "$REPO_ROOT/.venv" "$REPO_ROOT/venv" "$HOME/.hermes/hermes-agent/venv"; do
+for candidate in "$REPO_ROOT/.venv" "$REPO_ROOT/venv" "$HOME/.talaria/talaria-agent/venv"; do
   if [ -f "$candidate/bin/activate" ]; then
     VENV="$candidate"
     break
@@ -62,15 +62,15 @@ while IFS='=' read -r name _; do
   esac
 done < <(env)
 
-# Unset HERMES_* behavioral vars too.
-unset HERMES_YOLO_MODE HERMES_INTERACTIVE HERMES_QUIET HERMES_TOOL_PROGRESS \
-      HERMES_TOOL_PROGRESS_MODE HERMES_MAX_ITERATIONS HERMES_SESSION_PLATFORM \
-      HERMES_SESSION_CHAT_ID HERMES_SESSION_CHAT_NAME HERMES_SESSION_THREAD_ID \
-      HERMES_SESSION_SOURCE HERMES_SESSION_KEY HERMES_GATEWAY_SESSION \
-      HERMES_PLATFORM HERMES_INFERENCE_PROVIDER HERMES_MANAGED HERMES_DEV \
-      HERMES_CONTAINER HERMES_EPHEMERAL_SYSTEM_PROMPT HERMES_TIMEZONE \
-      HERMES_REDACT_SECRETS HERMES_BACKGROUND_NOTIFICATIONS HERMES_EXEC_ASK \
-      HERMES_HOME_MODE 2>/dev/null || true
+# Unset TALARIA_* behavioral vars too.
+unset TALARIA_YOLO_MODE TALARIA_INTERACTIVE TALARIA_QUIET TALARIA_TOOL_PROGRESS \
+      TALARIA_TOOL_PROGRESS_MODE TALARIA_MAX_ITERATIONS TALARIA_SESSION_PLATFORM \
+      TALARIA_SESSION_CHAT_ID TALARIA_SESSION_CHAT_NAME TALARIA_SESSION_THREAD_ID \
+      TALARIA_SESSION_SOURCE TALARIA_SESSION_KEY TALARIA_GATEWAY_SESSION \
+      TALARIA_PLATFORM TALARIA_INFERENCE_PROVIDER TALARIA_MANAGED TALARIA_DEV \
+      TALARIA_CONTAINER TALARIA_EPHEMERAL_SYSTEM_PROMPT TALARIA_TIMEZONE \
+      TALARIA_REDACT_SECRETS TALARIA_BACKGROUND_NOTIFICATIONS TALARIA_EXEC_ASK \
+      TALARIA_HOME_MODE 2>/dev/null || true
 
 # Pin deterministic runtime.
 export TZ=UTC
@@ -82,7 +82,7 @@ export PYTHONHASHSEED=0
 # CI uses `-n auto` on ubuntu-latest which gives 4 workers. A 20-core
 # workstation with `-n auto` gets 20 workers and exposes test-ordering
 # flakes that CI will never see. Pin to 4 so local matches CI.
-WORKERS="${HERMES_TEST_WORKERS:-4}"
+WORKERS="${TALARIA_TEST_WORKERS:-4}"
 
 # ── Run pytest ──────────────────────────────────────────────────────────────
 cd "$REPO_ROOT"

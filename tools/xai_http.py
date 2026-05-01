@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 
-def hermes_xai_user_agent() -> str:
-    """Return a stable Hermes-specific User-Agent for xAI HTTP calls."""
+def talaria_xai_user_agent() -> str:
+    """Return a stable Talaria-specific User-Agent for xAI HTTP calls."""
     try:
-        from hermes_cli import __version__
+        from talaria_cli import __version__
     except Exception:
         __version__ = "unknown"
-    return f"Hermes-Agent/{__version__}"
+    return f"Talaria-Agent/{__version__}"

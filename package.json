@@ -1,7 +1,7 @@
 {
   "name": "talaria-agent",
   "version": "1.0.0",
-  "description": "A slim Hermes-derived agent focused on Discord, Slack, Telegram, and a reduced model/provider surface.",
+  "description": "A slim Talaria-derived agent focused on Discord, Slack, Telegram, and a reduced model/provider surface.",
   "private": true,
   "scripts": {
     "postinstall": "echo '✅ Talaria browser helpers ready. Run: python run_agent.py --help'"

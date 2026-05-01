@@ -13,14 +13,21 @@ import copy
 from typing import Any, Dict, List, Optional
 
 from agent.lmstudio_reasoning import resolve_lmstudio_effort
-from agent.moonshot_schema import is_moonshot_model, sanitize_moonshot_tools
 from agent.prompt_builder import DEVELOPER_ROLE_MODELS
+
+
+def is_moonshot_model(_model: str) -> bool:
+    return False
+
+
+def sanitize_moonshot_tools(tools):
+    return tools
 from agent.transports.base import ProviderTransport
 from agent.transports.types import NormalizedResponse, ToolCall, Usage
 
 
 def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> dict | None:
-    """Translate Hermes/OpenRouter-style reasoning config to Gemini thinkingConfig."""
+    """Translate Talaria/OpenRouter-style reasoning config to Gemini thinkingConfig."""
     if reasoning_config is None or not isinstance(reasoning_config, dict):
         return None
 
@@ -38,7 +45,7 @@ def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> 
     if normalized_model.startswith("google/"):
         normalized_model = normalized_model.split("/", 1)[1]
 
-    # Gemini 2.5 accepts thinkingBudget; don't guess a budget from Hermes'
+    # Gemini 2.5 accepts thinkingBudget; don't guess a budget from Talaria'
     # coarse effort levels. ``includeThoughts`` alone is enough to surface
     # thought parts without risking request validation errors.
     if normalized_model.startswith("gemini-2.5-"):
@@ -48,7 +55,7 @@ def _build_gemini_thinking_config(model: str, reasoning_config: dict | None) -> 
         effort = "medium"
 
     # Gemini 3 Flash documents low/medium/high thinking levels; Gemini 3 Pro
-    # is stricter (low/high). Clamp Hermes' wider effort set to what each
+    # is stricter (low/high). Clamp Talaria' wider effort set to what each
     # family accepts so we never forward an undocumented level verbatim.
     if normalized_model.startswith(("gemini-3", "gemini-3.1")):
         if "flash" in normalized_model:
@@ -362,7 +369,7 @@ class ChatCompletionsTransport(ProviderTransport):
                     extra_body["reasoning"] = {"enabled": True, "effort": "medium"}
 
         if is_nous:
-            extra_body["tags"] = ["product=hermes-agent"]
+            extra_body["tags"] = ["product=talaria-agent"]
 
         # Ollama num_ctx
         ollama_ctx = params.get("ollama_num_ctx")
