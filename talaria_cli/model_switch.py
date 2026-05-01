@@ -46,50 +46,6 @@ from agent.models_dev import (
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Non-agentic model warning
-# ---------------------------------------------------------------------------
-
-_TALARIA_MODEL_WARNING = (
-    "Nous Research Talaria 3 & 4 models are NOT agentic and are not designed "
-    "for use with Talaria Agent. They lack the tool-calling capabilities "
-    "required for agent workflows. Consider using an agentic model instead "
-    "(Claude, GPT, Gemini, DeepSeek, etc.)."
-)
-
-# Match only the real Nous Research Talaria 3 / Talaria 4 chat families.
-# The previous substring check (`"talaria" in name.lower()`) false-positived on
-# unrelated local Modelfiles like ``talaria-brain:qwen3-14b-ctx16k`` that just
-# happen to carry "talaria" in their tag but are fully tool-capable.
-#
-# Positive examples the regex must match:
-#   NousResearch/Talaria-3-Llama-3.1-70B, talaria-4-405b, openrouter/talaria3:70b
-# Negative examples it must NOT match:
-#   talaria-brain:qwen3-14b-ctx16k, qwen3:14b, claude-opus-4-6
-_NOUS_TALARIA_NON_AGENTIC_RE = re.compile(
-    r"(?:^|[/:])talaria[-_ ]?[34](?:[-_.:]|$)",
-    re.IGNORECASE,
-)
-
-
-def is_nous_talaria_non_agentic(model_name: str) -> bool:
-    """Return True if *model_name* is a real Nous Talaria 3/4 chat model.
-
-    Used to decide whether to surface the non-agentic warning at startup.
-    Callers in :mod:`cli.py` and here should go through this single helper
-    so the two sites don't drift.
-    """
-    if not model_name:
-        return False
-    return bool(_NOUS_TALARIA_NON_AGENTIC_RE.search(model_name))
-
-
-def _check_talaria_model_warning(model_name: str) -> str:
-    """Return a warning string if *model_name* is a Nous Talaria 3/4 chat model."""
-    if is_nous_talaria_non_agentic(model_name):
-        return _TALARIA_MODEL_WARNING
-    return ""
-
 
 # ---------------------------------------------------------------------------
 # Model aliases -- short names -> (vendor, family) with NO version numbers.
@@ -521,10 +477,10 @@ def _resolve_alias_fallback(
 ) -> Optional[tuple[str, str, str]]:
     """Try to resolve an alias on the user's authenticated providers.
 
-    Falls back to ``("openrouter", "nous")`` only when no authenticated
-    providers are supplied (backwards compat for non-interactive callers).
+    Falls back to ``("anthropic", "openai")`` when no authenticated
+    providers are supplied.
     """
-    providers = authenticated_providers or ("openrouter", "nous")
+    providers = authenticated_providers or ("anthropic", "openai")
     for provider in providers:
         result = resolve_alias(raw_input, provider)
         if result is not None:
@@ -546,7 +502,7 @@ def resolve_display_context_length(
     but provider-enforced limits can be lower (e.g. Codex OAuth caps the
     same slug at 272k). The authoritative source is
     ``agent.model_metadata.get_model_context_length`` which already knows
-    about Codex OAuth, Copilot, Nous, and falls back to models.dev for the
+    about Codex OAuth and falls back to models.dev for the
     rest.
 
     When ``custom_providers`` is provided, per-model ``context_length``
@@ -952,10 +908,6 @@ def switch_model(
     warnings: list[str] = []
     if validation.get("message"):
         warnings.append(validation["message"])
-    talaria_warn = _check_talaria_model_warning(new_model)
-    if talaria_warn:
-        warnings.append(talaria_warn)
-
     # --- Build result ---
     return ModelSwitchResult(
         success=True,
@@ -1054,10 +1006,8 @@ def list_authenticated_providers(
 
     # Build curated model lists keyed by talaria provider ID
     curated: dict[str, list[str]] = dict(_PROVIDER_MODELS)
-    curated["openrouter"] = [mid for mid, _ in OPENROUTER_MODELS]
-    # "nous" shares OpenRouter's curated list if not separately defined
-    if "nous" not in curated:
-        curated["nous"] = curated["openrouter"]
+    if OPENROUTER_MODELS:
+        curated["openrouter"] = [mid for mid, _ in OPENROUTER_MODELS]
     # Ollama Cloud uses dynamic discovery (no static curated list)
     if "ollama-cloud" not in curated:
         from talaria_cli.models import fetch_ollama_cloud_models
@@ -1157,7 +1107,7 @@ def list_authenticated_providers(
         seen_mdev_ids.add(mdev_id)
         _record_builtin_endpoint(slug)
 
-    # --- 2. Check Talaria-only providers (nous, openai-codex, copilot, opencode-go) ---
+    # --- 2. Check Talaria-only providers (openai-codex) ---
     from talaria_cli.providers import TALARIA_OVERLAYS
     from talaria_cli.auth import PROVIDER_REGISTRY as _auth_registry
 

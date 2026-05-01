@@ -29,49 +29,11 @@ COPILOT_REASONING_EFFORTS_GPT5 = ["minimal", "low", "medium", "high"]
 COPILOT_REASONING_EFFORTS_O_SERIES = ["low", "medium", "high"]
 
 
-# Fallback OpenRouter snapshot used when the live catalog is unavailable.
-# (model_id, display description shown in menus)
-OPENROUTER_MODELS: list[tuple[str, str]] = [
-    ("moonshotai/kimi-k2.6",            "recommended"),
-    ("anthropic/claude-opus-4.7",       ""),
-    ("anthropic/claude-opus-4.6",       ""),
-    ("anthropic/claude-sonnet-4.6",     ""),
-    ("qwen/qwen3.6-plus",               ""),
-    ("anthropic/claude-sonnet-4.5",     ""),
-    ("anthropic/claude-haiku-4.5",      ""),
-    ("openrouter/elephant-alpha",       "free"),
-    ("openai/gpt-5.5",                  ""),
-    ("openai/gpt-5.4-mini",             ""),
-    ("xiaomi/mimo-v2.5-pro",             ""),
-    ("xiaomi/mimo-v2.5",                 ""),
-    ("tencent/hy3-preview:free",         "free"),
-    ("openai/gpt-5.3-codex",            ""),
-    ("google/gemini-3-pro-image-preview", ""),
-    ("google/gemini-3-flash-preview",   ""),
-    ("google/gemini-3.1-pro-preview",     ""),
-    ("google/gemini-3.1-flash-lite-preview",   ""),
-    ("qwen/qwen3.5-plus-02-15",         ""),
-    ("qwen/qwen3.5-35b-a3b",            ""),
-    ("stepfun/step-3.5-flash",          ""),
-    ("minimax/minimax-m2.7",            ""),
-    ("minimax/minimax-m2.5",            ""),
-    ("minimax/minimax-m2.5:free",       "free"),
-    ("z-ai/glm-5.1",                    ""),
-    ("z-ai/glm-5v-turbo",               ""),
-    ("z-ai/glm-5-turbo",                ""),
-    ("x-ai/grok-4.20",                  ""),
-    ("nvidia/nemotron-3-super-120b-a12b",      ""),
-    ("nvidia/nemotron-3-super-120b-a12b:free", "free"),
-    ("arcee-ai/trinity-large-preview:free", "free"),
-    ("arcee-ai/trinity-large-thinking",  ""),
-    ("openai/gpt-5.5-pro",              ""),
-    ("openai/gpt-5.4-nano",             ""),
-]
+# Talaria does not bundle a Vercel AI Gateway / OpenRouter aggregator
+# snapshot. The list is kept as an empty placeholder so model_switch can
+# still reference it when building curated catalogs.
+OPENROUTER_MODELS: list[tuple[str, str]] = []
 
-_openrouter_catalog_cache: list[tuple[str, str]] | None = None
-
-
-# Fallback Vercel AI Gateway snapshot used when the live catalog is unavailable.
 
 def _codex_curated_models() -> list[str]:
     """Derive the openai-codex curated list from codex_models.py.
