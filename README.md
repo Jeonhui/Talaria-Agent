@@ -5,17 +5,18 @@
 Talaria is a slim, opinionated fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) that drops the everything-included framework surface and keeps a small, well-defined assistant. **~71% smaller** than the upstream code base (~29% the original size).
 
 ```
-        ⢠⣶⣶⣦⣄⡀
-        ⠘⠿⠿⣿⣿⣷⣶⣦⣄⡀
-         ⢠⣶⣶⣶⣦⣄⡈⠙⠻⢷⣶⣄⡀
-         ⠘⠿⢿⣿⣿⣿⣷⣶⣦⣄⡈⠙⠿⣷⣦⡀
-            ⢠⣶⣶⣶⣦⣬⣛⠻⢿⣷⣦⣬⡻⠿⣦⡀
-            ⠘⠿⢿⣿⣿⣿⣿⣷⣶⣦⣭⣛⣛⣛⣓⣿⣦⣀
-                       ⢀⣴⠞⠉⠉⠳⣦⡀
-                       ⢸⡏    ⠹⡇
-                       ⠈⠳⣄  ⢀⡾⠁
-        ⢀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣉⣛⣶⣟⣁⣀⣀⣀⣀⣀⣀⣀⡀
-            ⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁
+  ⢀⣄
+ ⠈⢿⣿⣷⣦⣄⡀
+   ⠉⠛⠿⣿⣿⣶⣦⣄⡀
+       ⠈⠉⠻⢿⣿⣿⣶⣦⣄⡀
+            ⠈⠙⠻⢿⣿⣿⣶⣦⣄⡀
+                 ⠈⠙⠻⢿⣿⣷⣦⣄⡀
+         ⢀⣀⣀⣀⡀   ⠈⠙⠿⣿⣿⣦⡀
+       ⢠⡾⠋⠉⠙⠳⣦⡀     ⠈⠙⢿⣿⣆⡀
+       ⢸⡇      ⠘⡇         ⠈⠻⠿⠃
+       ⠈⠳⣄  ⢀⡴⠋
+   ⢀⣀⣤⣤⣤⣤⣤⣤⣤⣤⣬⣷⣶⣟⣁⣤⣤⣤⣤⣤⣤⣄⣀⡀
+       ⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁
 ```
 
 ## What ships

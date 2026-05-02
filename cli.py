@@ -55,8 +55,10 @@ from prompt_toolkit.widgets import TextArea
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit import print_formatted_text as _pt_print
 from prompt_toolkit.formatted_text import ANSI as _PT_ANSI
+
 try:
     from prompt_toolkit.cursor_shapes import CursorShape
+
     _STEADY_CURSOR = CursorShape.BLOCK  # Non-blinking block cursor
 except (ImportError, AttributeError):
     _STEADY_CURSOR = None
@@ -76,7 +78,6 @@ from talaria_cli.banner import _format_context_length, format_banner_version_lab
 
 _COMMAND_SPINNER_FRAMES = ("⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏")
 
-
 # Load .env from ~/.talaria/.env first, then project root as dev fallback.
 # User-managed env files should override stale shell exports on restart.
 from talaria_constants import get_talaria_home, display_talaria_home
@@ -91,7 +92,6 @@ from utils import base_url_host_matches
 _talaria_home = get_talaria_home()
 _project_env = Path(__file__).parent / '.env'
 load_talaria_dotenv(talaria_home=_talaria_home, project_env=_project_env)
-
 
 _REASONING_TAGS = (
     "REASONING_SCRATCHPAD",
@@ -245,6 +245,7 @@ def _parse_service_tier_config(raw: str) -> str | None:
     logger.warning("Unknown service_tier '%s', ignoring", raw)
     return None
 
+
 def load_cli_config() -> Dict[str, Any]:
     """
     Load CLI configuration from config files.
@@ -298,8 +299,8 @@ def load_cli_config() -> Dict[str, Any]:
             "record_sessions": False,  # Auto-record browser sessions as WebM videos
         },
         "compression": {
-            "enabled": True,      # Auto-compress when approaching context limit
-            "threshold": 0.50,    # Compress at 50% of model's context limit
+            "enabled": True,  # Auto-compress when approaching context limit
+            "threshold": 0.50,  # Compress at 50% of model's context limit
         },
         "agent": {
             "max_turns": 90,  # Default max tool-calling iterations (shared with subagents)
@@ -339,7 +340,7 @@ def load_cli_config() -> Dict[str, Any]:
             "timeout": 120,  # Seconds to wait for a clarify answer before auto-proceeding
         },
         "code_execution": {
-            "timeout": 300,    # Max seconds a sandbox script can run before being killed (5 min)
+            "timeout": 300,  # Max seconds a sandbox script can run before being killed (5 min)
             "max_tool_calls": 50,  # Max RPC tool calls per execution
         },
         "auxiliary": {
@@ -358,10 +359,10 @@ def load_cli_config() -> Dict[str, Any]:
         },
         "delegation": {
             "max_iterations": 45,  # Max tool-calling turns per child agent
-            "model": "",       # Subagent model override (empty = inherit parent model)
-            "provider": "",    # Subagent provider override (empty = inherit parent provider)
-            "base_url": "",    # Direct OpenAI-compatible endpoint for subagents
-            "api_key": "",     # API key for delegation.base_url (falls back to OPENAI_API_KEY)
+            "model": "",  # Subagent model override (empty = inherit parent model)
+            "provider": "",  # Subagent provider override (empty = inherit parent provider)
+            "base_url": "",  # Direct OpenAI-compatible endpoint for subagents
+            "api_key": "",  # API key for delegation.base_url (falls back to OPENAI_API_KEY)
         },
         "onboarding": {
             # First-touch hint flags (see agent/onboarding.py).  Each hint is
@@ -369,7 +370,7 @@ def load_cli_config() -> Dict[str, Any]:
             "seen": {},
         },
     }
-    
+
     # Track whether the config file explicitly set terminal config.
     # When using defaults (no config file / no terminal section), we should NOT
     # overwrite env vars that were already set by .env -- only a user's config
@@ -381,7 +382,7 @@ def load_cli_config() -> Dict[str, Any]:
         try:
             with open(config_path, "r", encoding="utf-8") as f:
                 file_config = yaml.safe_load(f) or {}
-            
+
             _file_has_terminal_config = "terminal" in file_config
 
             # Handle model config - can be string (new format) or dict (old format)
@@ -415,7 +416,7 @@ def load_cli_config() -> Dict[str, Any]:
                 root_base_url = file_config.get("base_url")
                 if root_base_url:
                     defaults["model"]["base_url"] = root_base_url
-            
+
             # Deep merge file_config into defaults.
             # First: merge keys that exist in both (deep-merge dicts, overwrite scalars)
             for key in defaults:
@@ -426,19 +427,19 @@ def load_cli_config() -> Dict[str, Any]:
                         defaults[key].update(file_config[key])
                     else:
                         defaults[key] = file_config[key]
-            
+
             # Second: carry over keys from file_config that aren't in defaults
             # (e.g. platform_toolsets, provider_routing, memory, honcho, etc.)
             for key in file_config:
                 if key not in defaults and key != "model":
                     defaults[key] = file_config[key]
-            
+
             # Handle legacy root-level max_turns (backwards compat) - copy to
             # agent.max_turns whenever the nested key is missing.
             agent_file_config = file_config.get("agent")
             if "max_turns" in file_config and not (
-                isinstance(agent_file_config, dict)
-                and agent_file_config.get("max_turns") is not None
+                    isinstance(agent_file_config, dict)
+                    and agent_file_config.get("max_turns") is not None
             ):
                 defaults["agent"]["max_turns"] = file_config["max_turns"]
         except Exception as e:
@@ -450,13 +451,13 @@ def load_cli_config() -> Dict[str, Any]:
 
     # Apply terminal config to environment variables (so terminal_tool picks them up)
     terminal_config = defaults.get("terminal", {})
-    
+
     # Normalize config key: the new config system (talaria_cli/config.py) and all
     # documentation use "backend", the legacy cli-config.yaml uses "env_type".
     # Accept both, with "backend" taking precedence (it's the documented key).
     if "backend" in terminal_config:
         terminal_config["env_type"] = terminal_config["backend"]
-    
+
     # Handle special cwd values: "." or "auto" means use current working directory.
     # Only resolve to the host's CWD for the local backend where the host
     # filesystem is directly accessible.  For ALL remote/container backends
@@ -483,7 +484,7 @@ def load_cli_config() -> Dict[str, Any]:
             else:
                 # Remove so TERMINAL_CWD stays unset → tool picks backend default
                 terminal_config.pop("cwd", None)
-    
+
     env_mappings = {
         "env_type": "TERMINAL_ENV",
         "cwd": "TERMINAL_CWD",
@@ -510,7 +511,7 @@ def load_cli_config() -> Dict[str, Any]:
         # Sudo support (works with all backends)
         "sudo_password": "SUDO_PASSWORD",
     }
-    
+
     # Apply config values to env vars so terminal_tool picks them up.
     # If the config file explicitly has a [terminal] section, those values are
     # authoritative and override any .env settings.  When using defaults only
@@ -524,17 +525,17 @@ def load_cli_config() -> Dict[str, Any]:
                     os.environ[env_var] = json.dumps(val)
                 else:
                     os.environ[env_var] = str(val)
-    
+
     # Apply browser config to environment variables
     browser_config = defaults.get("browser", {})
     browser_env_mappings = {
         "inactivity_timeout": "BROWSER_INACTIVITY_TIMEOUT",
     }
-    
+
     for config_key, env_var in browser_env_mappings.items():
         if config_key in browser_config:
             os.environ[env_var] = str(browser_config[config_key])
-    
+
     # Apply auxiliary model/direct-endpoint overrides to environment variables.
     # Vision and web_extract each have their own provider/model/base_url/api_key tuple.
     # Compression config is read directly from config.yaml by run_agent.py and
@@ -563,7 +564,7 @@ def load_cli_config() -> Dict[str, Any]:
             "api_key": "AUXILIARY_APPROVAL_API_KEY",
         },
     }
-    
+
     for task_key, env_map in auxiliary_task_env.items():
         task_cfg = auxiliary_config.get(task_key, {})
         if not isinstance(task_cfg, dict):
@@ -580,7 +581,7 @@ def load_cli_config() -> Dict[str, Any]:
             os.environ[env_map["base_url"]] = base_url
         if api_key:
             os.environ[env_map["api_key"]] = api_key
-    
+
     # Security settings
     security_config = defaults.get("security", {})
     if isinstance(security_config, dict):
@@ -590,6 +591,7 @@ def load_cli_config() -> Dict[str, Any]:
 
     return defaults
 
+
 # Load configuration at module startup
 CLI_CONFIG = load_cli_config()
 
@@ -597,6 +599,7 @@ CLI_CONFIG = load_cli_config()
 # This ensures CLI sessions produce a log trail even before AIAgent is instantiated.
 try:
     from talaria_logging import setup_logging
+
     setup_logging(mode="cli")
 except Exception:
     pass  # Logging setup is best-effort — don't crash the CLI
@@ -604,6 +607,7 @@ except Exception:
 # Validate config structure early — print warnings before user hits cryptic errors
 try:
     from talaria_cli.config import print_config_warnings
+
     print_config_warnings()
 except Exception:
     pass
@@ -611,6 +615,7 @@ except Exception:
 # Initialize the skin engine from config
 try:
     from talaria_cli.skin_engine import init_skin_from_config
+
     init_skin_from_config(CLI_CONFIG)
 except Exception:
     pass  # Skin engine is optional — default skin used if unavailable
@@ -618,6 +623,7 @@ except Exception:
 # Initialize tool preview length from config
 try:
     from agent.display import set_tool_preview_max_len
+
     _tpl = CLI_CONFIG.get("display", {}).get("tool_preview_length", 0)
     set_tool_preview_max_len(int(_tpl) if _tpl else 0)
 except Exception:
@@ -630,6 +636,7 @@ except Exception:
 # "Event loop is closed" / "Press ENTER to continue..." errors.
 try:
     from agent.auxiliary_client import neuter_async_httpx_del
+
     neuter_async_httpx_del()
 except Exception:
     pass
@@ -666,6 +673,7 @@ _cleanup_done = False
 # Weak reference to the active AIAgent for memory provider shutdown at exit
 _active_agent_ref = None
 
+
 def _run_cleanup():
     """Run resource cleanup exactly once."""
     global _cleanup_done
@@ -697,7 +705,8 @@ def _run_cleanup():
     # session boundary — NOT per-turn inside run_conversation().
     try:
         from talaria_cli.plugins import invoke_hook as _invoke_hook
-        _invoke_hook("on_session_finalize", session_id=_active_agent_ref.session_id if _active_agent_ref else None, platform="cli")
+        _invoke_hook("on_session_finalize", session_id=_active_agent_ref.session_id if _active_agent_ref else None,
+                     platform="cli")
     except Exception:
         pass
     try:
@@ -983,8 +992,8 @@ def _prune_stale_worktrees(repo_root: str, max_age_hours: int = 24) -> None:
         return
 
     now = time.time()
-    soft_cutoff = now - (max_age_hours * 3600)       # 24h default
-    hard_cutoff = now - (max_age_hours * 3 * 3600)   # 72h default
+    soft_cutoff = now - (max_age_hours * 3600)  # 24h default
+    hard_cutoff = now - (max_age_hours * 3 * 3600)  # 72h default
 
     for entry in worktrees_dir.iterdir():
         if not entry.is_dir() or not entry.name.startswith("talaria-"):
@@ -1085,7 +1094,7 @@ def _prune_orphaned_branches(repo_root: str) -> None:
     orphaned = [
         b for b in all_branches
         if b not in active_branches
-        and (b.startswith("talaria/talaria-") or b.startswith("pr-"))
+           and (b.startswith("talaria/talaria-") or b.startswith("pr-"))
     ]
 
     if not orphaned:
@@ -1103,6 +1112,7 @@ def _prune_orphaned_branches(repo_root: str) -> None:
             logger.debug("Failed to prune orphaned branches: %s", e)
 
     logger.debug("Pruned %d orphaned branches", len(orphaned))
+
 
 # ============================================================================
 # ASCII Art & Branding
@@ -1246,7 +1256,6 @@ _IMAGE_EXTENSIONS = frozenset({
     '.bmp', '.tiff', '.tif', '.svg', '.ico',
 })
 
-
 from talaria_constants import is_termux as _is_termux_environment
 
 
@@ -1287,7 +1296,7 @@ def _split_path_input(raw: str) -> tuple[str, str]:
                 continue
             if ch == quote:
                 token = raw[1:pos]
-                remainder = raw[pos + 1 :].strip()
+                remainder = raw[pos + 1:].strip()
                 return token, remainder
             pos += 1
         return raw[1:], ""
@@ -1417,17 +1426,19 @@ def _detect_file_drop(user_input: str) -> "dict | None":
         return None
 
     starts_like_path = (
-        stripped.startswith("/")
-        or stripped.startswith("~")
-        or stripped.startswith("./")
-        or stripped.startswith("../")
-        or stripped.startswith("file://")
-        or (len(stripped) >= 3 and stripped[1] == ":" and stripped[2] in ("\\", "/") and stripped[0].isalpha())
-        or stripped.startswith('"/')
-        or stripped.startswith('"~')
-        or stripped.startswith("'/")
-        or stripped.startswith("'~")
-        or (len(stripped) >= 4 and stripped[0] in ("'", '"') and stripped[2] == ":" and stripped[3] in ("\\", "/") and stripped[1].isalpha())
+            stripped.startswith("/")
+            or stripped.startswith("~")
+            or stripped.startswith("./")
+            or stripped.startswith("../")
+            or stripped.startswith("file://")
+            or (len(stripped) >= 3 and stripped[1] == ":" and stripped[2] in ("\\", "/") and stripped[0].isalpha())
+            or stripped.startswith('"/')
+            or stripped.startswith('"~')
+            or stripped.startswith("'/")
+            or stripped.startswith("'~")
+            or (len(stripped) >= 4 and stripped[0] in ("'", '"') and stripped[2] == ":" and stripped[3] in ("\\",
+                                                                                                            "/") and
+                stripped[1].isalpha())
     )
     if not starts_like_path:
         return None
@@ -1449,7 +1460,7 @@ def _detect_file_drop(user_input: str) -> "dict | None":
             resolved = _resolve_attachment_path(candidate)
             if resolved is not None:
                 drop_path = resolved
-                remainder = stripped[pos + 1 :].strip()
+                remainder = stripped[pos + 1:].strip()
                 break
     if drop_path is None:
         return None
@@ -1626,26 +1637,28 @@ class ChatConsole:
         yield self
 
 # ASCII Art - TALARIA-AGENT logo (full width, single line - requires ~95 char terminal)
-TALARIA_AGENT_LOGO = """[bold #FFD700]██╗  ██╗███████╗██████╗ ███╗   ███╗███████╗███████╗       █████╗  ██████╗ ███████╗███╗   ██╗████████╗[/]
-[bold #FFD700]██║  ██║██╔════╝██╔══██╗████╗ ████║██╔════╝██╔════╝      ██╔══██╗██╔════╝ ██╔════╝████╗  ██║╚══██╔══╝[/]
-[#FFBF00]███████║█████╗  ██████╔╝██╔████╔██║█████╗  ███████╗█████╗███████║██║  ███╗█████╗  ██╔██╗ ██║   ██║[/]
-[#FFBF00]██╔══██║██╔══╝  ██╔══██╗██║╚██╔╝██║██╔══╝  ╚════██║╚════╝██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║[/]
-[#CD7F32]██║  ██║███████╗██║  ██║██║ ╚═╝ ██║███████╗███████║      ██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║[/]
-[#CD7F32]╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝      ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝[/]"""
+TALARIA_AGENT_LOGO = """[bold #FFD700]
+████████╗ █████╗ ██╗      █████╗ ██████╗ ██╗ █████╗ 
+╚══██╔══╝██╔══██╗██║     ██╔══██╗██╔══██╗██║██╔══██╗
+   ██║   ███████║██║     ███████║██████╔╝██║███████║
+   ██║   ██╔══██║██║     ██╔══██║██╔══██╗██║██╔══██║
+   ██║   ██║  ██║███████╗██║  ██║██║  ██║██║██║  ██║
+   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝
+[/]"""
 
 # ASCII Art - Talaria winged sandal (Greek sandal w/ ankle loop + thin sole)
-TALARIA_CADUCEUS = """[bold #FFD700]⢠⣶⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[bold #FFD700]⠘⠿⠿⣿⣿⣷⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⢠⣶⣶⣶⣦⣄⡈⠙⠻⢷⣶⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠘⠿⢿⣿⣿⣿⣷⣶⣦⣄⡈⠙⠿⣷⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⢠⣶⣶⣶⣦⣬⣛⠻⢿⣷⣦⣬⡻⠿⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠘⠿⢿⣿⣿⣿⣿⣷⣶⣦⣭⣛⣛⣛⣓⣿⣦⣀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣴⠞⠉⠉⠳⣦⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡏⠀⠀⠀⠀⠹⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣄⠀⠀⢀⡾⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⢀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣀⣉⣛⣶⣟⣁⣀⣀⣀⣀⣀⣀⣀⡀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁⠀⠀⠀[/]"""
-
+TALARIA_CADUCEUS = """[bold #FFD700]⠀⠀⢀⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[bold #FFD700]⠀⠈⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#FFD700]⠀⠀⠀⠉⠛⠿⣿⣿⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#FFD700]⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣿⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣿⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀[/]
+[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⡀⠀⠀⠈⠙⠿⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀[/]
+[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡾⠋⠉⠙⠳⣦⡀⠀⠀⠀⠈⠙⢿⣿⣆⡀⠀⠀⠀⠀[/]
+[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠘⡇⠀⠀⠀⠀⠀⠈⠻⠿⠃⠀⠀⠀⠀[/]
+[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣄⡀⠀⢀⡴⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#B8860B]⠀⠀⠀⢀⣀⣤⣤⣤⣤⣤⣤⣤⣤⣬⣷⣶⣟⣁⣤⣤⣤⣤⣤⣤⣄⣀⡀⠀⠀⠀[/]
+[#B8860B]⠀⠀⠀⠀⠈⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁⠀⠀⠀[/]"""
 
 
 def _build_compact_banner() -> str:
@@ -1689,7 +1702,6 @@ def _build_compact_banner() -> str:
         f"[bold {border_color}]║[/] [dim {dim_color}]{line2}[/] [bold {border_color}]║[/]\n"
         f"[bold {border_color}]╚{bar}╝[/]\n"
     )
-
 
 
 # ============================================================================
@@ -1779,18 +1791,18 @@ def save_config_value(key_path: str, value: any) -> bool:
     user_config_path = _talaria_home / 'config.yaml'
     project_config_path = Path(__file__).parent / 'cli-config.yaml'
     config_path = user_config_path if user_config_path.exists() else project_config_path
-    
+
     try:
         # Ensure parent directory exists (for ~/.talaria/config.yaml on first use)
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Load existing config
         if config_path.exists():
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f) or {}
         else:
             config = {}
-        
+
         # Navigate to the key and set value
         keys = key_path.split('.')
         current = config
@@ -1799,24 +1811,22 @@ def save_config_value(key_path: str, value: any) -> bool:
                 current[key] = {}
             current = current[key]
         current[keys[-1]] = value
-        
+
         # Save back atomically — write to temp file + fsync + os.replace
         # so an interrupt never leaves config.yaml truncated or empty.
         from utils import atomic_yaml_write
         atomic_yaml_write(config_path, config)
-        
+
         # Enforce owner-only permissions on config files (contain API keys)
         try:
             os.chmod(config_path, 0o600)
         except (OSError, NotImplementedError):
             pass
-        
+
         return True
     except Exception as e:
         logger.error("Failed to save config: %s", e)
         return False
-
-
 
 
 # ============================================================================
@@ -1830,21 +1840,21 @@ class TalariaCLI:
     Provides a REPL interface with rich formatting, command history,
     and tool execution capabilities.
     """
-    
+
     def __init__(
-        self,
-        model: str = None,
-        toolsets: List[str] = None,
-        provider: str = None,
-        api_key: str = None,
-        base_url: str = None,
-        max_turns: int = None,
-        verbose: bool = False,
-        compact: bool = False,
-        resume: str = None,
-        checkpoints: bool = False,
-        pass_session_id: bool = False,
-        ignore_rules: bool = False,
+            self,
+            model: str = None,
+            toolsets: List[str] = None,
+            provider: str = None,
+            api_key: str = None,
+            base_url: str = None,
+            max_turns: int = None,
+            verbose: bool = False,
+            compact: bool = False,
+            resume: str = None,
+            checkpoints: bool = False,
+            pass_session_id: bool = False,
+            ignore_rules: bool = False,
     ):
         """
         Initialize the Talaria CLI.
@@ -1887,7 +1897,7 @@ class TalariaCLI:
             self.busy_input_mode = "interrupt"
 
         self.verbose = verbose if verbose is not None else (self.tool_progress_mode == "verbose")
-        
+
         # streaming: stream tokens to the terminal as they arrive (display.streaming in config.yaml)
         self.streaming_enabled = CLI_CONFIG["display"].get("streaming", False)
         self.final_response_markdown = str(
@@ -1915,19 +1925,21 @@ class TalariaCLI:
         self.user_message_preview_last_lines = max(0, _ump_last_lines)
 
         # Streaming display state
-        self._stream_buf = ""        # Partial line buffer for line-buffered rendering
+        self._stream_buf = ""  # Partial line buffer for line-buffered rendering
         self._stream_started = False  # True once first delta arrives
         self._stream_box_opened = False  # True once the response box header is printed
         self._reasoning_preview_buf = ""  # Coalesce tiny reasoning chunks for [thinking] output
         self._pending_edit_snapshots = {}
-        
+
         # Configuration - priority: CLI args > env vars > config file
         # Model comes from: CLI arg or config.yaml (single source of truth).
         # LLM_MODEL/OPENAI_MODEL env vars are NOT checked — config.yaml is
         # authoritative.  This avoids conflicts in multi-agent setups where
         # env vars would stomp each other.
         _model_config = CLI_CONFIG.get("model", {})
-        _config_model = (_model_config.get("default") or _model_config.get("model") or "") if isinstance(_model_config, dict) else (_model_config or "")
+        _config_model = (_model_config.get("default") or _model_config.get("model") or "") if isinstance(_model_config,
+                                                                                                         dict) else (
+                    _model_config or "")
         _DEFAULT_CONFIG_MODEL = ""
         self.model = model or _config_model or _DEFAULT_CONFIG_MODEL
         # Auto-detect model from local server if still on default
@@ -1945,7 +1957,7 @@ class TalariaCLI:
         # explicit choice — the user just never changed it.  But a config model
         # like "gpt-5.3-codex" IS explicit and must be preserved.
         self._model_is_default = not model and (
-            not _config_model or _config_model == _DEFAULT_CONFIG_MODEL
+                not _config_model or _config_model == _DEFAULT_CONFIG_MODEL
         )
 
         self._explicit_api_key = api_key
@@ -1953,10 +1965,10 @@ class TalariaCLI:
 
         # Provider selection is resolved lazily at use-time via _ensure_runtime_credentials().
         self.requested_provider = (
-            provider
-            or CLI_CONFIG["model"].get("provider")
-            or os.getenv("TALARIA_INFERENCE_PROVIDER")
-            or "auto"
+                provider
+                or CLI_CONFIG["model"].get("provider")
+                or os.getenv("TALARIA_INFERENCE_PROVIDER")
+                or "auto"
         )
         self._provider_source: Optional[str] = None
         self.provider = self.requested_provider
@@ -1964,10 +1976,10 @@ class TalariaCLI:
         self.acp_command: Optional[str] = None
         self.acp_args: list[str] = []
         self.base_url = (
-            base_url
-            or CLI_CONFIG["model"].get("base_url", "")
-            or os.getenv("OPENROUTER_BASE_URL", "")
-        ) or None
+                                base_url
+                                or CLI_CONFIG["model"].get("base_url", "")
+                                or os.getenv("OPENROUTER_BASE_URL", "")
+                        ) or None
         # Match key to resolved base_url: OpenRouter URL → prefer OPENROUTER_API_KEY,
         # custom endpoint → prefer OPENAI_API_KEY (issue #560).
         # Note: _ensure_runtime_credentials() re-resolves this before first use.
@@ -1986,7 +1998,7 @@ class TalariaCLI:
             self.max_turns = int(os.getenv("TALARIA_MAX_ITERATIONS"))
         else:
             self.max_turns = 90
-        
+
         # Parse and validate toolsets
         self.enabled_toolsets = toolsets
         if toolsets and "all" not in toolsets and "*" not in toolsets:
@@ -1997,7 +2009,7 @@ class TalariaCLI:
             invalid = [t for t in toolsets if not validate_toolset(t) and t not in mcp_names]
             if invalid:
                 self._console_print(f"[bold red]Warning: Unknown toolsets: {', '.join(invalid)}[/]")
-        
+
         # Filesystem checkpoints: CLI flag > config
         cp_cfg = CLI_CONFIG.get("checkpoints", {})
         if isinstance(cp_cfg, bool):
@@ -2010,19 +2022,19 @@ class TalariaCLI:
         # pass skip_context_files=True and skip_memory=True to AIAgent so
         # AGENTS.md/SOUL.md/.cursorrules and persistent memory are not loaded.
         self.ignore_rules = ignore_rules or os.environ.get("TALARIA_IGNORE_RULES") == "1"
-        
+
         # Ephemeral system prompt: env var takes precedence, then config
         self.system_prompt = (
-            os.getenv("TALARIA_EPHEMERAL_SYSTEM_PROMPT", "")
-            or CLI_CONFIG["agent"].get("system_prompt", "")
+                os.getenv("TALARIA_EPHEMERAL_SYSTEM_PROMPT", "")
+                or CLI_CONFIG["agent"].get("system_prompt", "")
         )
         self.personalities = CLI_CONFIG["agent"].get("personalities", {})
-        
+
         # Ephemeral prefill messages (few-shot priming, never persisted)
         self.prefill_messages = _load_prefill_messages(
             CLI_CONFIG["agent"].get("prefill_messages_file", "")
         )
-        
+
         # Reasoning config (OpenRouter reasoning effort level)
         self.reasoning_config = _parse_reasoning_config(
             CLI_CONFIG["agent"].get("reasoning_effort", "")
@@ -2030,7 +2042,7 @@ class TalariaCLI:
         self.service_tier = _parse_service_tier_config(
             CLI_CONFIG["agent"].get("service_tier", "")
         )
-        
+
         # OpenRouter provider routing preferences
         pr = CLI_CONFIG.get("provider_routing", {}) or {}
         self._provider_sort = pr.get("sort")
@@ -2039,7 +2051,7 @@ class TalariaCLI:
         self._providers_order = pr.get("order")
         self._provider_require_params = pr.get("require_parameters", False)
         self._provider_data_collection = pr.get("data_collection")
-        
+
         # Fallback provider chain — tried in order when primary fails after retries.
         # Supports new list format (fallback_providers) and legacy single-dict (fallback_model).
         fb = CLI_CONFIG.get("fallback_providers") or CLI_CONFIG.get("fallback_model") or []
@@ -2056,7 +2068,7 @@ class TalariaCLI:
         # Agent will be initialized on first use
         self.agent: Optional[AIAgent] = None
         self._app = None  # prompt_toolkit Application (set in run())
-        
+
         # Conversation state
         self.conversation_history: List[Dict[str, Any]] = []
         self.session_start = datetime.now()
@@ -2086,7 +2098,7 @@ class TalariaCLI:
 
         # Deferred title: stored in memory until the session is created in the DB
         self._pending_title: Optional[str] = None
-        
+
         # Session ID: reuse existing one when resuming, otherwise generate fresh
         if resume:
             self.session_id = resume
@@ -2095,7 +2107,7 @@ class TalariaCLI:
             timestamp_str = self.session_start.strftime("%Y%m%d_%H%M%S")
             short_uuid = uuid.uuid4().hex[:6]
             self.session_id = f"{timestamp_str}_{short_uuid}"
-        
+
         # History file for persistent input recall across sessions
         self._history_file = _talaria_home / ".talaria_history"
         self._last_invalidate: float = 0.0  # throttle UI repaints
@@ -2691,15 +2703,15 @@ class TalariaCLI:
             line_break = buf.rfind("\n")
             min_newline_flush = max(16, target_width // 3)
             if line_break != -1 and (
-                line_break >= min_newline_flush
-                or buf.endswith("\n\n")
-                or buf.endswith(".\n")
-                or buf.endswith("!\n")
-                or buf.endswith("?\n")
-                or buf.endswith(":\n")
+                    line_break >= min_newline_flush
+                    or buf.endswith("\n\n")
+                    or buf.endswith(".\n")
+                    or buf.endswith("!\n")
+                    or buf.endswith("?\n")
+                    or buf.endswith(":\n")
             ):
                 flush_text = buf[: line_break + 1]
-                buf = buf[line_break + 1 :]
+                buf = buf[line_break + 1:]
             elif len(buf) >= target_width:
                 search_start = max(20, target_width // 2)
                 search_end = min(len(buf), max(target_width + (target_width // 3), target_width + 8))
@@ -2708,7 +2720,7 @@ class TalariaCLI:
                     cut = max(cut, buf.rfind(boundary, search_start, search_end))
                 if cut != -1:
                     flush_text = buf[: cut + 1]
-                    buf = buf[cut + 1 :]
+                    buf = buf[cut + 1:]
 
         self._reasoning_preview_buf = buf.lstrip() if flush_text else buf
         if flush_text:
@@ -2853,7 +2865,8 @@ class TalariaCLI:
         # enabled, in which case we route the inner content to the
         # reasoning display box instead of discarding it.
         _OPEN_TAGS = ("<REASONING_SCRATCHPAD>", "<think>", "<reasoning>", "<THINKING>", "<thinking>", "<thought>")
-        _CLOSE_TAGS = ("</REASONING_SCRATCHPAD>", "</think>", "</reasoning>", "</THINKING>", "</thinking>", "</thought>")
+        _CLOSE_TAGS = ("</REASONING_SCRATCHPAD>", "</think>", "</reasoning>", "</THINKING>", "</thinking>",
+                       "</thought>")
 
         # Append to a pre-filter buffer first
         self._stream_prefilt = getattr(self, "_stream_prefilt", "") + text
@@ -2893,8 +2906,8 @@ class TalariaCLI:
                             # last emit was a newline AND only whitespace
                             # has accumulated before the tag
                             is_block_boundary = (
-                                getattr(self, "_stream_last_was_newline", True)
-                                and preceding.strip() == ""
+                                    getattr(self, "_stream_last_was_newline", True)
+                                    and preceding.strip() == ""
                             )
                         else:
                             # Text between last newline and tag must be
@@ -3029,7 +3042,8 @@ class TalariaCLI:
 
         if self._stream_buf:
             _tc = getattr(self, "_stream_text_ansi", "")
-            line = _strip_markdown_syntax(self._stream_buf) if self.final_response_markdown == "strip" else self._stream_buf
+            line = _strip_markdown_syntax(
+                self._stream_buf) if self.final_response_markdown == "strip" else self._stream_buf
             _cprint(f"{_STREAM_PAD}{_tc}{line}{_RST}" if _tc else f"{_STREAM_PAD}{line}")
             self._stream_buf = ""
 
@@ -3209,10 +3223,10 @@ class TalariaCLI:
 
         credentials_changed = api_key != self.api_key or base_url != self.base_url
         routing_changed = (
-            resolved_provider != self.provider
-            or resolved_api_mode != self.api_mode
-            or resolved_acp_command != self.acp_command
-            or resolved_acp_args != self.acp_args
+                resolved_provider != self.provider
+                or resolved_api_mode != self.api_mode
+                or resolved_acp_command != self.acp_command
+                or resolved_acp_args != self.acp_args
         )
         self.provider = resolved_provider
         self.api_mode = resolved_api_mode
@@ -3232,9 +3246,9 @@ class TalariaCLI:
         if runtime_model and isinstance(runtime_model, str):
             # Only use runtime model if: model is unset, or model equals provider name
             should_use_runtime_model = (
-                not self.model or  # No model configured yet
-                self.model == self.provider or  # Model is the provider slug
-                self.model == runtime.get("name")  # Model matches provider display name
+                    not self.model or  # No model configured yet
+                    self.model == self.provider or  # Model is the provider slug
+                    self.model == runtime.get("name")  # Model matches provider display name
             )
             if should_use_runtime_model:
                 self.model = runtime_model
@@ -3311,7 +3325,8 @@ class TalariaCLI:
         route["request_overrides"] = overrides
         return route
 
-    def _init_agent(self, *, model_override: str = None, runtime_override: dict = None, request_overrides: dict | None = None) -> bool:
+    def _init_agent(self, *, model_override: str = None, runtime_override: dict = None,
+                    request_overrides: dict | None = None) -> bool:
         """
         Initialize the agent on first use.
         When resuming a session, restores conversation history from SQLite.
@@ -3332,7 +3347,7 @@ class TalariaCLI:
                 self._session_db = SessionDB()
             except Exception as e:
                 logger.warning("SQLite session store not available — session will NOT be indexed: %s", e)
-        
+
         # If resuming, validate the session exists and load its history.
         # _preload_resumed_session() may have already loaded it (called from
         # run() for immediate display).  In that case, conversation_history
@@ -3387,7 +3402,7 @@ class TalariaCLI:
                 self._session_db._conn.commit()
             except Exception:
                 pass
-        
+
         try:
             runtime = runtime_override or {
                 "api_key": self.api_key,
@@ -3469,7 +3484,7 @@ class TalariaCLI:
         except Exception as e:
             ChatConsole().print(f"[bold red]Failed to initialize agent: {e}[/]")
             return False
-    
+
     def show_banner(self):
         """Display the welcome banner in Claude Code style."""
         self.console.clear()
@@ -3479,22 +3494,22 @@ class TalariaCLI:
         ctx_len = None
         if hasattr(self, 'agent') and self.agent and hasattr(self.agent, 'context_compressor'):
             ctx_len = self.agent.context_compressor.context_length
-        
+
         # Auto-compact for narrow terminals — the full banner with caduceus
         # + tool list needs ~80 columns minimum to render without wrapping.
         term_width = shutil.get_terminal_size().columns
         use_compact = self.compact or term_width < 80
-        
+
         if use_compact:
             self._console_print(_build_compact_banner())
             self._show_status()
         else:
             # Get tools for display
             tools = get_tool_definitions(enabled_toolsets=self.enabled_toolsets, quiet_mode=True)
-            
+
             # Get terminal working directory (where commands will execute)
             cwd = os.getenv("TERMINAL_CWD", os.getcwd())
-            
+
             # Build and display the banner
             build_welcome_banner(
                 console=self.console,
@@ -3505,7 +3520,7 @@ class TalariaCLI:
                 session_id=self.session_id,
                 context_length=ctx_len,
             )
-        
+
         # Show tool availability warnings if any tools are disabled
         self._show_tool_availability_warnings()
 
@@ -3627,15 +3642,15 @@ class TalariaCLI:
         if self.resume_display == "minimal":
             return
 
-        MAX_DISPLAY_EXCHANGES = 10   # max user+assistant pairs to show
-        MAX_USER_LEN = 300           # truncate user messages
-        MAX_ASST_LEN = 200           # truncate assistant text
-        MAX_ASST_LINES = 3           # max lines of assistant text
+        MAX_DISPLAY_EXCHANGES = 10  # max user+assistant pairs to show
+        MAX_USER_LEN = 300  # truncate user messages
+        MAX_ASST_LEN = 200  # truncate assistant text
+        MAX_ASST_LINES = 3  # max lines of assistant text
 
         # Collect displayable entries (skip system, tool-result messages)
         entries = []  # list of (role, display_text)
-        _last_asst_idx = None       # index of last assistant entry
-        _last_asst_full = None      # un-truncated display text for last assistant
+        _last_asst_idx = None  # index of last assistant entry
+        _last_asst_full = None  # un-truncated display text for last assistant
         for msg in self.conversation_history:
             role = msg.get("role", "")
             content = msg.get("content")
@@ -3922,7 +3937,7 @@ class TalariaCLI:
                 return
             print(f"  State snapshots ({display_talaria_home()}/state-snapshots/):\n")
             print(f"  {'#':>3}  {'ID':<35} {'Files':>5} {'Size':>10} {'Label'}")
-            print(f"  {'─'*3}  {'─'*35} {'─'*5} {'─'*10} {'─'*20}")
+            print(f"  {'─' * 3}  {'─' * 35} {'─' * 5} {'─' * 10} {'─' * 20}")
             for i, s in enumerate(snaps, 1):
                 size = s.get("total_size", 0)
                 if size < 1024:
@@ -4124,7 +4139,8 @@ class TalariaCLI:
         if _remainder:
             _cprint(f"  {_DIM}Now type your prompt (or use --image in single-query mode): {_remainder}{_RST}")
         elif _is_termux_environment():
-            _cprint(f"  {_DIM}Tip: type your next message, or run talaria chat -q --image {_termux_example_image_path(image_path.name)} \"What do you see?\"{_RST}")
+            _cprint(
+                f"  {_DIM}Tip: type your next message, or run talaria chat -q --image {_termux_example_image_path(image_path.name)} \"What do you see?\"{_RST}")
 
     def _preprocess_images_with_vision(self, text: str, images: list, *, announce: bool = True) -> str:
         """Analyze attached images via the vision tool and return enriched text.
@@ -4196,24 +4212,25 @@ class TalariaCLI:
         """Show warnings about disabled tools due to missing API keys."""
         try:
             from model_tools import check_tool_availability
-            
+
             available, unavailable = check_tool_availability()
-            
+
             # Filter to only those missing API keys (not system deps)
             api_key_missing = [u for u in unavailable if u["missing_vars"]]
-            
+
             if api_key_missing:
                 self._console_print()
                 self._console_print("[yellow]⚠️  Some tools disabled (missing API keys):[/]")
                 for item in api_key_missing:
                     tools_str = ", ".join(item["tools"][:2])  # Show first 2 tools
                     if len(item["tools"]) > 2:
-                        tools_str += f", +{len(item['tools'])-2} more"
-                    self._console_print(f"   [dim]• {item['name']}[/] [dim italic]({', '.join(item['missing_vars'])})[/]")
+                        tools_str += f", +{len(item['tools']) - 2} more"
+                    self._console_print(
+                        f"   [dim]• {item['name']}[/] [dim italic]({', '.join(item['missing_vars'])})[/]")
                 self._console_print("[dim]   Run 'talaria setup' to configure[/]")
         except Exception:
             pass  # Don't crash on import errors
-    
+
     def _show_status(self):
         """Show compact startup status line."""
         # Get tool count
@@ -4306,7 +4323,7 @@ class TalariaCLI:
             f"Agent Running: {'Yes' if is_running else 'No'}",
         ])
         self._console_print("\n".join(lines), highlight=False, markup=False)
-    
+
     def _fast_command_available(self) -> bool:
         try:
             from talaria_cli.models import model_supports_fast_mode
@@ -4356,18 +4373,19 @@ class TalariaCLI:
         _cprint(f"  {_DIM}Multi-line: Alt+Enter for a new line{_RST}")
         _cprint(f"  {_DIM}Draft editor: Ctrl+G (Alt+G in VSCode/Cursor){_RST}")
         if _is_termux_environment():
-            _cprint(f"  {_DIM}Attach image: /image {_termux_example_image_path()} or start your prompt with a local image path{_RST}\n")
+            _cprint(
+                f"  {_DIM}Attach image: /image {_termux_example_image_path()} or start your prompt with a local image path{_RST}\n")
         else:
             _cprint(f"  {_DIM}Paste image: Alt+V (or /paste){_RST}\n")
-    
+
     def show_tools(self):
         """Display available tools with kawaii ASCII art."""
         tools = get_tool_definitions(enabled_toolsets=self.enabled_toolsets, quiet_mode=True)
-        
+
         if not tools:
             print("(;_;) No tools available")
             return
-        
+
         # Header
         print()
         title = "(^_^)/ Available Tools"
@@ -4377,7 +4395,7 @@ class TalariaCLI:
         print("|" + " " * (pad // 2) + title + " " * (pad - pad // 2) + "|")
         print("+" + "-" * width + "+")
         print()
-        
+
         # Group tools by toolset
         toolsets = {}
         for tool in sorted(tools, key=lambda t: t["function"]["name"]):
@@ -4391,14 +4409,14 @@ class TalariaCLI:
             if ". " in desc:
                 desc = desc[:desc.index(". ") + 1]
             toolsets[toolset].append((name, desc))
-        
+
         # Display by toolset
         for toolset in sorted(toolsets.keys()):
             print(f"  [{toolset}]")
             for name, desc in toolsets[toolset]:
                 print(f"    * {name:<20} - {desc}")
             print()
-        
+
         print(f"  Total: {len(tools)} tools  ヽ(^o^)ノ")
         print()
 
@@ -4484,7 +4502,7 @@ class TalariaCLI:
     def show_toolsets(self):
         """Display available toolsets with kawaii ASCII art."""
         all_toolsets = get_all_toolsets()
-        
+
         # Header
         print()
         title = "(^_^)b Available Toolsets"
@@ -4494,24 +4512,24 @@ class TalariaCLI:
         print("|" + " " * (pad // 2) + title + " " * (pad - pad // 2) + "|")
         print("+" + "-" * width + "+")
         print()
-        
+
         for name in sorted(all_toolsets.keys()):
             info = get_toolset_info(name)
             if info:
                 tool_count = info["tool_count"]
                 desc = info["description"]
-                
+
                 # Mark if currently enabled
                 marker = "(*)" if self.enabled_toolsets and name in self.enabled_toolsets else "   "
                 print(f"  {marker} {name:<18} [{tool_count:>2} tools] - {desc}")
-        
+
         print()
         print("  (*) = currently enabled")
         print()
         print("  Tip: Use 'all' or '*' to enable all toolsets")
         print("  Example: python cli.py --toolsets web,terminal")
         print()
-    
+
     def _handle_profile_command(self):
         """Display active profile name and home directory."""
         from talaria_constants import display_talaria_home
@@ -4531,7 +4549,7 @@ class TalariaCLI:
         terminal_env = os.getenv("TERMINAL_ENV", "local")
         terminal_cwd = os.getenv("TERMINAL_CWD", os.getcwd())
         terminal_timeout = os.getenv("TERMINAL_TIMEOUT", "60")
-        
+
         user_config_path = _talaria_home / 'config.yaml'
         project_config_path = Path(__file__).parent / 'cli-config.yaml'
         if user_config_path.exists():
@@ -4539,9 +4557,9 @@ class TalariaCLI:
         else:
             config_path = project_config_path
         config_status = "(loaded)" if config_path.exists() else "(not found)"
-        
+
         api_key_display = '********' + self.api_key[-4:] if self.api_key and len(self.api_key) > 4 else 'Not set!'
-        
+
         print()
         title = "(^_^) Configuration"
         width = 50
@@ -4574,7 +4592,7 @@ class TalariaCLI:
         print(f"  Started:     {self.session_start.strftime('%Y-%m-%d %H:%M:%S')}")
         print(f"  Config File: {config_path} {config_status}")
         print()
-    
+
     def _list_recent_sessions(self, limit: int = 10) -> list[dict[str, Any]]:
         """Return recent CLI sessions for in-chat browsing/resume affordances."""
         if not self._session_db:
@@ -4684,7 +4702,7 @@ class TalariaCLI:
 
         flush_tool_summary()
         print()
-    
+
     def _notify_session_boundary(self, event_type: str) -> None:
         """Fire a session-boundary plugin hook (on_session_finalize or on_session_reset).
 
@@ -4982,7 +5000,7 @@ class TalariaCLI:
             # messages written after branching land in the correct file.
             if hasattr(self.agent, "session_log_file") and hasattr(self.agent, "logs_dir"):
                 self.agent.session_log_file = (
-                    self.agent.logs_dir / f"session_{new_session_id}.json"
+                        self.agent.logs_dir / f"session_{new_session_id}.json"
                 )
             self.agent.reset_session_state()
             if hasattr(self.agent, "_last_flushed_db_idx"):
@@ -5054,7 +5072,7 @@ class TalariaCLI:
                 print(f"       Resume the live session with: talaria --resume {self.session_id}")
         except Exception as e:
             print(f"(x_x) Failed to save: {e}")
-    
+
     def retry_last(self):
         """Retry the last user message by removing the last exchange and re-sending.
         
@@ -5065,25 +5083,25 @@ class TalariaCLI:
         if not self.conversation_history:
             print("(._.) No messages to retry.")
             return None
-        
+
         # Walk backwards to find the last user message
         last_user_idx = None
         for i in range(len(self.conversation_history) - 1, -1, -1):
             if self.conversation_history[i].get("role") == "user":
                 last_user_idx = i
                 break
-        
+
         if last_user_idx is None:
             print("(._.) No user message found to retry.")
             return None
-        
+
         # Extract the message text and remove everything from that point forward
         last_message = self.conversation_history[last_user_idx].get("content", "")
         self.conversation_history = self.conversation_history[:last_user_idx]
-        
+
         print(f"(^_^)b Retrying: \"{last_message[:60]}{'...' if len(last_message) > 60 else ''}\"")
         return last_message
-    
+
     def undo_last(self):
         """Remove the last user/assistant exchange from conversation history.
         
@@ -5093,29 +5111,30 @@ class TalariaCLI:
         if not self.conversation_history:
             print("(._.) No messages to undo.")
             return
-        
+
         # Walk backwards to find the last user message
         last_user_idx = None
         for i in range(len(self.conversation_history) - 1, -1, -1):
             if self.conversation_history[i].get("role") == "user":
                 last_user_idx = i
                 break
-        
+
         if last_user_idx is None:
             print("(._.) No user message found to undo.")
             return
-        
+
         # Count how many messages we're removing
         removed_count = len(self.conversation_history) - last_user_idx
         removed_msg = self.conversation_history[last_user_idx].get("content", "")
-        
+
         # Truncate history to before the last user message
         self.conversation_history = self.conversation_history[:last_user_idx]
-        
-        print(f"(^_^)b Undid {removed_count} message(s). Removed: \"{removed_msg[:60]}{'...' if len(removed_msg) > 60 else ''}\"")
+
+        print(
+            f"(^_^)b Undid {removed_count} message(s). Removed: \"{removed_msg[:60]}{'...' if len(removed_msg) > 60 else ''}\"")
         remaining = len(self.conversation_history)
         print(f"  {remaining} message(s) remaining in history.")
-    
+
     def _run_curses_picker(self, title: str, items: list[str], default_index: int = 0) -> int | None:
         """Run curses_single_select via run_in_terminal so prompt_toolkit handles terminal ownership cleanly."""
         import threading
@@ -5170,7 +5189,8 @@ class TalariaCLI:
             _ask()
         return result[0]
 
-    def _open_model_picker(self, providers: list, current_model: str, current_provider: str, user_provs=None, custom_provs=None) -> None:
+    def _open_model_picker(self, providers: list, current_model: str, current_provider: str, user_provs=None,
+                           custom_provs=None) -> None:
         """Open prompt_toolkit-native /model picker modal."""
         self._capture_modal_input_snapshot()
         default_idx = next((i for i, p in enumerate(providers) if p.get("is_current")), 0)
@@ -5192,13 +5212,13 @@ class TalariaCLI:
 
     @staticmethod
     def _compute_model_picker_viewport(
-        selected: int,
-        scroll_offset: int,
-        n: int,
-        term_rows: int,
-        reserved_below: int = 6,
-        panel_chrome: int = 6,
-        min_visible: int = 3,
+            selected: int,
+            scroll_offset: int,
+            n: int,
+            term_rows: int,
+            reserved_below: int = 6,
+            panel_chrome: int = 6,
+            min_visible: int = 3,
     ) -> tuple[int, int]:
         """Resolve (scroll_offset, visible) for the /model picker viewport.
 
@@ -5283,8 +5303,8 @@ class TalariaCLI:
             _cprint(f"    Capabilities: {mi.format_capabilities()}")
 
         cache_enabled = (
-            (base_url_host_matches(result.base_url or "", "openrouter.ai") and "claude" in result.new_model.lower())
-            or result.api_mode == "anthropic_messages"
+                (base_url_host_matches(result.base_url or "", "openrouter.ai") and "claude" in result.new_model.lower())
+                or result.api_mode == "anthropic_messages"
         )
         if cache_enabled:
             _cprint("    Prompt caching: enabled")
@@ -5336,7 +5356,8 @@ class TalariaCLI:
             cancel_idx = len(model_list) + 1
             if selected == back_idx:
                 state["stage"] = "provider"
-                state["selected"] = next((i for i, p in enumerate(state.get("providers") or []) if p.get("slug") == provider_data.get("slug")), 0)
+                state["selected"] = next((i for i, p in enumerate(state.get("providers") or []) if
+                                          p.get("slug") == provider_data.get("slug")), 0)
                 self._invalidate(min_interval=0.0)
                 return
             if selected >= cancel_idx:
@@ -5508,8 +5529,8 @@ class TalariaCLI:
 
         # Cache notice
         cache_enabled = (
-            (base_url_host_matches(result.base_url or "", "openrouter.ai") and "claude" in result.new_model.lower())
-            or result.api_mode == "anthropic_messages"
+                (base_url_host_matches(result.base_url or "", "openrouter.ai") and "claude" in result.new_model.lower())
+                or result.api_mode == "anthropic_messages"
         )
         if cache_enabled:
             _cprint("    Prompt caching: enabled")
@@ -5579,20 +5600,20 @@ class TalariaCLI:
         if isinstance(value, dict):
             parts = [value.get("system_prompt", "")]
             if value.get("tone"):
-                parts.append(f'Tone: {value["tone"]}' )
+                parts.append(f'Tone: {value["tone"]}')
             if value.get("style"):
-                parts.append(f'Style: {value["style"]}' )
+                parts.append(f'Style: {value["style"]}')
             return "\n".join(p for p in parts if p)
         return str(value)
 
     def _handle_personality_command(self, cmd: str):
         """Handle the /personality command to set predefined personalities."""
         parts = cmd.split(maxsplit=1)
-        
+
         if len(parts) > 1:
             # Set personality
             personality_name = parts[1].strip().lower()
-            
+
             if personality_name in ("none", "default", "neutral"):
                 self.system_prompt = ""
                 self.agent = None  # Force re-init
@@ -5629,7 +5650,7 @@ class TalariaCLI:
             print()
             print("  Usage: /personality <name>")
             print()
-    
+
     def _handle_cron_command(self, cmd: str):
         """Handle the /cron command to manage scheduled tasks."""
         import shlex
@@ -5815,7 +5836,8 @@ class TalariaCLI:
             replacement_skills = _normalize_skills(opts["skills"])
             add_skills = _normalize_skills(opts["add_skills"])
             remove_skills = set(_normalize_skills(opts["remove_skills"]))
-            existing_skills = list(existing.get("skills") or ([] if not existing.get("skill") else [existing.get("skill")]))
+            existing_skills = list(
+                existing.get("skills") or ([] if not existing.get("skill") else [existing.get("skill")]))
             if opts["clear_skills"]:
                 final_skills = []
             elif replacement_skills:
@@ -5905,26 +5927,26 @@ class TalariaCLI:
     def _show_gateway_status(self):
         """Show status of the gateway and connected messaging platforms."""
         from gateway.config import load_gateway_config, Platform
-        
+
         print()
         print("+" + "-" * 60 + "+")
         print("|" + " " * 15 + "(✿◠‿◠) Gateway Status" + " " * 17 + "|")
         print("+" + "-" * 60 + "+")
         print()
-        
+
         try:
             config = load_gateway_config()
-            
+
             print("  Messaging Platform Configuration:")
             print("  " + "-" * 55)
-            
+
             platform_status = {
                 Platform.TELEGRAM: ("Telegram", "TELEGRAM_BOT_TOKEN"),
                 Platform.DISCORD: ("Discord", "DISCORD_BOT_TOKEN"),
                 Platform.SLACK: ("Slack", "SLACK_BOT_TOKEN"),
                 Platform.WHATSAPP: ("WhatsApp", "WHATSAPP_ENABLED"),
             }
-            
+
             for platform, (name, env_var) in platform_status.items():
                 pconfig = config.platforms.get(platform)
                 if pconfig and pconfig.enabled:
@@ -5933,7 +5955,7 @@ class TalariaCLI:
                     print(f"    ✓ {name:<12} Enabled{home_str}")
                 else:
                     print(f"    ○ {name:<12} Not configured ({env_var})")
-            
+
             print()
             print("  Session Reset Policy:")
             print("  " + "-" * 55)
@@ -5941,14 +5963,14 @@ class TalariaCLI:
             print(f"    Mode: {policy.mode}")
             print(f"    Daily reset at: {policy.at_hour}:00")
             print(f"    Idle timeout: {policy.idle_minutes} minutes")
-            
+
             print()
             print("  To start the gateway:")
             print("    python cli.py --gateway")
             print()
             print(f"  Configuration file: {display_talaria_home()}/config.yaml")
             print()
-            
+
         except Exception as e:
             print(f"  Error loading gateway config: {e}")
             print()
@@ -5958,7 +5980,7 @@ class TalariaCLI:
             print("       DISCORD_BOT_TOKEN=your_token")
             print(f"    2. Or configure settings in {display_talaria_home()}/config.yaml")
             print()
-    
+
     def process_command(self, command: str) -> bool:
         """
         Process a slash command.
@@ -5979,7 +6001,7 @@ class TalariaCLI:
         _base_word = cmd_lower.split()[0].lstrip("/")
         _cmd_def = _resolve_cmd(_base_word)
         canonical = _cmd_def.name if _cmd_def else _base_word
-        
+
         if canonical in ("quit", "exit", "q"):
             return False
         elif canonical == "help":
@@ -6250,7 +6272,8 @@ class TalariaCLI:
                     _cprint(f"  Steer failed: {exc}")
                 else:
                     if accepted:
-                        _cprint(f"  ⏩ Steer queued — arrives after the next tool call: {payload[:80]}{'...' if len(payload) > 80 else ''}")
+                        _cprint(
+                            f"  ⏩ Steer queued — arrives after the next tool call: {payload[:80]}{'...' if len(payload) > 80 else ''}")
                     else:
                         _cprint("  Steer rejected (empty payload).")
             else:
@@ -6297,7 +6320,8 @@ class TalariaCLI:
                     else:
                         self._console_print(f"[bold red]Quick command '{base_cmd}' has no target defined[/]")
                 else:
-                    self._console_print(f"[bold red]Quick command '{base_cmd}' has unsupported type (supported: 'exec', 'alias')[/]")
+                    self._console_print(
+                        f"[bold red]Quick command '{base_cmd}' has unsupported type (supported: 'exec', 'alias')[/]")
             # Check for plugin-registered slash commands
             elif base_cmd.lstrip("/") in _get_plugin_cmd_handler_names():
                 from talaria_cli.plugins import get_plugin_command_handler
@@ -6363,9 +6387,9 @@ class TalariaCLI:
                 else:
                     _cprint(f"\033[1;31mUnknown command: {cmd_lower}{_RST}")
                     _cprint(f"{_DIM}{_ACCENT}Type /help for available commands{_RST}")
-        
+
         return True
-    
+
     def _handle_background_command(self, cmd: str):
         """Handle /background <prompt> — run a prompt in a separate background session.
 
@@ -6762,7 +6786,7 @@ class TalariaCLI:
 
         set_active_skin(new_skin)
         _ACCENT.reset()  # Re-resolve ANSI color for the new skin
-        _DIM.reset()     # Re-resolve dim/secondary ANSI color for the new skin
+        _DIM.reset()  # Re-resolve dim/secondary ANSI color for the new skin
         if save_config_value("display.skin", new_skin):
             print(f"  Skin set to: {new_skin} (saved)")
         else:
@@ -6976,7 +7000,8 @@ class TalariaCLI:
     def _handle_fast_command(self, cmd: str):
         """Handle /fast — toggle fast mode (OpenAI Priority Processing / Anthropic Fast Mode)."""
         if not self._fast_command_available():
-            _cprint("  (._.) /fast is only available for models that support fast mode (OpenAI Priority Processing or Anthropic Fast Mode).")
+            _cprint(
+                "  (._.) /fast is only available for models that support fast mode (OpenAI Priority Processing or Anthropic Fast Mode).")
             return
 
         # Determine the branding for the current model
@@ -7083,8 +7108,8 @@ class TalariaCLI:
                 # ended parent. Without this, subsequent end_session() calls target
                 # the already-closed parent and the child is orphaned.
                 if (
-                    getattr(self.agent, "session_id", None)
-                    and self.agent.session_id != self.session_id
+                        getattr(self.agent, "session_id", None)
+                        and self.agent.session_id != self.session_id
                 ):
                     self.session_id = self.agent.session_id
                     self._pending_title = None
@@ -7487,7 +7512,7 @@ class TalariaCLI:
                 print("🔄 Reloading skills...")
 
             result = reload_skills()
-            added = result.get("added", [])      # [{"name", "description"}, ...]
+            added = result.get("added", [])  # [{"name", "description"}, ...]
             removed = result.get("removed", [])  # [{"name", "description"}, ...]
             total = result.get("total", 0)
 
@@ -7563,7 +7588,8 @@ class TalariaCLI:
     # Tool progress callback
     # ====================================================================
 
-    def _on_tool_progress(self, event_type: str, function_name: str = None, preview: str = None, function_args: dict = None, **kwargs):
+    def _on_tool_progress(self, event_type: str, function_name: str = None, preview: str = None,
+                          function_args: dict = None, **kwargs):
         """Called on tool lifecycle events (tool.started, tool.completed, reasoning.available, etc.).
 
         Updates the TUI spinner widget so the user can see what the agent
@@ -7610,9 +7636,9 @@ class TalariaCLI:
                 # across processes either.
                 try:
                     if (
-                        not getattr(self, "_long_tool_hint_fired", False)
-                        and self.tool_progress_mode == "all"
-                        and duration >= 30.0
+                            not getattr(self, "_long_tool_hint_fired", False)
+                            and self.tool_progress_mode == "all"
+                            and duration >= 30.0
                     ):
                         from agent.onboarding import (
                             TOOL_PROGRESS_FLAG,
@@ -7893,7 +7919,8 @@ class TalariaCLI:
         if not state:
             return []
 
-        def _panel_box_width(title_text: str, content_lines: list[str], min_width: int = 46, max_width: int = 76) -> int:
+        def _panel_box_width(title_text: str, content_lines: list[str], min_width: int = 46,
+                             max_width: int = 76) -> int:
             term_cols = shutil.get_terminal_size((100, 20)).columns
             longest = max([len(title_text)] + [len(line) for line in content_lines] + [min_width - 4])
             inner = min(max(longest + 4, min_width - 2), max_width - 2, max(24, term_cols - 6))
@@ -8126,12 +8153,12 @@ class TalariaCLI:
         if self.agent is None:
             _cprint(f"{_DIM}Initializing agent...{_RST}")
         if not self._init_agent(
-            model_override=turn_route["model"],
-            runtime_override=turn_route["runtime"],
-            request_overrides=turn_route.get("request_overrides"),
+                model_override=turn_route["model"],
+                runtime_override=turn_route["runtime"],
+                request_overrides=turn_route.get("request_overrides"),
         ):
             return None
-        
+
         # Route image attachments based on the active model's vision capability.
         # "native" → pass pixels as OpenAI-style content parts (adapters
         #            translate for Anthropic/Gemini/Bedrock).
@@ -8177,7 +8204,7 @@ class TalariaCLI:
 
         ChatConsole().print(f"[{_accent_hex()}]{'─' * 40}[/]")
         print(flush=True)
-        
+
         try:
             # Run the conversation with interrupt monitoring
             result = None
@@ -8280,9 +8307,10 @@ class TalariaCLI:
                             try:
                                 _dbg = _talaria_home / "interrupt_debug.log"
                                 with open(_dbg, "a") as _f:
-                                    _f.write(f"{time.strftime('%H:%M:%S')} interrupt fired: msg={str(interrupt_msg)[:60]!r}, "
-                                             f"children={len(self.agent._active_children)}, "
-                                             f"parent._interrupt={self.agent._interrupt_requested}\n")
+                                    _f.write(
+                                        f"{time.strftime('%H:%M:%S')} interrupt fired: msg={str(interrupt_msg)[:60]!r}, "
+                                        f"children={len(self.agent._active_children)}, "
+                                        f"parent._interrupt={self.agent._interrupt_requested}\n")
                                     for _ci, _ch in enumerate(self.agent._active_children):
                                         _f.write(f"  child[{_ci}]._interrupt={_ch._interrupt_requested}\n")
                             except Exception:
@@ -8354,7 +8382,8 @@ class TalariaCLI:
             time.sleep(0.15)
 
             # Update history with full conversation
-            self.conversation_history = result.get("messages", self.conversation_history) if result else self.conversation_history
+            self.conversation_history = result.get("messages",
+                                                   self.conversation_history) if result else self.conversation_history
 
             # If auto-compression fired mid-turn, the agent created a new
             # continuation session and mutated self.agent.session_id. Sync
@@ -8363,9 +8392,9 @@ class TalariaCLI:
             # than the ended parent. Mirrors the gateway's post-run sync
             # (gateway/run.py around line 9983).
             if (
-                self.agent
-                and getattr(self.agent, "session_id", None)
-                and self.agent.session_id != self.session_id
+                    self.agent
+                    and getattr(self.agent, "session_id", None)
+                    and self.agent.session_id != self.session_id
             ):
                 self.session_id = self.agent.session_id
                 self._pending_title = None
@@ -8474,7 +8503,6 @@ class TalariaCLI:
                         padding=(1, 4),
                     ))
 
-
             # Play terminal bell when agent finishes (if enabled).
             # Works over SSH — the bell propagates to the user's terminal.
             if self.bell_on_complete:
@@ -8524,10 +8552,11 @@ class TalariaCLI:
                 self._pending_input.put(_leftover_steer)
 
             return response
-            
+
         except Exception as e:
             print(f"Error: {e}")
             return None
+
     def _print_exit_summary(self):
         """Print session resume info on exit, similar to Claude Code."""
         print()
@@ -8544,7 +8573,7 @@ class TalariaCLI:
                 duration_str = f"{minutes}m {seconds}s"
             else:
                 duration_str = f"{seconds}s"
-            
+
             # Look up session title for resume-by-name hint
             session_title = None
             if self._session_db:
@@ -8690,21 +8719,21 @@ class TalariaCLI:
         """
 
     def _build_tui_layout_children(
-        self,
-        *,
-        sudo_widget,
-        secret_widget,
-        approval_widget,
-        clarify_widget,
-        model_picker_widget=None,
-        spinner_widget=None,
-        spacer,
-        status_bar,
-        input_rule_top,
-        image_bar,
-        input_area,
-        input_rule_bot,
-        completions_menu,
+            self,
+            *,
+            sudo_widget,
+            secret_widget,
+            approval_widget,
+            clarify_widget,
+            model_picker_widget=None,
+            spinner_widget=None,
+            spacer,
+            status_bar,
+            input_rule_top,
+            image_bar,
+            input_area,
+            input_rule_bot,
+            completions_menu,
     ) -> list:
         """Assemble the ordered list of children for the root ``HSplit``.
 
@@ -8759,7 +8788,8 @@ class TalariaCLI:
         try:
             from talaria_cli.skin_engine import get_active_skin
             _welcome_skin = get_active_skin()
-            _welcome_text = _welcome_skin.get_branding("welcome", "Welcome to Talaria Agent! Type your message or /help for commands.")
+            _welcome_text = _welcome_skin.get_branding("welcome",
+                                                       "Welcome to Talaria Agent! Type your message or /help for commands.")
             _welcome_color = _welcome_skin.get_color("banner_text", "#FFF8DC")
         except Exception:
             _welcome_text = "Welcome to Talaria Agent! Type your message or /help for commands."
@@ -8798,11 +8828,11 @@ class TalariaCLI:
             )
             self._startup_skills_line_shown = True
         self._console_print()
-        
+
         # State for async operation
         self._agent_running = False
-        self._pending_input = queue.Queue()     # For normal input (commands + new queries)
-        self._interrupt_queue = queue.Queue()   # For messages typed while agent is running
+        self._pending_input = queue.Queue()  # For normal input (commands + new queries)
+        self._interrupt_queue = queue.Queue()  # For messages typed while agent is running
         self._should_exit = False
         self._last_ctrl_c_time = 0  # Track double Ctrl+C for force exit
 
@@ -8820,17 +8850,17 @@ class TalariaCLI:
         # Clarify tool state: interactive question/answer with the user.
         # When the agent calls the clarify tool, _clarify_state is set and
         # the prompt_toolkit UI switches to a selection mode.
-        self._clarify_state = None      # dict with question, choices, selected, response_queue
+        self._clarify_state = None  # dict with question, choices, selected, response_queue
         self._clarify_freetext = False  # True when user chose "Other" and is typing
-        self._clarify_deadline = 0      # monotonic timestamp when the clarify times out
+        self._clarify_deadline = 0  # monotonic timestamp when the clarify times out
 
         # Sudo password prompt state (similar mechanism to clarify)
-        self._sudo_state = None         # dict with response_queue when active
+        self._sudo_state = None  # dict with response_queue when active
         self._sudo_deadline = 0
         self._modal_input_snapshot = None
 
         # Dangerous command approval state (similar mechanism to clarify)
-        self._approval_state = None     # dict with command, description, choices, selected, response_queue
+        self._approval_state = None  # dict with command, description, choices, selected, response_queue
         self._approval_deadline = 0
         self._approval_lock = threading.Lock()  # serialize concurrent approval prompts (delegation race fix)
 
@@ -8839,7 +8869,7 @@ class TalariaCLI:
         self._command_status = ""
 
         # Secure secret capture state for skill setup
-        self._secret_state = None       # dict with var_name, prompt, metadata, response_queue
+        self._secret_state = None  # dict with var_name, prompt, metadata, response_queue
         self._secret_deadline = 0
 
         # Clipboard image attachments (paste images into the CLI)
@@ -8865,10 +8895,10 @@ class TalariaCLI:
                             f"— command scanning will use pattern matching only{_RST}")
         except Exception:
             pass  # Non-fatal — fail-open at scan time if unavailable
-        
+
         # Key bindings for the input area
         kb = KeyBindings()
-        
+
         @kb.add('enter')
         def handle_enter(event):
             """Handle Enter key - submit input.
@@ -9003,8 +9033,9 @@ class TalariaCLI:
                         try:
                             _dbg = _talaria_home / "interrupt_debug.log"
                             with open(_dbg, "a") as _f:
-                                _f.write(f"{time.strftime('%H:%M:%S')} ENTER: queued interrupt msg={str(payload)[:60]!r}, "
-                                         f"agent_running={self._agent_running}\n")
+                                _f.write(
+                                    f"{time.strftime('%H:%M:%S')} ENTER: queued interrupt msg={str(payload)[:60]!r}, "
+                                    f"agent_running={self._agent_running}\n")
                         except Exception:
                             pass
                     # First-touch onboarding: on the very first busy-while-running
@@ -9028,7 +9059,7 @@ class TalariaCLI:
                 else:
                     self._pending_input.put(payload)
                 event.app.current_buffer.reset(append_to_history=True)
-        
+
         @kb.add('escape', 'enter')
         def handle_alt_enter(event):
             """Alt+Enter inserts a newline for multi-line input."""
@@ -9120,12 +9151,14 @@ class TalariaCLI:
                         # Select "Other" option
                         self._clarify_freetext = True
                         event.app.invalidate()
+
             return handler
 
         for _num in range(10):
             # 1-9 select items 0-8, 0 selects item 9 (10thitem)
             _idx = 9 if _num == 0 else _num - 1
-            kb.add(str(_num), filter=Condition(lambda: bool(self._clarify_state) and not self._clarify_freetext))(_make_clarify_number_handler(_idx))
+            kb.add(str(_num), filter=Condition(lambda: bool(self._clarify_state) and not self._clarify_freetext))(
+                _make_clarify_number_handler(_idx))
 
         # --- Dangerous command approval: arrow-key navigation ---
 
@@ -9175,6 +9208,7 @@ class TalariaCLI:
                     self._approval_state["selected"] = idx
                     self._handle_approval_selection()
                     event.app.invalidate()
+
             return handler
 
         for _num in range(10):
@@ -9267,7 +9301,7 @@ class TalariaCLI:
                     self._should_exit = True
                     event.app.exit()
                     return
-                
+
                 self._last_ctrl_c_time = now
                 print("\n⚡ Interrupting agent... (press Ctrl+C again to force exit)")
                 self.agent.interrupt()
@@ -9281,7 +9315,7 @@ class TalariaCLI:
                 else:
                     self._should_exit = True
                     event.app.exit()
-        
+
         @kb.add('c-d')
         def handle_ctrl_d(event):
             """Ctrl+D: delete char under cursor (standard readline behaviour).
@@ -9329,9 +9363,11 @@ class TalariaCLI:
             from talaria_cli.skin_engine import get_active_skin
             agent_name = get_active_skin().get_branding("agent_name", "Talaria Agent")
             msg = f"\n{agent_name} has been suspended. Run `fg` to bring {agent_name} back."
+
             def _suspend():
                 os.write(1, msg.encode())
                 os.kill(0, _sig.SIGTSTP)
+
             run_in_terminal(_suspend)
 
         from prompt_toolkit.keys import Keys
@@ -9434,7 +9470,6 @@ class TalariaCLI:
 
         # Create the input area with multiline (shift+enter), autocomplete, and paste handling
         from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-
 
         _completer = SlashCommandCompleter(
             skill_commands_provider=lambda: _skill_commands,
@@ -9560,6 +9595,7 @@ class TalariaCLI:
 
         class _PlaceholderProcessor(Processor):
             """Render grayed-out placeholder text inside the input when empty."""
+
             def __init__(self, get_text):
                 self._get_text = get_text
 
@@ -9812,7 +9848,8 @@ class TalariaCLI:
             # Box top border
             lines.append(('class:clarify-border', '╭─ '))
             lines.append(('class:clarify-title', 'Talaria needs your input'))
-            lines.append(('class:clarify-border', ' ' + ('─' * max(0, box_width - len("Talaria needs your input") - 3)) + '╮\n'))
+            lines.append(
+                ('class:clarify-border', ' ' + ('─' * max(0, box_width - len("Talaria needs your input") - 3)) + '╮\n'))
             if not use_compact_chrome:
                 _append_blank_panel_line(lines, 'class:clarify-border', box_width)
 
@@ -9844,7 +9881,7 @@ class TalariaCLI:
                     other_num_prefix = '0'
                 else:
                     other_num_prefix = ' '
-                
+
                 if selected == other_idx and not cli_ref._clarify_freetext:
                     other_style = 'class:clarify-selected'
                 elif cli_ref._clarify_freetext:
@@ -10089,7 +10126,7 @@ class TalariaCLI:
                 )
             )
         )
-        
+
         # Style for the application
         self._tui_style_base = {
             'input-area': '#FFF8DC',
@@ -10135,7 +10172,7 @@ class TalariaCLI:
             'approval-selected': '#FFD700 bold',
         }
         style = PTStyle.from_dict(self._build_tui_style_dict())
-        
+
         # Create the application
         app = Application(
             layout=layout,
@@ -10202,7 +10239,7 @@ class TalariaCLI:
 
         spinner_thread = threading.Thread(target=spinner_loop, daemon=True)
         spinner_thread.start()
-        
+
         # Background thread to process inputs and run agent
         def process_loop():
             while not self._should_exit:
@@ -10222,7 +10259,8 @@ class TalariaCLI:
                                     evt = process_registry.completion_queue.get_nowait()
                                     # Skip if the agent already consumed this via wait/poll/log
                                     _evt_sid = evt.get("session_id", "")
-                                    if evt.get("type") == "completion" and process_registry.is_completion_consumed(_evt_sid):
+                                    if evt.get("type") == "completion" and process_registry.is_completion_consumed(
+                                            _evt_sid):
                                         pass  # already delivered via tool result
                                     else:
                                         _synth = _format_process_notification(evt)
@@ -10231,7 +10269,7 @@ class TalariaCLI:
                             except Exception:
                                 pass
                         continue
-                    
+
                     if not user_input:
                         continue
 
@@ -10243,7 +10281,7 @@ class TalariaCLI:
                     if isinstance(user_input, str):
                         user_input = _strip_leaked_bracketed_paste_wrappers(user_input)
                         user_input = _strip_leaked_terminal_responses(user_input)
-                    
+
                     # Check for commands — but detect dragged/pasted file paths first.
                     # See _detect_file_drop() for details.
                     _file_drop = _detect_file_drop(user_input) if isinstance(user_input, str) else None
@@ -10257,8 +10295,8 @@ class TalariaCLI:
                         else:
                             _cprint(f"  📄 Detected file: {_drop_path.name}")
                             user_input = (
-                                f"[User attached file: {_drop_path}]"
-                                + (f"\n{_remainder}" if _remainder else "")
+                                    f"[User attached file: {_drop_path}]"
+                                    + (f"\n{_remainder}" if _remainder else "")
                             )
 
                     if not _file_drop and isinstance(user_input, str) and _looks_like_slash_command(user_input):
@@ -10269,7 +10307,7 @@ class TalariaCLI:
                             if app.is_running:
                                 app.exit()
                         continue
-                    
+
                     # Expand paste references back to full content
                     _paste_ref_re = re.compile(r'\[Pasted text #\d+: \d+ lines \u2192 (.+?)\]')
                     paste_refs = list(_paste_ref_re.finditer(user_input)) if isinstance(user_input, str) else []
@@ -10277,7 +10315,7 @@ class TalariaCLI:
                         user_input = self._expand_paste_references(user_input)
                     print()
                     self._print_user_message_preview(user_input)
-                    
+
                     # Show image attachment count
                     if submit_images:
                         n = len(submit_images)
@@ -10306,7 +10344,8 @@ class TalariaCLI:
                                 evt = process_registry.completion_queue.get_nowait()
                                 # Skip if the agent already consumed this via wait/poll/log
                                 _evt_sid = evt.get("session_id", "")
-                                if evt.get("type") == "completion" and process_registry.is_completion_consumed(_evt_sid):
+                                if evt.get("type") == "completion" and process_registry.is_completion_consumed(
+                                        _evt_sid):
                                     continue  # already delivered via tool result
                                 _synth = _format_process_notification(evt)
                                 if _synth:
@@ -10316,14 +10355,14 @@ class TalariaCLI:
 
                 except Exception as e:
                     print(f"Error: {e}")
-        
+
         # Start processing thread
         process_thread = threading.Thread(target=process_loop, daemon=True)
         process_thread.start()
-        
+
         # Register atexit cleanup so resources are freed even on unexpected exit
         atexit.register(_run_cleanup)
-        
+
         # Register signal handlers for graceful shutdown on SSH disconnect / SIGTERM
         def _signal_handler(signum, frame):
             """Handle SIGHUP/SIGTERM by triggering graceful cleanup.
@@ -10356,7 +10395,7 @@ class TalariaCLI:
             except Exception:
                 pass  # never block signal handling
             raise KeyboardInterrupt()
-        
+
         try:
             import signal as _signal
             _signal.signal(_signal.SIGTERM, _signal_handler)
@@ -10364,7 +10403,7 @@ class TalariaCLI:
                 _signal.signal(_signal.SIGHUP, _signal_handler)
         except Exception:
             pass  # Signal handlers may fail in restricted environments
-        
+
         # Install a custom asyncio exception handler that suppresses the
         # "Event loop is closed" RuntimeError from httpx transport cleanup
         # and the "0 is not registered" KeyError from broken stdin (#6393).
@@ -10471,29 +10510,29 @@ class TalariaCLI:
 # ============================================================================
 
 def main(
-    query: str = None,
-    q: str = None,
-    image: str = None,
-    toolsets: str = None,
-    skills: str | list[str] | tuple[str, ...] = None,
-    model: str = None,
-    provider: str = None,
-    api_key: str = None,
-    base_url: str = None,
-    max_turns: int = None,
-    verbose: bool = False,
-    quiet: bool = False,
-    compact: bool = False,
-    list_tools: bool = False,
-    list_toolsets: bool = False,
-    gateway: bool = False,
-    resume: str = None,
-    worktree: bool = False,
-    w: bool = False,
-    checkpoints: bool = False,
-    pass_session_id: bool = False,
-    ignore_user_config: bool = False,
-    ignore_rules: bool = False,
+        query: str = None,
+        q: str = None,
+        image: str = None,
+        toolsets: str = None,
+        skills: str | list[str] | tuple[str, ...] = None,
+        model: str = None,
+        provider: str = None,
+        api_key: str = None,
+        base_url: str = None,
+        max_turns: int = None,
+        verbose: bool = False,
+        quiet: bool = False,
+        compact: bool = False,
+        list_tools: bool = False,
+        list_toolsets: bool = False,
+        gateway: bool = False,
+        resume: str = None,
+        worktree: bool = False,
+        w: bool = False,
+        checkpoints: bool = False,
+        pass_session_id: bool = False,
+        ignore_user_config: bool = False,
+        ignore_rules: bool = False,
 ):
     """
     Talaria Agent CLI - Interactive AI Assistant
@@ -10533,7 +10572,7 @@ def main(
     # Signal to terminal_tool that we're in interactive mode
     # This enables interactive sudo password prompts with timeout
     os.environ["TALARIA_INTERACTIVE"] = "1"
-    
+
     # Handle gateway mode (messaging + cron)
     if gateway:
         import asyncio
@@ -10565,10 +10604,10 @@ def main(
                 return
     else:
         wt_info = None
-    
+
     # Handle query shorthand
     query = query or q
-    
+
     # Parse toolsets - handle both string and tuple/list inputs
     # Default to talaria-cli toolset which includes cronjob management tools
     toolsets_list = None
@@ -10587,7 +10626,7 @@ def main(
         # Use the shared resolver so MCP servers are included at runtime
         from talaria_cli.tools_config import _get_platform_tools
         toolsets_list = sorted(_get_platform_tools(CLI_CONFIG, "cli"))
-    
+
     parsed_skills = _parse_skills_argument(skills)
 
     # Create CLI instance
@@ -10630,18 +10669,18 @@ def main(
             f"The original repo is at {wt_info['repo_root']}.]"
         )
         cli.system_prompt = (cli.system_prompt or "") + wt_note
-    
+
     # Handle list commands (don't init agent for these)
     if list_tools:
         cli.show_banner()
         cli.show_tools()
         sys.exit(0)
-    
+
     if list_toolsets:
         cli.show_banner()
         cli.show_toolsets()
         sys.exit(0)
-    
+
     # Register cleanup for single-query mode (interactive mode registers in run())
     atexit.register(_run_cleanup)
 
@@ -10675,6 +10714,7 @@ def main(
         except Exception:
             pass  # never block signal handling
         raise KeyboardInterrupt()
+
     try:
         import signal as _signal
         _signal.signal(_signal.SIGTERM, _signal_handler_q)
@@ -10682,7 +10722,7 @@ def main(
             _signal.signal(_signal.SIGHUP, _signal_handler_q)
     except Exception:
         pass  # signal handler may fail in restricted environments
-    
+
     # Handle single query mode
     if query or image:
         query, single_query_images = _collect_query_images(query, image)
@@ -10702,9 +10742,9 @@ def main(
                 if turn_route["signature"] != cli._active_agent_route_signature:
                     cli.agent = None
                 if cli._init_agent(
-                    model_override=turn_route["model"],
-                    runtime_override=turn_route["runtime"],
-                    request_overrides=turn_route.get("request_overrides"),
+                        model_override=turn_route["model"],
+                        runtime_override=turn_route["runtime"],
+                        request_overrides=turn_route.get("request_overrides"),
                 ):
                     cli.agent.quiet_mode = True
                     cli.agent.suppress_status_output = True
@@ -10722,8 +10762,8 @@ def main(
                     # session_id to stderr for automation wrappers; without
                     # this sync it would point at the ended parent.
                     if (
-                        getattr(cli.agent, "session_id", None)
-                        and cli.agent.session_id != cli.session_id
+                            getattr(cli.agent, "session_id", None)
+                            and cli.agent.session_id != cli.session_id
                     ):
                         cli.session_id = cli.agent.session_id
                     response = result.get("final_response", "") if isinstance(result, dict) else str(result)
@@ -10731,10 +10771,10 @@ def main(
                         print(response)
                     # Session ID goes to stderr so piped stdout is clean.
                     print(f"\nsession_id: {cli.session_id}", file=sys.stderr)
-                    
+
                     # Ensure proper exit code for automation wrappers
                     sys.exit(1 if isinstance(result, dict) and result.get("failed") else 0)
-            
+
             # Exit with error code if credentials or agent init fails
             sys.exit(1)
         else:
@@ -10745,7 +10785,7 @@ def main(
             cli.chat(query, images=single_query_images or None)
             cli._print_exit_summary()
         return
-    
+
     # Run interactive mode
     cli.run()
 
