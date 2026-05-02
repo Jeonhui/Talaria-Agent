@@ -860,7 +860,7 @@ def build_skills_system_prompt(
             "already know how to do, because the skill defines how it should be done here.\n"
             "Whenever the user asks you to configure, set up, install, enable, disable, modify, "
             "or troubleshoot Talaria Agent itself — its CLI, config, models, providers, tools, "
-            "skills, voice, gateway, plugins, or any feature — load the `talaria-agent` skill "
+            "skills, gateway, plugins, or any feature — load the `talaria-agent` skill "
             "first. It has the actual commands (e.g. `talaria config set …`, `talaria tools`, "
             "`talaria setup`) so you don't have to guess or invent workarounds.\n"
             "If a skill has issues, fix it with skill_manage(action='patch').\n"
@@ -883,11 +883,6 @@ def build_skills_system_prompt(
             _SKILLS_PROMPT_CACHE.popitem(last=False)
 
     return result
-
-
-def build_nous_subscription_prompt(valid_tool_names: "set[str] | None" = None) -> str:
-    """Talaria does not include the Nous Tool Gateway."""
-    return ""
 
 
 def _truncate_content(content: str, filename: str, max_chars: int = CONTEXT_FILE_MAX_CHARS) -> str:

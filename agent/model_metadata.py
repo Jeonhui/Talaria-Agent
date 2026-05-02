@@ -1193,39 +1193,6 @@ def _resolve_codex_oauth_context_length(
     return None
 
 
-def _resolve_nous_context_length(model: str) -> Optional[int]:
-    """Resolve Nous Portal model context length via OpenRouter metadata.
-
-    Nous model IDs are bare (e.g. 'claude-opus-4-6') while OpenRouter uses
-    prefixed IDs (e.g. 'anthropic/claude-opus-4.6'). Try suffix matching
-    with version normalization (dot↔dash).
-    """
-    metadata = fetch_model_metadata()  # OpenRouter cache
-    # Exact match first
-    if model in metadata:
-        return metadata[model].get("context_length")
-
-    normalized = _normalize_model_version(model).lower()
-
-    for or_id, entry in metadata.items():
-        bare = or_id.split("/", 1)[1] if "/" in or_id else or_id
-        if bare.lower() == model.lower() or _normalize_model_version(bare).lower() == normalized:
-            return entry.get("context_length")
-
-    # Partial prefix match for cases like gemini-3-flash → gemini-3-flash-preview
-    # Require match to be at a word boundary (followed by -, :, or end of string)
-    model_lower = model.lower()
-    for or_id, entry in metadata.items():
-        bare = or_id.split("/", 1)[1] if "/" in or_id else or_id
-        for candidate, query in [(bare.lower(), model_lower), (_normalize_model_version(bare).lower(), normalized)]:
-            if candidate.startswith(query) and (
-                len(candidate) == len(query) or candidate[len(query)] in "-:."
-            ):
-                return entry.get("context_length")
-
-    return None
-
-
 def get_model_context_length(
     model: str,
     base_url: str = "",
@@ -1378,10 +1345,6 @@ def get_model_context_length(
         except Exception:
             pass  # Fall through to models.dev
 
-    if effective_provider == "nous":
-        ctx = _resolve_nous_context_length(model)
-        if ctx:
-            return ctx
     if effective_provider == "openai-codex":
         # Codex OAuth enforces lower context limits than the direct OpenAI
         # API for the same slug (e.g. gpt-5.5 is 1.05M on the API but 272K

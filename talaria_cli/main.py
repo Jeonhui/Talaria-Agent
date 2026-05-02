@@ -755,428 +755,8 @@ def _resolve_session_by_name_or_id(name_or_id: str) -> Optional[str]:
     return None
 
 
-def _read_tui_active_session_file(path: Optional[str]) -> Optional[str]:
-    if not path:
-        return None
-    try:
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-        sid = str(data.get("session_id") or "").strip()
-        return sid or None
-    except Exception:
-        return None
-
-
-def _print_tui_exit_summary(session_id: Optional[str], active_session_file: Optional[str] = None) -> None:
-    """Print a shell-visible epilogue after TUI exits."""
-    target = _read_tui_active_session_file(active_session_file) or session_id or _resolve_last_session(source="tui")
-    if not target:
-        return
-
-    db = None
-    try:
-        from talaria_state import SessionDB
-
-        db = SessionDB()
-        session = db.get_session(target)
-        if not session:
-            return
-
-        title = db.get_session_title(target)
-        message_count = int(session.get("message_count") or 0)
-        input_tokens = int(session.get("input_tokens") or 0)
-        output_tokens = int(session.get("output_tokens") or 0)
-        cache_read_tokens = int(session.get("cache_read_tokens") or 0)
-        cache_write_tokens = int(session.get("cache_write_tokens") or 0)
-        reasoning_tokens = int(session.get("reasoning_tokens") or 0)
-        total_tokens = (
-            input_tokens
-            + output_tokens
-            + cache_read_tokens
-            + cache_write_tokens
-            + reasoning_tokens
-        )
-    except Exception:
-        return
-    finally:
-        if db is not None:
-            db.close()
-
-    print()
-    print("Resume this session with:")
-    print(f"  talaria --tui --resume {target}")
-    if title:
-        print(f'  talaria --tui -c "{title}"')
-    print()
-    print(f"Session:        {target}")
-    if title:
-        print(f"Title:          {title}")
-    print(f"Messages:       {message_count}")
-    print(
-        "Tokens:         "
-        f"{total_tokens} (in {input_tokens}, out {output_tokens}, "
-        f"cache {cache_read_tokens + cache_write_tokens}, reasoning {reasoning_tokens})"
-    )
-
-
-_NPM_LOCK_RUNTIME_KEYS = frozenset({"ideallyInert"})
-
-
-def _tui_need_npm_install(root: Path) -> bool:
-    """True when @talaria/ink is missing or node_modules is behind package-lock.json.
-
-    Compares ``package-lock.json`` against ``node_modules/.package-lock.json``
-    (npm's hidden lockfile) by **content**, not mtime: git checkouts and npm
-    rewrites can bump the root lockfile's timestamp even when installed deps
-    already match, which used to trigger a spurious "Installing TUI
-    dependencies" on every launch.
-
-    For each entry in the root lock's ``packages`` map:
-      - missing from hidden lock → reinstall (unless the entry is marked
-        ``optional`` or ``peer``, which npm may intentionally skip per platform)
-      - present but with differing fields (excluding npm-written runtime
-        annotations like ``ideallyInert``) → reinstall
-
-    Extra entries that exist only in the hidden lock are ignored — stale
-    transitives left over from a removed dependency don't break runtime and
-    we'd rather not force a reinstall for them. Falls back to mtime
-    comparison if either lockfile is unparseable.
-    """
-    ink = root / "node_modules" / "@talaria" / "ink" / "package.json"
-    if not ink.is_file():
-        return True
-    lock = root / "package-lock.json"
-    if not lock.is_file():
-        return False
-    marker = root / "node_modules" / ".package-lock.json"
-    if not marker.is_file():
-        return True
-
-    # Compare lockfile contents, not mtimes: git checkouts and npm rewrites
-    # can bump the root lockfile timestamp even when installed deps already
-    # match. Fall back to mtime when either file is unparseable.
-    try:
-        wanted = json.loads(lock.read_text(encoding="utf-8")).get("packages") or {}
-        installed = json.loads(marker.read_text(encoding="utf-8")).get("packages") or {}
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return lock.stat().st_mtime > marker.stat().st_mtime
-
-    def comparable(pkg: dict) -> dict:
-        return {k: v for k, v in pkg.items() if k not in _NPM_LOCK_RUNTIME_KEYS}
-
-    for name, pkg in wanted.items():
-        if not name:
-            continue
-
-        if not isinstance(pkg, dict):
-            continue
-
-        if name not in installed:
-            if pkg.get("optional") or pkg.get("peer"):
-                continue
-            return True
-
-        if isinstance(installed[name], dict) and comparable(pkg) != comparable(installed[name]):
-            return True
-
-    return False
-
-
-def _find_bundled_tui(tui_dir: Path) -> Optional[Path]:
-    """Directory whose dist/entry.js we should run: TALARIA_TUI_DIR first, else repo ui-tui."""
-    env = os.environ.get("TALARIA_TUI_DIR")
-    if env:
-        p = Path(env)
-        if (p / "dist" / "entry.js").exists() and not _tui_need_npm_install(p):
-            return p
-    if (tui_dir / "dist" / "entry.js").exists() and not _tui_need_npm_install(tui_dir):
-        return tui_dir
-    return None
-
-
-def _tui_build_needed(tui_dir: Path) -> bool:
-    if _talaria_ink_bundle_stale(tui_dir):
-        return True
-    entry = tui_dir / "dist" / "entry.js"
-    if not entry.exists():
-        return True
-    dist_m = entry.stat().st_mtime
-    skip = frozenset({"node_modules", "dist"})
-    for dirpath, dirnames, filenames in os.walk(tui_dir, topdown=True):
-        dirnames[:] = [d for d in dirnames if d not in skip]
-        for fn in filenames:
-            if fn.endswith((".ts", ".tsx")):
-                if os.path.getmtime(os.path.join(dirpath, fn)) > dist_m:
-                    return True
-    for meta in (
-        "package.json",
-        "package-lock.json",
-        "tsconfig.json",
-        "tsconfig.build.json",
-    ):
-        mp = tui_dir / meta
-        if mp.exists() and mp.stat().st_mtime > dist_m:
-            return True
-    return False
-
-
-def _talaria_ink_bundle_stale(tui_dir: Path) -> bool:
-    ink_root = tui_dir / "packages" / "talaria-ink"
-    bundle = ink_root / "dist" / "ink-bundle.js"
-    if not bundle.exists():
-        return True
-    bm = bundle.stat().st_mtime
-    skip = frozenset({"node_modules", "dist"})
-    for dirpath, dirnames, filenames in os.walk(ink_root, topdown=True):
-        dirnames[:] = [d for d in dirnames if d not in skip]
-        for fn in filenames:
-            if fn.endswith((".ts", ".tsx")):
-                if os.path.getmtime(os.path.join(dirpath, fn)) > bm:
-                    return True
-    mp = ink_root / "package.json"
-    if mp.exists() and mp.stat().st_mtime > bm:
-        return True
-    return False
-
-
-def _ensure_tui_node() -> None:
-    """Make sure `node` + `npm` are on PATH for the TUI.
-
-    If either is missing and scripts/lib/node-bootstrap.sh is available, source
-    it and call `ensure_node` (fnm/nvm/proto/brew/bundled cascade). After
-    install, capture the resolved node binary path from the bash subprocess
-    and prepend its directory to os.environ["PATH"] so shutil.which finds the
-    new binaries in this Python process — regardless of which version manager
-    was used (nvm, fnm, proto, brew, or the bundled fallback).
-
-    Idempotent no-op when node+npm are already discoverable. Set
-    ``TALARIA_SKIP_NODE_BOOTSTRAP=1`` to disable auto-install.
-    """
-    if shutil.which("node") and shutil.which("npm"):
-        return
-    if os.environ.get("TALARIA_SKIP_NODE_BOOTSTRAP"):
-        return
-
-    helper = PROJECT_ROOT / "scripts" / "lib" / "node-bootstrap.sh"
-    if not helper.is_file():
-        return
-
-    talaria_home = os.environ.get("TALARIA_HOME") or str(Path.home() / ".talaria")
-    try:
-        # Helper writes logs to stderr; we ask bash to print `command -v node`
-        # on stdout once ensure_node succeeds. Subshell PATH edits don't leak
-        # back into Python, so the stdout capture is the bridge.
-        result = subprocess.run(
-            [
-                "bash",
-                "-c",
-                f'source "{helper}" >&2 && ensure_node >&2 && command -v node',
-            ],
-            env={**os.environ, "TALARIA_HOME": talaria_home},
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return
-
-    parts = os.environ.get("PATH", "").split(os.pathsep)
-    extras: list[Path] = []
-
-    resolved = (result.stdout or "").strip()
-    if resolved:
-        extras.append(Path(resolved).resolve().parent)
-
-    extras.extend([Path(talaria_home) / "node" / "bin", Path.home() / ".local" / "bin"])
-
-    for extra in extras:
-        s = str(extra)
-        if extra.is_dir() and s not in parts:
-            parts.insert(0, s)
-    os.environ["PATH"] = os.pathsep.join(parts)
-
-
-def _make_tui_argv(tui_dir: Path, tui_dev: bool) -> tuple[list[str], Path]:
-    """TUI: --dev → tsx src; else node dist (TALARIA_TUI_DIR or ui-tui, build when stale)."""
-    _ensure_tui_node()
-
-    def _node_bin(bin: str) -> str:
-        if bin == "node":
-            env_node = os.environ.get("TALARIA_NODE")
-            if env_node and os.path.isfile(env_node) and os.access(env_node, os.X_OK):
-                return env_node
-        path = shutil.which(bin)
-        if not path:
-            print(f"{bin} not found — install Node.js to use the TUI.")
-            sys.exit(1)
-        return path
-
-    # pre-built dist + node_modules (nix / full TALARIA_TUI_DIR) skips npm.
-    if not tui_dev:
-        ext_dir = os.environ.get("TALARIA_TUI_DIR")
-        if ext_dir:
-            p = Path(ext_dir)
-            if (p / "dist" / "entry.js").exists() and not _tui_need_npm_install(p):
-                node = _node_bin("node")
-                return [node, str(p / "dist" / "entry.js")], p
-
-    npm = _node_bin("npm")
-    if _tui_need_npm_install(tui_dir):
-        if not os.environ.get("TALARIA_QUIET"):
-            print("Installing TUI dependencies…")
-        result = subprocess.run(
-            [npm, "install", "--silent", "--no-fund", "--no-audit", "--progress=false"],
-            cwd=str(tui_dir),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.PIPE,
-            text=True,
-            env={**os.environ, "CI": "1"},
-        )
-        if result.returncode != 0:
-            err = (result.stderr or "").strip()
-            preview = "\n".join(err.splitlines()[-30:])
-            print("npm install failed.")
-            if preview:
-                print(preview)
-            sys.exit(1)
-
-    if tui_dev:
-        if _talaria_ink_bundle_stale(tui_dir):
-            result = subprocess.run(
-                [npm, "run", "build", "--prefix", "packages/talaria-ink"],
-                cwd=str(tui_dir),
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                combined = f"{result.stdout or ''}{result.stderr or ''}".strip()
-                preview = "\n".join(combined.splitlines()[-30:])
-                print("@talaria/ink build failed.")
-                if preview:
-                    print(preview)
-                sys.exit(1)
-        tsx = tui_dir / "node_modules" / ".bin" / "tsx"
-        if tsx.exists():
-            return [str(tsx), "src/entry.tsx"], tui_dir
-        return [npm, "start"], tui_dir
-
-    if _tui_build_needed(tui_dir):
-        result = subprocess.run(
-            [npm, "run", "build"],
-            cwd=str(tui_dir),
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
-            combined = f"{result.stdout or ''}{result.stderr or ''}".strip()
-            preview = "\n".join(combined.splitlines()[-30:])
-            print("TUI build failed.")
-            if preview:
-                print(preview)
-            sys.exit(1)
-
-    root = _find_bundled_tui(tui_dir)
-    if not root:
-        print("TUI build did not produce dist/entry.js")
-        sys.exit(1)
-
-    node = _node_bin("node")
-    return [node, str(root / "dist" / "entry.js")], root
-
-
-def _normalize_tui_toolsets(toolsets: object) -> list[str]:
-    """Normalize argparse/Fire-style toolset input for the TUI subprocess."""
-    try:
-        from talaria_cli.oneshot import _normalize_toolsets
-
-        return _normalize_toolsets(toolsets) or []
-    except (AttributeError, ImportError):
-        if not toolsets:
-            return []
-
-        raw_items = [toolsets] if isinstance(toolsets, str) else toolsets
-        if not isinstance(raw_items, (list, tuple)):
-            raw_items = [raw_items]
-
-        normalized: list[str] = []
-        for item in raw_items:
-            if isinstance(item, str):
-                normalized.extend(part.strip() for part in item.split(","))
-            else:
-                normalized.append(str(item).strip())
-
-        return [item for item in normalized if item]
-
-
-def _launch_tui(
-    resume_session_id: Optional[str] = None,
-    tui_dev: bool = False,
-    model: Optional[str] = None,
-    provider: Optional[str] = None,
-    toolsets: object = None,
-):
-    """Replace current process with the TUI."""
-    tui_dir = PROJECT_ROOT / "ui-tui"
-
-    import tempfile
-
-    env = os.environ.copy()
-    active_session_fd, active_session_file = tempfile.mkstemp(
-        prefix="talaria-tui-active-session-", suffix=".json"
-    )
-    os.close(active_session_fd)
-    env["TALARIA_TUI_ACTIVE_SESSION_FILE"] = active_session_file
-    env["TALARIA_PYTHON_SRC_ROOT"] = os.environ.get(
-        "TALARIA_PYTHON_SRC_ROOT", str(PROJECT_ROOT)
-    )
-    env.setdefault("TALARIA_PYTHON", sys.executable)
-    env.setdefault("TALARIA_CWD", os.getcwd())
-    env.setdefault("NODE_ENV", "development" if tui_dev else "production")
-    if model:
-        env["TALARIA_MODEL"] = model
-        env["TALARIA_INFERENCE_MODEL"] = model
-    if provider:
-        env["TALARIA_TUI_PROVIDER"] = provider
-        env["TALARIA_INFERENCE_PROVIDER"] = provider
-    tui_toolsets = _normalize_tui_toolsets(toolsets)
-    if tui_toolsets:
-        env["TALARIA_TUI_TOOLSETS"] = ",".join(tui_toolsets)
-    # Guarantee an 8GB V8 heap + exposed GC for the TUI. Default node cap is
-    # ~1.5–4GB depending on version and can fatal-OOM on long sessions with
-    # large transcripts / reasoning blobs. Token-level merge: respect any
-    # user-supplied --max-old-space-size (they may have set it higher) and
-    # avoid duplicating --expose-gc.
-    _tokens = env.get("NODE_OPTIONS", "").split()
-    if not any(t.startswith("--max-old-space-size=") for t in _tokens):
-        _tokens.append("--max-old-space-size=8192")
-    if "--expose-gc" not in _tokens:
-        _tokens.append("--expose-gc")
-    env["NODE_OPTIONS"] = " ".join(_tokens)
-    if resume_session_id:
-        env["TALARIA_TUI_RESUME"] = resume_session_id
-
-    argv, cwd = _make_tui_argv(tui_dir, tui_dev)
-    code: Optional[int] = None
-    try:
-        try:
-            code = subprocess.call(argv, cwd=str(cwd), env=env)
-        except KeyboardInterrupt:
-            code = 130
-
-        if code in (0, 130):
-            _print_tui_exit_summary(resume_session_id, active_session_file)
-    finally:
-        try:
-            os.unlink(active_session_file)
-        except OSError:
-            pass
-
-    sys.exit(code)
-
-
 def cmd_chat(args):
     """Run interactive chat CLI."""
-    use_tui = getattr(args, "tui", False) or os.environ.get("TALARIA_TUI") == "1"
-
     # Resolve --continue into --resume with the latest session or by name
     continue_val = getattr(args, "continue_last", None)
     if continue_val and not getattr(args, "resume", None):
@@ -1191,15 +771,11 @@ def cmd_chat(args):
                 sys.exit(1)
         else:
             # -c with no argument — continue the most recent session
-            source = "tui" if use_tui else "cli"
-            last_id = _resolve_last_session(source=source)
-            if not last_id and source == "tui":
-                last_id = _resolve_last_session(source="cli")
+            last_id = _resolve_last_session(source="cli")
             if last_id:
                 args.resume = last_id
             else:
-                kind = "TUI" if use_tui else "CLI"
-                print(f"No previous {kind} session found to continue.")
+                print("No previous CLI session found to continue.")
                 sys.exit(1)
 
     # Resolve --resume by title if it's not a direct session ID
@@ -1280,15 +856,6 @@ def cmd_chat(args):
     # --source: tag session source for filtering (e.g. 'tool' for third-party integrations)
     if getattr(args, "source", None):
         os.environ["TALARIA_SESSION_SOURCE"] = args.source
-
-    if use_tui:
-        _launch_tui(
-            getattr(args, "resume", None),
-            tui_dev=getattr(args, "tui_dev", False),
-            model=getattr(args, "model", None),
-            provider=getattr(args, "provider", None),
-            toolsets=getattr(args, "toolsets", None),
-        )
 
     # Import and run the CLI
     from cli import main as cli_main
@@ -3230,13 +2797,6 @@ def _model_flow_anthropic(config, current_model=""):
         print(f"Default model set to: {selected} (via Anthropic)")
     else:
         print("No change.")
-
-
-def cmd_login(args):
-    """Authenticate Talaria CLI with a provider."""
-    from talaria_cli.auth import login_command
-
-    login_command(args)
 
 
 def cmd_logout(args):
@@ -5495,7 +5055,6 @@ def _coalesce_session_name_args(argv: list) -> list:
         "gateway",
         "setup",
         "whatsapp",
-        "login",
         "logout",
         "auth",
         "status",
@@ -5514,7 +5073,6 @@ def _coalesce_session_name_args(argv: list) -> list:
         "profile",
         "dashboard",
         "honcho",
-        "claw",
         "plugins",
         "acp",
         "webhook",
@@ -6194,52 +5752,6 @@ def main():
              "into an existing manifest manually).",
     )
     slack_parser.set_defaults(func=cmd_slack)
-
-    # =========================================================================
-    # login command
-    # =========================================================================
-    login_parser = subparsers.add_parser(
-        "login",
-        help="Authenticate with an inference provider",
-        description="Run OAuth device authorization flow for Talaria CLI",
-    )
-    login_parser.add_argument(
-        "--provider",
-        choices=["nous", "openai-codex"],
-        default=None,
-        help="Provider to authenticate with (default: nous)",
-    )
-    login_parser.add_argument(
-        "--portal-url", help="Portal base URL (default: production portal)"
-    )
-    login_parser.add_argument(
-        "--inference-url",
-        help="Inference API base URL (default: production inference API)",
-    )
-    login_parser.add_argument(
-        "--client-id", default=None, help="OAuth client id to use (default: talaria-cli)"
-    )
-    login_parser.add_argument("--scope", default=None, help="OAuth scope to request")
-    login_parser.add_argument(
-        "--no-browser",
-        action="store_true",
-        help="Do not attempt to open the browser automatically",
-    )
-    login_parser.add_argument(
-        "--timeout",
-        type=float,
-        default=15.0,
-        help="HTTP request timeout in seconds (default: 15)",
-    )
-    login_parser.add_argument(
-        "--ca-bundle", help="Path to CA bundle PEM file for TLS verification"
-    )
-    login_parser.add_argument(
-        "--insecure",
-        action="store_true",
-        help="Disable TLS verification (testing only)",
-    )
-    login_parser.set_defaults(func=cmd_login)
 
     # =========================================================================
     # logout command

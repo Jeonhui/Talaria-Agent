@@ -533,17 +533,10 @@ def run_doctor(args):
 
     try:
         from talaria_cli.auth import (
-            get_nous_auth_status,
             get_codex_auth_status,
             get_gemini_oauth_auth_status,
             get_minimax_oauth_auth_status,
         )
-
-        nous_status = get_nous_auth_status()
-        if nous_status.get("logged_in"):
-            check_ok("Nous Portal auth", "(logged in)")
-        else:
-            check_warn("Nous Portal auth", "(not logged in)")
 
         codex_status = get_codex_auth_status()
         if codex_status.get("logged_in"):
@@ -855,22 +848,6 @@ def run_doctor(args):
             check_fail("TERMINAL_SSH_HOST not set", "(required for TERMINAL_ENV=ssh)")
             issues.append("Set TERMINAL_SSH_HOST in .env")
     
-    # Daytona (if using daytona backend)
-    if terminal_env == "daytona":
-        daytona_key = os.getenv("DAYTONA_API_KEY")
-        if daytona_key:
-            check_ok("Daytona API key", "(configured)")
-        else:
-            check_fail("DAYTONA_API_KEY not set", "(required for TERMINAL_ENV=daytona)")
-            issues.append("Set DAYTONA_API_KEY environment variable")
-        try:
-            from daytona import Daytona  # noqa: F401 — SDK presence check
-            check_ok("daytona SDK", "(installed)")
-        except ImportError:
-            check_fail("daytona SDK not installed", "(pip install daytona)")
-            issues.append("Install daytona SDK: pip install daytona")
-
-    # Vercel Sandbox (if using vercel_sandbox backend)
     # Node.js + agent-browser (for browser automation tools)
     if _safe_which("node"):
         check_ok("Node.js")

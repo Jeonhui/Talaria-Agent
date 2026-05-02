@@ -18,7 +18,7 @@
 services:
   gateway:
     build: .
-    image: talaria-agent:0.1.0
+    image: talaria-agent:0.2.0
     container_name: talaria
     restart: unless-stopped
     network_mode: host

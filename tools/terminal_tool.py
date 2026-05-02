@@ -52,7 +52,6 @@ from tools.interrupt import is_interrupted, _interrupt_event  # noqa: F401 — r
 
 
 
-from tools.tool_backend_helpers import managed_nous_tools_enabled
 
 
 def _get_scratch_dir() -> Path:
@@ -103,42 +102,6 @@ FOREGROUND_MAX_TIMEOUT = _safe_parse_import_env(
     int,
     "integer",
 )
-
-# Disk usage warning threshold (in GB)
-DISK_USAGE_WARNING_THRESHOLD_GB = _safe_parse_import_env(
-    "TERMINAL_DISK_WARNING_GB",
-    500.0,
-    float,
-    "number",
-)
-def _check_disk_usage_warning():
-    """Check if total disk usage exceeds warning threshold."""
-    try:
-        scratch_dir = _get_scratch_dir()
-
-        # Get total size of talaria directories
-        total_bytes = 0
-        import glob
-        for path in glob.glob(str(scratch_dir / "talaria-*")):
-            for f in Path(path).rglob('*'):
-                if f.is_file():
-                    try:
-                        total_bytes += f.stat().st_size
-                    except OSError as e:
-                        logger.debug("Could not stat file %s: %s", f, e)
-        
-        total_gb = total_bytes / (1024 ** 3)
-        
-        if total_gb > DISK_USAGE_WARNING_THRESHOLD_GB:
-            logger.warning("Disk usage (%.1fGB) exceeds threshold (%.0fGB). Consider running cleanup_all_environments().",
-                           total_gb, DISK_USAGE_WARNING_THRESHOLD_GB)
-            return True
-        
-        return False
-    except Exception as e:
-        logger.debug("Disk usage warning check failed: %s", e, exc_info=True)
-        return False
-
 
 # Interactive sudo password cache.
 #

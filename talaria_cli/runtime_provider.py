@@ -16,10 +16,8 @@ from talaria_cli.auth import (
     DEFAULT_CODEX_BASE_URL,
     DEFAULT_QWEN_BASE_URL,
     PROVIDER_REGISTRY,
-    _agent_key_is_usable,
     format_auth_error,
     resolve_provider,
-    resolve_nous_runtime_credentials,
     resolve_codex_runtime_credentials,
     resolve_qwen_runtime_credentials,
     resolve_gemini_oauth_runtime_credentials,
@@ -216,8 +214,6 @@ def _resolve_runtime_from_pool_entry(
         base_url = base_url or OPENROUTER_BASE_URL
     elif provider == "xai":
         api_mode = "codex_responses"
-    elif provider == "nous":
-        api_mode = "chat_completions"
     elif provider == "copilot":
         api_mode = _copilot_runtime_api_mode(model_cfg, getattr(entry, "runtime_api_key", ""))
         base_url = base_url or PROVIDER_REGISTRY["copilot"].inference_base_url
@@ -784,37 +780,6 @@ def _resolve_explicit_runtime(
             "requested_provider": requested_provider,
         }
 
-    if provider == "nous":
-        state = auth_mod.get_provider_auth_state("nous") or {}
-        base_url = (
-            explicit_base_url
-            or str(state.get("inference_base_url") or auth_mod.DEFAULT_NOUS_INFERENCE_URL).strip().rstrip("/")
-        )
-        # Only use agent_key for inference — access_token is an OAuth token for the
-        # portal API (minting keys, refreshing tokens), not for the inference API.
-        # Falling back to access_token sends an OAuth bearer token to the inference
-        # endpoint, which returns 404 because it is not a valid inference credential.
-        api_key = explicit_api_key or str(state.get("agent_key") or "").strip()
-        expires_at = state.get("agent_key_expires_at") or state.get("expires_at")
-        if not api_key:
-            creds = resolve_nous_runtime_credentials(
-                min_key_ttl_seconds=max(60, int(os.getenv("TALARIA_NOUS_MIN_KEY_TTL_SECONDS", "1800"))),
-                timeout_seconds=float(os.getenv("TALARIA_NOUS_TIMEOUT_SECONDS", "15")),
-            )
-            api_key = creds.get("api_key", "")
-            expires_at = creds.get("expires_at")
-            if not explicit_base_url:
-                base_url = creds.get("base_url", "").rstrip("/") or base_url
-        return {
-            "provider": "nous",
-            "api_mode": "chat_completions",
-            "base_url": base_url,
-            "api_key": api_key,
-            "source": "explicit",
-            "expires_at": expires_at,
-            "requested_provider": requested_provider,
-        }
-
     # Azure Foundry: user-configured endpoint with selectable API mode
     if provider == "azure-foundry":
         return _resolve_azure_foundry_runtime(
@@ -984,21 +949,6 @@ def resolve_runtime_provider(
                 getattr(entry, "runtime_api_key", None)
                 or getattr(entry, "access_token", "")
             )
-        # For Nous, the pool entry's runtime_api_key is the agent_key — a
-        # short-lived inference credential (~30 min TTL).  The pool doesn't
-        # refresh it during selection (that would trigger network calls in
-        # non-runtime contexts like `talaria auth list`).  If the key is
-        # expired, clear pool_api_key so we fall through to
-        # resolve_nous_runtime_credentials() which handles refresh + mint.
-        if provider == "nous" and entry is not None and pool_api_key:
-            min_ttl = max(60, int(os.getenv("TALARIA_NOUS_MIN_KEY_TTL_SECONDS", "1800")))
-            nous_state = {
-                "agent_key": getattr(entry, "agent_key", None),
-                "agent_key_expires_at": getattr(entry, "agent_key_expires_at", None),
-            }
-            if not _agent_key_is_usable(nous_state, min_ttl):
-                logger.debug("Nous pool entry agent_key expired/missing, falling through to runtime resolution")
-                pool_api_key = ""
         if entry is not None and pool_api_key:
             return _resolve_runtime_from_pool_entry(
                 provider=provider,
@@ -1008,29 +958,6 @@ def resolve_runtime_provider(
                 pool=pool,
                 target_model=target_model,
             )
-
-    if provider == "nous":
-        try:
-            creds = resolve_nous_runtime_credentials(
-                min_key_ttl_seconds=max(60, int(os.getenv("TALARIA_NOUS_MIN_KEY_TTL_SECONDS", "1800"))),
-                timeout_seconds=float(os.getenv("TALARIA_NOUS_TIMEOUT_SECONDS", "15")),
-            )
-            return {
-                "provider": "nous",
-                "api_mode": "chat_completions",
-                "base_url": creds.get("base_url", "").rstrip("/"),
-                "api_key": creds.get("api_key", ""),
-                "source": creds.get("source", "portal"),
-                "expires_at": creds.get("expires_at"),
-                "requested_provider": requested_provider,
-            }
-        except AuthError:
-            if requested_provider != "auto":
-                raise
-            # Auto-detected Nous but credentials are stale/revoked —
-            # fall through to env-var providers (e.g. OpenRouter).
-            logger.info("Auto-detected Nous provider but credentials failed; "
-                        "falling through to next provider.")
 
     if provider == "openai-codex":
         try:

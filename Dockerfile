@@ -14,7 +14,7 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/opt/talaria/.playwright
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         build-essential curl python3 python3-dev libffi-dev gcc \
-        ripgrep ffmpeg git openssh-client docker-cli tini procps \
+        ripgrep git openssh-client docker-cli tini procps \
         nodejs npm && \
     rm -rf /var/lib/apt/lists/*
 

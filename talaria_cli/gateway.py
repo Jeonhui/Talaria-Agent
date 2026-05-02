@@ -2039,7 +2039,7 @@ def generate_launchd_plist() -> str:
     # minimal default (/usr/bin:/bin:/usr/sbin:/sbin) which misses Homebrew,
     # nvm, cargo, etc.  We prepend venv/bin and node_modules/.bin (matching
     # the systemd unit), then capture the user's full shell PATH so every
-    # user-installed tool (node, ffmpeg, …) is reachable.
+    # user-installed tool (node, ripgrep, …) is reachable.
     detected_venv = _detect_venv_dir()
     venv_bin = str(detected_venv / "bin") if detected_venv else str(PROJECT_ROOT / "venv" / "bin")
     venv_dir = str(detected_venv) if detected_venv else str(PROJECT_ROOT / "venv")

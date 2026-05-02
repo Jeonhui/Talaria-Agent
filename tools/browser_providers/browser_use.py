@@ -10,7 +10,7 @@ import requests
 
 from tools.browser_providers.base import CloudBrowserProvider
 from tools.managed_tool_gateway import resolve_managed_tool_gateway
-from tools.tool_backend_helpers import managed_nous_tools_enabled, prefers_gateway
+from tools.tool_backend_helpers import prefers_gateway
 
 logger = logging.getLogger(__name__)
 _pending_create_keys: Dict[str, str] = {}
@@ -95,15 +95,9 @@ class BrowserUseProvider(CloudBrowserProvider):
     def _get_config(self) -> Dict[str, Any]:
         config = self._get_config_or_none()
         if config is None:
-            message = (
+            raise ValueError(
                 "Browser Use requires a direct BROWSER_USE_API_KEY credential."
             )
-            if managed_nous_tools_enabled():
-                message = (
-                    "Browser Use requires either a direct BROWSER_USE_API_KEY "
-                    "credential or a managed Browser Use gateway configuration."
-                )
-            raise ValueError(message)
         return config
 
     # ------------------------------------------------------------------

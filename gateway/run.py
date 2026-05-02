@@ -975,9 +975,6 @@ class GatewayRunner:
         from gateway.hooks import HookRegistry
         self.hooks = HookRegistry()
 
-        # Per-chat voice reply mode: "off" | "voice_only" | "all"
-        self._voice_mode: Dict[str, str] = self._load_voice_modes()
-
         # Track background tasks to prevent garbage collection mid-execution
         self._background_tasks: set = set()
 
@@ -1040,125 +1037,6 @@ class GatewayRunner:
             return _find_skill("talaria-agent-setup") is not None
         except Exception:
             return False
-
-    # -- Voice mode persistence ------------------------------------------
-
-    _VOICE_MODE_PATH = _talaria_home / "gateway_voice_mode.json"
-
-    def _voice_key(self, platform: Platform, chat_id: str) -> str:
-        """Return a platform-namespaced key for voice mode state."""
-        return f"{platform.value}:{chat_id}"
-
-    def _load_voice_modes(self) -> Dict[str, str]:
-        try:
-            data = json.loads(self._VOICE_MODE_PATH.read_text())
-        except (FileNotFoundError, json.JSONDecodeError, OSError):
-            return {}
-
-        if not isinstance(data, dict):
-            return {}
-
-        valid_modes = {"off", "voice_only", "all"}
-        result = {}
-        for chat_id, mode in data.items():
-            if mode not in valid_modes:
-                continue
-            key = str(chat_id)
-            # Skip legacy unprefixed keys (warn and skip)
-            if ":" not in key:
-                logger.warning(
-                    "Skipping legacy unprefixed voice mode key %r during migration. "
-                    "Re-enable voice mode on that chat to rebuild the prefixed key.",
-                    key,
-                )
-                continue
-            result[key] = mode
-        return result
-
-    def _save_voice_modes(self) -> None:
-        try:
-            self._VOICE_MODE_PATH.parent.mkdir(parents=True, exist_ok=True)
-            self._VOICE_MODE_PATH.write_text(
-                json.dumps(self._voice_mode, indent=2)
-            )
-        except OSError as e:
-            logger.warning("Failed to save voice modes: %s", e)
-
-    def _set_adapter_auto_tts_disabled(self, adapter, chat_id: str, disabled: bool) -> None:
-        """Update an adapter's in-memory auto-TTS suppression set if present."""
-        disabled_chats = getattr(adapter, "_auto_tts_disabled_chats", None)
-        if not isinstance(disabled_chats, set):
-            return
-        if disabled:
-            disabled_chats.add(chat_id)
-            # ``/voice off`` also clears any explicit enable — it's a hard override.
-            enabled_chats = getattr(adapter, "_auto_tts_enabled_chats", None)
-            if isinstance(enabled_chats, set):
-                enabled_chats.discard(chat_id)
-        else:
-            disabled_chats.discard(chat_id)
-
-    def _set_adapter_auto_tts_enabled(self, adapter, chat_id: str, enabled: bool) -> None:
-        """Update an adapter's per-chat auto-TTS opt-in set if present.
-
-        Used for ``/voice on``/``/voice tts`` where the user explicitly wants
-        auto-TTS even when ``voice.auto_tts`` is False globally.
-        """
-        enabled_chats = getattr(adapter, "_auto_tts_enabled_chats", None)
-        if not isinstance(enabled_chats, set):
-            return
-        if enabled:
-            enabled_chats.add(chat_id)
-            # An explicit opt-in clears any stale /voice off for this chat.
-            disabled_chats = getattr(adapter, "_auto_tts_disabled_chats", None)
-            if isinstance(disabled_chats, set):
-                disabled_chats.discard(chat_id)
-        else:
-            enabled_chats.discard(chat_id)
-
-    def _sync_voice_mode_state_to_adapter(self, adapter) -> None:
-        """Restore persisted /voice state into a live platform adapter.
-
-        Populates three fields from config + ``self._voice_mode``:
-          - ``_auto_tts_default``: global default from ``voice.auto_tts``
-          - ``_auto_tts_enabled_chats``: chats with mode ``voice_only``/``all``
-          - ``_auto_tts_disabled_chats``: chats with mode ``off``
-        """
-        platform = getattr(adapter, "platform", None)
-        if not isinstance(platform, Platform):
-            return
-
-        disabled_chats = getattr(adapter, "_auto_tts_disabled_chats", None)
-        enabled_chats = getattr(adapter, "_auto_tts_enabled_chats", None)
-        if not isinstance(disabled_chats, set) and not isinstance(enabled_chats, set):
-            return
-
-        # Push the global voice.auto_tts default (config.yaml) onto the adapter.
-        # Lazy import to avoid adding a module-level dep from gateway → talaria_cli.
-        try:
-            from talaria_cli.config import load_config as _load_full_config
-            _full_cfg = _load_full_config()
-            _auto_tts_default = bool(
-                (_full_cfg.get("voice") or {}).get("auto_tts", False)
-            )
-        except Exception:
-            _auto_tts_default = False
-        if hasattr(adapter, "_auto_tts_default"):
-            adapter._auto_tts_default = _auto_tts_default
-
-        prefix = f"{platform.value}:"
-        if isinstance(disabled_chats, set):
-            disabled_chats.clear()
-            disabled_chats.update(
-                key[len(prefix):] for key, mode in self._voice_mode.items()
-                if mode == "off" and key.startswith(prefix)
-            )
-        if isinstance(enabled_chats, set):
-            enabled_chats.clear()
-            enabled_chats.update(
-                key[len(prefix):] for key, mode in self._voice_mode.items()
-                if mode in ("voice_only", "all") and key.startswith(prefix)
-            )
 
     async def _safe_adapter_disconnect(self, adapter, platform) -> None:
         """Call adapter.disconnect() defensively, swallowing any error.
@@ -2546,7 +2424,6 @@ class GatewayRunner:
                 success = await self._connect_adapter_with_timeout(adapter, platform)
                 if success:
                     self.adapters[platform] = adapter
-                    self._sync_voice_mode_state_to_adapter(adapter)
                     connected_count += 1
                     self._update_platform_runtime_status(
                         platform.value,
@@ -2937,7 +2814,6 @@ class GatewayRunner:
                     success = await self._connect_adapter_with_timeout(adapter, platform)
                     if success:
                         self.adapters[platform] = adapter
-                        self._sync_voice_mode_state_to_adapter(adapter)
                         self.delivery_router.adapters = self.adapters
                         del self._failed_platforms[platform]
                         self._update_platform_runtime_status(
@@ -4326,9 +4202,6 @@ class GatewayRunner:
             # at the end of this function so the rewritten text is sent
             # to the agent as a regular user turn.
 
-        if canonical == "voice":
-            return await self._handle_voice_command(event)
-
         if self._draining:
             return f"⏳ Gateway is {self._status_action_gerund()} and is not accepting new work right now."
 
@@ -4521,13 +4394,10 @@ class GatewayRunner:
 
         if event.media_urls:
             image_paths = []
-            audio_paths = []
             for i, path in enumerate(event.media_urls):
                 mtype = event.media_types[i] if i < len(event.media_types) else ""
                 if mtype.startswith("image/") or event.message_type == MessageType.PHOTO:
                     image_paths.append(path)
-                if mtype.startswith("audio/") or event.message_type in (MessageType.VOICE, MessageType.AUDIO):
-                    audio_paths.append(path)
 
             if image_paths:
                 # Decide routing: native (attach pixels) vs text (vision_analyze
@@ -4549,40 +4419,6 @@ class GatewayRunner:
                         message_text,
                         image_paths,
                     )
-
-            if audio_paths:
-                message_text = await self._enrich_message_with_transcription(
-                    message_text,
-                    audio_paths,
-                )
-                _stt_fail_markers = (
-                    "No STT provider",
-                    "STT is disabled",
-                    "can't listen",
-                    "VOICE_TOOLS_OPENAI_KEY",
-                )
-                if any(marker in message_text for marker in _stt_fail_markers):
-                    _stt_adapter = self.adapters.get(source.platform)
-                    _stt_meta = {"thread_id": source.thread_id} if source.thread_id else None
-                    if _stt_adapter:
-                        try:
-                            _stt_msg = (
-                                "🎤 I received your voice message but can't transcribe it — "
-                                "no speech-to-text provider is configured.\n\n"
-                                "To enable voice: install faster-whisper "
-                                "(`pip install faster-whisper` in the Talaria venv) "
-                                "and set `stt.enabled: true` in config.yaml, "
-                                "then /restart the gateway."
-                            )
-                            if self._has_setup_skill():
-                                _stt_msg += "\n\nFor full setup instructions, type: `/skill talaria-agent-setup`"
-                            await _stt_adapter.send(
-                                source.chat_id,
-                                _stt_msg,
-                                metadata=_stt_meta,
-                            )
-                        except Exception:
-                            pass
 
         if event.media_urls and event.message_type == MessageType.DOCUMENT:
             import mimetypes as _mimetypes
@@ -5162,19 +4998,6 @@ class GatewayRunner:
                     )
         
         # -----------------------------------------------------------------
-        # Voice channel awareness — inject current voice channel state
-        # into context so the agent knows who is in the channel and who
-        # is speaking, without needing a separate tool call.
-        # -----------------------------------------------------------------
-        if source.platform == Platform.DISCORD:
-            adapter = self.adapters.get(Platform.DISCORD)
-            guild_id = self._get_guild_id(event)
-            if guild_id and adapter and hasattr(adapter, "get_voice_channel_context"):
-                vc_context = adapter.get_voice_channel_context(guild_id)
-                if vc_context:
-                    context_prompt += f"\n\n{vc_context}"
-
-        # -----------------------------------------------------------------
         # Auto-analyze images sent by the user
         #
         # If the user attached image(s), we run the vision tool eagerly so
@@ -5514,11 +5337,6 @@ class GatewayRunner:
                 session_entry.session_key,
                 last_prompt_tokens=agent_result.get("last_prompt_tokens", 0),
             )
-
-            # Auto voice reply: send TTS audio before the text response
-            _already_sent = bool(agent_result.get("already_sent"))
-            if self._should_send_voice_reply(event, response, agent_messages, already_sent=_already_sent):
-                await self._send_voice_reply(event, response)
 
             # If streaming already delivered the response, extract and
             # deliver any MEDIA: files before returning None.  Streaming
@@ -6701,338 +6519,6 @@ class GatewayRunner:
         if hasattr(raw, "guild") and raw.guild:
             return raw.guild.id
         return None
-
-    async def _handle_voice_command(self, event: MessageEvent) -> str:
-        """Handle /voice [on|off|tts|channel|leave|status] command."""
-        args = event.get_command_args().strip().lower()
-        chat_id = event.source.chat_id
-        platform = event.source.platform
-        voice_key = self._voice_key(platform, chat_id)
-
-        adapter = self.adapters.get(platform)
-
-        if args in ("on", "enable"):
-            self._voice_mode[voice_key] = "voice_only"
-            self._save_voice_modes()
-            if adapter:
-                self._set_adapter_auto_tts_enabled(adapter, chat_id, enabled=True)
-            return (
-                "Voice mode enabled.\n"
-                "I'll reply with voice when you send voice messages.\n"
-                "Use /voice tts to get voice replies for all messages."
-            )
-        elif args in ("off", "disable"):
-            self._voice_mode[voice_key] = "off"
-            self._save_voice_modes()
-            if adapter:
-                self._set_adapter_auto_tts_disabled(adapter, chat_id, disabled=True)
-            return "Voice mode disabled. Text-only replies."
-        elif args == "tts":
-            self._voice_mode[voice_key] = "all"
-            self._save_voice_modes()
-            if adapter:
-                self._set_adapter_auto_tts_enabled(adapter, chat_id, enabled=True)
-            return (
-                "Auto-TTS enabled.\n"
-                "All replies will include a voice message."
-            )
-        elif args in ("channel", "join"):
-            return await self._handle_voice_channel_join(event)
-        elif args == "leave":
-            return await self._handle_voice_channel_leave(event)
-        elif args == "status":
-            mode = self._voice_mode.get(voice_key, "off")
-            labels = {
-                "off": "Off (text only)",
-                "voice_only": "On (voice reply to voice messages)",
-                "all": "TTS (voice reply to all messages)",
-            }
-            # Append voice channel info if connected
-            adapter = self.adapters.get(event.source.platform)
-            guild_id = self._get_guild_id(event)
-            if guild_id and hasattr(adapter, "get_voice_channel_info"):
-                info = adapter.get_voice_channel_info(guild_id)
-                if info:
-                    lines = [
-                        f"Voice mode: {labels.get(mode, mode)}",
-                        f"Voice channel: #{info['channel_name']}",
-                        f"Participants: {info['member_count']}",
-                    ]
-                    for m in info["members"]:
-                        status = " (speaking)" if m.get("is_speaking") else ""
-                        lines.append(f"  - {m['display_name']}{status}")
-                    return "\n".join(lines)
-            return f"Voice mode: {labels.get(mode, mode)}"
-        else:
-            # Toggle: off → on, on/all → off
-            current = self._voice_mode.get(voice_key, "off")
-            if current == "off":
-                self._voice_mode[voice_key] = "voice_only"
-                self._save_voice_modes()
-                if adapter:
-                    self._set_adapter_auto_tts_enabled(adapter, chat_id, enabled=True)
-                return "Voice mode enabled."
-            else:
-                self._voice_mode[voice_key] = "off"
-                self._save_voice_modes()
-                if adapter:
-                    self._set_adapter_auto_tts_disabled(adapter, chat_id, disabled=True)
-                return "Voice mode disabled."
-
-    async def _handle_voice_channel_join(self, event: MessageEvent) -> str:
-        """Join the user's current Discord voice channel."""
-        adapter = self.adapters.get(event.source.platform)
-        if not hasattr(adapter, "join_voice_channel"):
-            return "Voice channels are not supported on this platform."
-
-        guild_id = self._get_guild_id(event)
-        if not guild_id:
-            return "This command only works in a Discord server."
-
-        voice_channel = await adapter.get_user_voice_channel(
-            guild_id, event.source.user_id
-        )
-        if not voice_channel:
-            return "You need to be in a voice channel first."
-
-        # Wire callbacks BEFORE join so voice input arriving immediately
-        # after connection is not lost.
-        if hasattr(adapter, "_voice_input_callback"):
-            adapter._voice_input_callback = self._handle_voice_channel_input
-        if hasattr(adapter, "_on_voice_disconnect"):
-            adapter._on_voice_disconnect = self._handle_voice_timeout_cleanup
-
-        try:
-            success = await adapter.join_voice_channel(voice_channel)
-        except Exception as e:
-            logger.warning("Failed to join voice channel: %s", e)
-            adapter._voice_input_callback = None
-            err_lower = str(e).lower()
-            if "pynacl" in err_lower or "nacl" in err_lower or "davey" in err_lower:
-                return (
-                    "Voice dependencies are missing (PyNaCl / davey). "
-                    f"Install with: `{sys.executable} -m pip install PyNaCl`"
-                )
-            return f"Failed to join voice channel: {e}"
-
-        if success:
-            adapter._voice_text_channels[guild_id] = int(event.source.chat_id)
-            if hasattr(adapter, "_voice_sources"):
-                adapter._voice_sources[guild_id] = event.source.to_dict()
-            self._voice_mode[self._voice_key(event.source.platform, event.source.chat_id)] = "all"
-            self._save_voice_modes()
-            self._set_adapter_auto_tts_enabled(adapter, event.source.chat_id, enabled=True)
-            return (
-                f"Joined voice channel **{voice_channel.name}**.\n"
-                f"I'll speak my replies and listen to you. Use /voice leave to disconnect."
-            )
-        # Join failed — clear callback
-        adapter._voice_input_callback = None
-        return "Failed to join voice channel. Check bot permissions (Connect + Speak)."
-
-    async def _handle_voice_channel_leave(self, event: MessageEvent) -> str:
-        """Leave the Discord voice channel."""
-        adapter = self.adapters.get(event.source.platform)
-        guild_id = self._get_guild_id(event)
-
-        if not guild_id or not hasattr(adapter, "leave_voice_channel"):
-            return "Not in a voice channel."
-
-        if not hasattr(adapter, "is_in_voice_channel") or not adapter.is_in_voice_channel(guild_id):
-            return "Not in a voice channel."
-
-        try:
-            await adapter.leave_voice_channel(guild_id)
-        except Exception as e:
-            logger.warning("Error leaving voice channel: %s", e)
-        # Always clean up state even if leave raised an exception
-        self._voice_mode[self._voice_key(event.source.platform, event.source.chat_id)] = "off"
-        self._save_voice_modes()
-        self._set_adapter_auto_tts_disabled(adapter, event.source.chat_id, disabled=True)
-        if hasattr(adapter, "_voice_input_callback"):
-            adapter._voice_input_callback = None
-        return "Left voice channel."
-
-    def _handle_voice_timeout_cleanup(self, chat_id: str) -> None:
-        """Called by the adapter when a voice channel times out.
-
-        Cleans up runner-side voice_mode state that the adapter cannot reach.
-        """
-        self._voice_mode[self._voice_key(Platform.DISCORD, chat_id)] = "off"
-        self._save_voice_modes()
-        adapter = self.adapters.get(Platform.DISCORD)
-        self._set_adapter_auto_tts_disabled(adapter, chat_id, disabled=True)
-
-    async def _handle_voice_channel_input(
-        self, guild_id: int, user_id: int, transcript: str
-    ):
-        """Handle transcribed voice from a user in a voice channel.
-
-        Creates a synthetic MessageEvent and processes it through the
-        adapter's full message pipeline (session, typing, agent, TTS reply).
-        """
-        adapter = self.adapters.get(Platform.DISCORD)
-        if not adapter:
-            return
-
-        text_ch_id = adapter._voice_text_channels.get(guild_id)
-        if not text_ch_id:
-            return
-
-        # Build source — reuse the linked text channel's metadata when available
-        # so voice input shares the same session as the bound text conversation.
-        source_data = getattr(adapter, "_voice_sources", {}).get(guild_id)
-        if source_data:
-            source = SessionSource.from_dict(source_data)
-            source.user_id = str(user_id)
-            source.user_name = str(user_id)
-        else:
-            source = SessionSource(
-                platform=Platform.DISCORD,
-                chat_id=str(text_ch_id),
-                user_id=str(user_id),
-                user_name=str(user_id),
-                chat_type="channel",
-            )
-
-        # Check authorization before processing voice input
-        if not self._is_user_authorized(source):
-            logger.debug("Unauthorized voice input from user %d, ignoring", user_id)
-            return
-
-        # Show transcript in text channel (after auth, with mention sanitization)
-        try:
-            channel = adapter._client.get_channel(text_ch_id)
-            if channel:
-                safe_text = transcript[:2000].replace("@everyone", "@\u200beveryone").replace("@here", "@\u200bhere")
-                await channel.send(f"**[Voice]** <@{user_id}>: {safe_text}")
-        except Exception:
-            pass
-
-        # Build a synthetic MessageEvent and feed through the normal pipeline
-        # Use SimpleNamespace as raw_message so _get_guild_id() can extract
-        # guild_id and _send_voice_reply() plays audio in the voice channel.
-        from types import SimpleNamespace
-        event = MessageEvent(
-            source=source,
-            text=transcript,
-            message_type=MessageType.VOICE,
-            raw_message=SimpleNamespace(guild_id=guild_id, guild=None),
-        )
-
-        await adapter.handle_message(event)
-
-    def _should_send_voice_reply(
-        self,
-        event: MessageEvent,
-        response: str,
-        agent_messages: list,
-        already_sent: bool = False,
-    ) -> bool:
-        """Decide whether the runner should send a TTS voice reply.
-
-        Returns False when:
-        - voice_mode is off for this chat
-        - response is empty or an error
-        - agent already called text_to_speech tool (dedup)
-        - voice input and base adapter auto-TTS already handled it (skip_double)
-          UNLESS streaming already consumed the response (already_sent=True),
-          in which case the base adapter won't have text for auto-TTS so the
-          runner must handle it.
-        """
-        if not response or response.startswith("Error:"):
-            return False
-
-        chat_id = event.source.chat_id
-        voice_mode = self._voice_mode.get(self._voice_key(event.source.platform, chat_id), "off")
-        is_voice_input = (event.message_type == MessageType.VOICE)
-
-        should = (
-            (voice_mode == "all")
-            or (voice_mode == "voice_only" and is_voice_input)
-        )
-        if not should:
-            return False
-
-        # Dedup: agent already called TTS tool
-        has_agent_tts = any(
-            msg.get("role") == "assistant"
-            and any(
-                tc.get("function", {}).get("name") == "text_to_speech"
-                for tc in (msg.get("tool_calls") or [])
-            )
-            for msg in agent_messages
-        )
-        if has_agent_tts:
-            return False
-
-        # Dedup: base adapter auto-TTS already handles voice input
-        # (play_tts plays in VC when connected, so runner can skip).
-        # When streaming already delivered the text (already_sent=True),
-        # the base adapter will receive None and can't run auto-TTS,
-        # so the runner must take over.
-        if is_voice_input and not already_sent:
-            return False
-
-        return True
-
-    async def _send_voice_reply(self, event: MessageEvent, text: str) -> None:
-        """Generate TTS audio and send as a voice message before the text reply."""
-        import uuid as _uuid
-        audio_path = None
-        actual_path = None
-        try:
-            from tools.tts_tool import text_to_speech_tool, _strip_markdown_for_tts
-
-            tts_text = _strip_markdown_for_tts(text[:4000])
-            if not tts_text:
-                return
-
-            # Use .mp3 extension so edge-tts conversion to opus works correctly.
-            # The TTS tool may convert to .ogg — use file_path from result.
-            audio_path = os.path.join(
-                tempfile.gettempdir(), "talaria_voice",
-                f"tts_reply_{_uuid.uuid4().hex[:12]}.mp3",
-            )
-            os.makedirs(os.path.dirname(audio_path), exist_ok=True)
-
-            result_json = await asyncio.to_thread(
-                text_to_speech_tool, text=tts_text, output_path=audio_path
-            )
-            result = json.loads(result_json)
-
-            # Use the actual file path from result (may differ after opus conversion)
-            actual_path = result.get("file_path", audio_path)
-            if not result.get("success") or not os.path.isfile(actual_path):
-                logger.warning("Auto voice reply TTS failed: %s", result.get("error"))
-                return
-
-            adapter = self.adapters.get(event.source.platform)
-
-            # If connected to a voice channel, play there instead of sending a file
-            guild_id = self._get_guild_id(event)
-            if (guild_id
-                    and hasattr(adapter, "play_in_voice_channel")
-                    and hasattr(adapter, "is_in_voice_channel")
-                    and adapter.is_in_voice_channel(guild_id)):
-                await adapter.play_in_voice_channel(guild_id, actual_path)
-            elif adapter and hasattr(adapter, "send_voice"):
-                send_kwargs: Dict[str, Any] = {
-                    "chat_id": event.source.chat_id,
-                    "audio_path": actual_path,
-                    "reply_to": event.message_id,
-                }
-                if event.source.thread_id:
-                    send_kwargs["metadata"] = {"thread_id": event.source.thread_id}
-                await adapter.send_voice(**send_kwargs)
-        except Exception as e:
-            logger.warning("Auto voice reply failed: %s", e, exc_info=True)
-        finally:
-            for p in {audio_path, actual_path} - {None}:
-                try:
-                    os.unlink(p)
-                except OSError:
-                    pass
 
     async def _deliver_media_from_response(
         self,
@@ -9245,91 +8731,6 @@ class GatewayRunner:
             return prefix
         return user_text
 
-    async def _enrich_message_with_transcription(
-        self,
-        user_text: str,
-        audio_paths: List[str],
-    ) -> str:
-        """
-        Auto-transcribe user voice/audio messages using the configured STT provider
-        and prepend the transcript to the message text.
-
-        Args:
-            user_text:   The user's original caption / message text.
-            audio_paths: List of local file paths to cached audio files.
-
-        Returns:
-            The enriched message string with transcriptions prepended.
-        """
-        if not getattr(self.config, "stt_enabled", True):
-            disabled_note = "[The user sent voice message(s), but transcription is disabled in config."
-            if self._has_setup_skill():
-                disabled_note += (
-                    " You have a skill called talaria-agent-setup that can help "
-                    "users configure Talaria features including voice, tools, and more."
-                )
-            disabled_note += "]"
-            if user_text:
-                return f"{disabled_note}\n\n{user_text}"
-            return disabled_note
-
-        from tools.transcription_tools import transcribe_audio
-
-        enriched_parts = []
-        for path in audio_paths:
-            try:
-                logger.debug("Transcribing user voice: %s", path)
-                result = await asyncio.to_thread(transcribe_audio, path)
-                if result["success"]:
-                    transcript = result["transcript"]
-                    enriched_parts.append(
-                        f'[The user sent a voice message~ '
-                        f'Here\'s what they said: "{transcript}"]'
-                    )
-                else:
-                    error = result.get("error", "unknown error")
-                    if (
-                        "No STT provider" in error
-                        or error.startswith("Neither VOICE_TOOLS_OPENAI_KEY nor OPENAI_API_KEY is set")
-                    ):
-                        _no_stt_note = (
-                            "[The user sent a voice message but I can't listen "
-                            "to it right now — no STT provider is configured. "
-                            "A direct message has already been sent to the user "
-                            "with setup instructions."
-                        )
-                        if self._has_setup_skill():
-                            _no_stt_note += (
-                                " You have a skill called talaria-agent-setup "
-                                "that can help users configure Talaria features "
-                                "including voice, tools, and more."
-                            )
-                        _no_stt_note += "]"
-                        enriched_parts.append(_no_stt_note)
-                    else:
-                        enriched_parts.append(
-                            "[The user sent a voice message but I had trouble "
-                            f"transcribing it~ ({error})]"
-                        )
-            except Exception as e:
-                logger.error("Transcription error: %s", e)
-                enriched_parts.append(
-                    "[The user sent a voice message but something went wrong "
-                    "when I tried to listen to it~ Let them know!]"
-                )
-
-        if enriched_parts:
-            prefix = "\n\n".join(enriched_parts)
-            # Strip the empty-content placeholder from the Discord adapter
-            # when we successfully transcribed the audio — it's redundant.
-            _placeholder = "(The user sent a message with no text content)"
-            if user_text and user_text.strip() == _placeholder:
-                return prefix
-            if user_text:
-                return f"{prefix}\n\n{user_text}"
-            return prefix
-        return user_text
-
     def _build_process_event_source(self, evt: dict):
         """Resolve the canonical source for a synthetic background-process event.
 
@@ -9730,9 +9131,9 @@ class GatewayRunner:
         Use this at every site that ends a running turn, regardless of
         cause (normal completion, /stop, /reset, /resume, sentinel
         cleanup, stale-eviction).  Per-session state that PERSISTS
-        across turns (``_session_model_overrides``, ``_voice_mode``,
-        ``_pending_approvals``, ``_update_prompt_pending``) is NOT
-        touched here — those have their own lifecycles.
+        across turns (``_session_model_overrides``, ``_pending_approvals``,
+        ``_update_prompt_pending``) is NOT touched here — those have
+        their own lifecycles.
 
         When ``run_generation`` is provided, only clear the slot if that
         generation is still current for the session.  This prevents an

@@ -1,9 +1,9 @@
 """
 Unified self-relaunch for Talaria CLI.
 
-Preserves critical flags (--tui, --dev, --profile, --model, etc.) across
-process replacement so that ``talaria sessions browse`` or post-setup relaunch
-doesn't silently drop the user's UI mode or other preferences.
+Preserves critical flags (--profile, --model, etc.) across process replacement
+so that ``talaria sessions browse`` or post-setup relaunch doesn't silently
+drop the user's preferences.
 
 Also works when ``talaria`` is not on PATH (e.g. ``nix run`` or ``python -m``).
 """

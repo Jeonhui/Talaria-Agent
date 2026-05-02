@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "talaria-agent"
-version = "0.1.0"
+version = "0.2.0"
 description = "A lean personal assistant for Discord, Slack, Telegram, CLI, and optional MCP"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -73,12 +73,12 @@ talaria-acp = "acp_adapter.entry:main"
 py-modules = ["run_agent", "model_tools", "toolsets", "toolset_distributions", "cli", "talaria_constants", "talaria_state", "talaria_time", "talaria_logging", "utils"]
 
 [tool.setuptools.packages.find]
-include = ["agent", "agent.*", "tools", "tools.*", "talaria_cli", "gateway", "gateway.*", "tui_gateway", "tui_gateway.*", "cron", "acp_adapter"]
+include = ["agent", "agent.*", "tools", "tools.*", "talaria_cli", "gateway", "gateway.*", "cron", "acp_adapter"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "integration: marks tests requiring external services (API keys, Modal, etc.)",
+    "integration: marks tests requiring external services (API keys, network, Docker, etc.)",
 ]
 addopts = "-m 'not integration' -n auto"
 

@@ -21,8 +21,6 @@ import copy
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from talaria_cli.nous_subscription import get_nous_subscription_features
-from tools.tool_backend_helpers import managed_nous_tools_enabled
 from utils import base_url_hostname
 from talaria_constants import get_optional_skills_dir
 
@@ -352,7 +350,6 @@ def _print_setup_summary(config: dict, talaria_home):
     print_header("Tool Availability Summary")
 
     tool_status = []
-    subscription_features = get_nous_subscription_features(config)
 
     # Vision — use the same runtime resolver as the actual vision tools
     try:
@@ -374,49 +371,34 @@ def _print_setup_summary(config: dict, talaria_home):
         tool_status.append(("Mixture of Agents", False, "OPENROUTER_API_KEY"))
 
     # Web tools (Exa, Parallel, Firecrawl, or Tavily)
-    if subscription_features.web.managed_by_nous:
-        tool_status.append(("Web Search & Extract (Nous subscription)", True, None))
-    elif subscription_features.web.available:
-        label = "Web Search & Extract"
-        if subscription_features.web.current_provider:
-            label = f"Web Search & Extract ({subscription_features.web.current_provider})"
-        tool_status.append((label, True, None))
+    _web_available = any(
+        get_env_value(k)
+        for k in ("EXA_API_KEY", "PARALLEL_API_KEY", "FIRECRAWL_API_KEY", "FIRECRAWL_API_URL", "TAVILY_API_KEY")
+    )
+    if _web_available:
+        tool_status.append(("Web Search & Extract", True, None))
     else:
         tool_status.append(("Web Search & Extract", False, "EXA_API_KEY, PARALLEL_API_KEY, FIRECRAWL_API_KEY/FIRECRAWL_API_URL, or TAVILY_API_KEY"))
 
     # Browser tools (local Chromium, Camofox, Browserbase, Browser Use, or Firecrawl)
-    browser_provider = subscription_features.browser.current_provider
-    if subscription_features.browser.managed_by_nous:
-        tool_status.append(("Browser Automation (Nous Browser Use)", True, None))
-    elif subscription_features.browser.available:
-        label = "Browser Automation"
-        if browser_provider:
-            label = f"Browser Automation ({browser_provider})"
-        tool_status.append((label, True, None))
+    _browser_available = any(
+        get_env_value(k)
+        for k in ("CAMOFOX_URL", "BROWSERBASE_API_KEY", "BROWSER_USE_API_KEY")
+    )
+    try:
+        import shutil as _shutil
+        _agent_browser_installed = bool(_shutil.which("agent-browser"))
+    except Exception:
+        _agent_browser_installed = False
+    if _browser_available or _agent_browser_installed:
+        tool_status.append(("Browser Automation", True, None))
     else:
-        missing_browser_hint = "npm install -g agent-browser, set CAMOFOX_URL, or configure Browser Use or Browserbase"
-        if browser_provider == "Browserbase":
-            missing_browser_hint = (
-                "npm install -g agent-browser and set "
-                "BROWSERBASE_API_KEY/BROWSERBASE_PROJECT_ID"
-            )
-        elif browser_provider == "Browser Use":
-            missing_browser_hint = (
-                "npm install -g agent-browser and set BROWSER_USE_API_KEY"
-            )
-        elif browser_provider == "Camofox":
-            missing_browser_hint = "CAMOFOX_URL"
-        elif browser_provider == "Local browser":
-            missing_browser_hint = "npm install -g agent-browser"
         tool_status.append(
-            ("Browser Automation", False, missing_browser_hint)
+            ("Browser Automation", False, "npm install -g agent-browser, set CAMOFOX_URL, or configure Browser Use or Browserbase")
         )
 
-    # Image generation — FAL (direct or via Nous), or any plugin-registered
-    # provider (OpenAI, etc.)
-    if subscription_features.image_gen.managed_by_nous:
-        tool_status.append(("Image Generation (Nous subscription)", True, None))
-    elif subscription_features.image_gen.available:
+    # Image generation — FAL (direct), or any plugin-registered provider (OpenAI, etc.)
+    if get_env_value("FAL_KEY"):
         tool_status.append(("Image Generation", True, None))
     else:
         # Fall back to probing plugin-registered providers so OpenAI-only
@@ -442,62 +424,6 @@ def _print_setup_summary(config: dict, talaria_home):
             tool_status.append((f"Image Generation ({_img_backend})", True, None))
         else:
             tool_status.append(("Image Generation", False, "FAL_KEY or OPENAI_API_KEY"))
-
-    # TTS — show configured provider
-    tts_provider = cfg_get(config, "tts", "provider", default="edge")
-    if subscription_features.tts.managed_by_nous:
-        tool_status.append(("Text-to-Speech (OpenAI via Nous subscription)", True, None))
-    elif tts_provider == "elevenlabs" and get_env_value("ELEVENLABS_API_KEY"):
-        tool_status.append(("Text-to-Speech (ElevenLabs)", True, None))
-    elif tts_provider == "openai" and (
-        get_env_value("VOICE_TOOLS_OPENAI_KEY") or get_env_value("OPENAI_API_KEY")
-    ):
-        tool_status.append(("Text-to-Speech (OpenAI)", True, None))
-    elif tts_provider == "minimax" and get_env_value("MINIMAX_API_KEY"):
-        tool_status.append(("Text-to-Speech (MiniMax)", True, None))
-    elif tts_provider == "mistral" and get_env_value("MISTRAL_API_KEY"):
-        tool_status.append(("Text-to-Speech (Mistral Voxtral)", True, None))
-    elif tts_provider == "gemini" and (get_env_value("GEMINI_API_KEY") or get_env_value("GOOGLE_API_KEY")):
-        tool_status.append(("Text-to-Speech (Google Gemini)", True, None))
-    elif tts_provider == "neutts":
-        try:
-            neutts_ok = importlib.util.find_spec("neutts") is not None
-        except Exception:
-            neutts_ok = False
-        if neutts_ok:
-            tool_status.append(("Text-to-Speech (NeuTTS local)", True, None))
-        else:
-            tool_status.append(("Text-to-Speech (NeuTTS — not installed)", False, "run 'talaria setup tts'"))
-    elif tts_provider == "kittentts":
-        try:
-            import importlib.util
-            kittentts_ok = importlib.util.find_spec("kittentts") is not None
-        except Exception:
-            kittentts_ok = False
-        if kittentts_ok:
-            tool_status.append(("Text-to-Speech (KittenTTS local)", True, None))
-        else:
-            tool_status.append(("Text-to-Speech (KittenTTS — not installed)", False, "run 'talaria setup tts'"))
-    else:
-        tool_status.append(("Text-to-Speech (Edge TTS)", True, None))
-
-    if subscription_features.modal.managed_by_nous:
-        tool_status.append(("Modal Execution (Nous subscription)", True, None))
-    elif cfg_get(config, "terminal", "backend") == "modal":
-        if subscription_features.modal.direct_override:
-            tool_status.append(("Modal Execution (direct Modal)", True, None))
-        else:
-            tool_status.append(("Modal Execution", False, "run 'talaria setup terminal'"))
-    elif managed_nous_tools_enabled() and subscription_features.nous_auth_present:
-        tool_status.append(("Modal Execution (optional via Nous subscription)", True, None))
-
-    # Tinker + WandB (RL training)
-    if get_env_value("TINKER_API_KEY") and get_env_value("WANDB_API_KEY"):
-        tool_status.append(("RL Training (Tinker)", True, None))
-    elif get_env_value("TINKER_API_KEY"):
-        tool_status.append(("RL Training (Tinker)", False, "WANDB_API_KEY"))
-    else:
-        tool_status.append(("RL Training (Tinker)", False, "TINKER_API_KEY"))
 
     # Home Assistant
     if get_env_value("HASS_TOKEN"):
@@ -1784,331 +1710,6 @@ def _gateway_platform_short_label(label: str) -> str:
     return base or label
 
 
-def _get_section_config_summary(config: dict, section_key: str) -> Optional[str]:
-    """Return a short summary if a setup section is already configured, else None.
-
-    Used after OpenClaw migration to detect which sections can be skipped.
-    ``get_env_value`` is the module-level import from talaria_cli.config
-    so that test patches on ``setup_mod.get_env_value`` take effect.
-    """
-    if section_key == "model":
-        if not _model_section_has_credentials(config):
-            return None
-        model = config.get("model")
-        if isinstance(model, str) and model.strip():
-            return model.strip()
-        if isinstance(model, dict):
-            return str(model.get("default") or model.get("model") or "configured")
-        return "configured"
-
-    elif section_key == "terminal":
-        backend = cfg_get(config, "terminal", "backend", default="local")
-        return f"backend: {backend}"
-
-    elif section_key == "agent":
-        max_turns = cfg_get(config, "agent", "max_turns", default=90)
-        return f"max turns: {max_turns}"
-
-    elif section_key == "gateway":
-        from talaria_cli.gateway import _all_platforms, _platform_status
-        # Count any non-empty status other than the "not configured" sentinel —
-        # platforms like WhatsApp ("enabled, not paired"), Matrix ("configured
-        # + E2EE"), and Signal ("partially configured") all indicate the user
-        # has already started setup and we shouldn't force the section to rerun.
-        configured = [
-            _gateway_platform_short_label(plat["label"])
-            for plat in _all_platforms()
-            if _platform_status(plat) and _platform_status(plat) != "not configured"
-        ]
-        if configured:
-            return ", ".join(configured)
-        return None  # No platforms configured — section must run
-
-    elif section_key == "tools":
-        tools = []
-        if get_env_value("ELEVENLABS_API_KEY"):
-            tools.append("TTS/ElevenLabs")
-        if get_env_value("BROWSERBASE_API_KEY"):
-            tools.append("Browser")
-        if get_env_value("FIRECRAWL_API_KEY"):
-            tools.append("Firecrawl")
-        if tools:
-            return ", ".join(tools)
-        return None
-
-    return None
-
-
-def _skip_configured_section(
-    config: dict, section_key: str, label: str
-) -> bool:
-    """Show an already-configured section summary and offer to skip.
-
-    Returns True if the user chose to skip, False if the section should run.
-    """
-    summary = _get_section_config_summary(config, section_key)
-    if not summary:
-        return False
-    print()
-    print_success(f"  {label}: {summary}")
-    return not prompt_yes_no(f"  Reconfigure {label.lower()}?", default=False)
-
-
-# =============================================================================
-# OpenClaw Migration
-# =============================================================================
-
-
-_OPENCLAW_SCRIPT = (
-    get_optional_skills_dir(PROJECT_ROOT / "optional-skills")
-    / "migration"
-    / "openclaw-migration"
-    / "scripts"
-    / "openclaw_to_talaria.py"
-)
-
-
-def _load_openclaw_migration_module():
-    """Load the openclaw_to_talaria migration script as a module.
-
-    Returns the loaded module, or None if the script can't be loaded.
-    """
-    if not _OPENCLAW_SCRIPT.exists():
-        return None
-
-    spec = importlib.util.spec_from_file_location(
-        "openclaw_to_talaria", _OPENCLAW_SCRIPT
-    )
-    if spec is None or spec.loader is None:
-        return None
-
-    mod = importlib.util.module_from_spec(spec)
-    # Register in sys.modules so @dataclass can resolve the module
-    # (Python 3.11+ requires this for dynamically loaded modules)
-    import sys as _sys
-    _sys.modules[spec.name] = mod
-    try:
-        spec.loader.exec_module(mod)
-    except Exception:
-        _sys.modules.pop(spec.name, None)
-        raise
-    return mod
-
-
-# Item kinds that represent high-impact changes warranting explicit warnings.
-# Gateway tokens/channels can hijack messaging platforms from the old agent.
-# Config values may have different semantics between OpenClaw and Talaria.
-# Instruction/context files (.md) can contain incompatible setup procedures.
-_HIGH_IMPACT_KIND_KEYWORDS = {
-    "gateway": "⚠ Gateway/messaging — this will configure Talaria to use your OpenClaw messaging channels",
-    "telegram": "⚠ Telegram — this will point Talaria at your OpenClaw Telegram bot",
-    "slack": "⚠ Slack — this will point Talaria at your OpenClaw Slack workspace",
-    "discord": "⚠ Discord — this will point Talaria at your OpenClaw Discord bot",
-    "whatsapp": "⚠ WhatsApp — this will point Talaria at your OpenClaw WhatsApp connection",
-    "config": "⚠ Config values — OpenClaw settings may not map 1:1 to Talaria equivalents",
-    "soul": "⚠ Instruction file — may contain OpenClaw-specific setup/restart procedures",
-    "memory": "⚠ Memory/context file — may reference OpenClaw-specific infrastructure",
-    "context": "⚠ Context file — may contain OpenClaw-specific instructions",
-}
-
-
-def _print_migration_preview(report: dict):
-    """Print a detailed dry-run preview of what migration would do.
-
-    Groups items by category and adds explicit warnings for high-impact
-    changes like gateway token takeover and config value differences.
-    """
-    items = report.get("items", [])
-    if not items:
-        print_info("Nothing to migrate.")
-        return
-
-    migrated_items = [i for i in items if i.get("status") == "migrated"]
-    conflict_items = [i for i in items if i.get("status") == "conflict"]
-    skipped_items = [i for i in items if i.get("status") == "skipped"]
-
-    warnings_shown = set()
-
-    if migrated_items:
-        print(color("  Would import:", Colors.GREEN))
-        for item in migrated_items:
-            kind = item.get("kind", "unknown")
-            dest = item.get("destination", "")
-            if dest:
-                dest_short = str(dest).replace(str(Path.home()), "~")
-                print(f"      {kind:<22s} → {dest_short}")
-            else:
-                print(f"      {kind}")
-
-            # Check for high-impact items and collect warnings
-            kind_lower = kind.lower()
-            dest_lower = str(dest).lower()
-            for keyword, warning in _HIGH_IMPACT_KIND_KEYWORDS.items():
-                if keyword in kind_lower or keyword in dest_lower:
-                    warnings_shown.add(warning)
-        print()
-
-    if conflict_items:
-        print(color("  Would overwrite (conflicts with existing Talaria config):", Colors.YELLOW))
-        for item in conflict_items:
-            kind = item.get("kind", "unknown")
-            reason = item.get("reason", "already exists")
-            print(f"      {kind:<22s}  {reason}")
-        print()
-
-    if skipped_items:
-        print(color("  Would skip:", Colors.DIM))
-        for item in skipped_items:
-            kind = item.get("kind", "unknown")
-            reason = item.get("reason", "")
-            print(f"      {kind:<22s}  {reason}")
-        print()
-
-    # Print collected warnings
-    if warnings_shown:
-        print(color("  ── Warnings ──", Colors.YELLOW))
-        for warning in sorted(warnings_shown):
-            print(color(f"    {warning}", Colors.YELLOW))
-        print()
-        print(color("  Note: OpenClaw config values may have different semantics in Talaria.", Colors.YELLOW))
-        print(color("  For example, OpenClaw's tool_call_execution: \"auto\" ≠ Talaria's yolo mode.", Colors.YELLOW))
-        print(color("  Instruction files (.md) from OpenClaw may contain incompatible procedures.", Colors.YELLOW))
-        print()
-
-
-def _offer_openclaw_migration(talaria_home: Path) -> bool:
-    """Detect ~/.openclaw and offer to migrate during first-time setup.
-
-    Runs a dry-run first to show the user exactly what would be imported,
-    overwritten, or taken over. Only executes after explicit confirmation.
-
-    Returns True if migration ran successfully, False otherwise.
-    """
-    openclaw_dir = Path.home() / ".openclaw"
-    if not openclaw_dir.is_dir():
-        return False
-
-    if not _OPENCLAW_SCRIPT.exists():
-        return False
-
-    print()
-    print_header("OpenClaw Installation Detected")
-    print_info(f"Found OpenClaw data at {openclaw_dir}")
-    print_info("Talaria can preview what would be imported before making any changes.")
-    print()
-
-    if not prompt_yes_no("Would you like to see what can be imported?", default=True):
-        print_info(
-            "Skipping migration. You can run it later with: talaria claw migrate --dry-run"
-        )
-        return False
-
-    # Ensure config.yaml exists before migration tries to read it
-    config_path = get_config_path()
-    if not config_path.exists():
-        save_config(load_config())
-
-    # Load the migration module
-    try:
-        mod = _load_openclaw_migration_module()
-        if mod is None:
-            print_warning("Could not load migration script.")
-            return False
-    except Exception as e:
-        print_warning(f"Could not load migration script: {e}")
-        logger.debug("OpenClaw migration module load error", exc_info=True)
-        return False
-
-    # ── Phase 1: Dry-run preview ──
-    try:
-        selected = mod.resolve_selected_options(None, None, preset="full")
-        dry_migrator = mod.Migrator(
-            source_root=openclaw_dir.resolve(),
-            target_root=talaria_home.resolve(),
-            execute=False,  # dry-run — no files modified
-            workspace_target=None,
-            overwrite=True,  # show everything including conflicts
-            migrate_secrets=True,
-            output_dir=None,
-            selected_options=selected,
-            preset_name="full",
-        )
-        preview_report = dry_migrator.migrate()
-    except Exception as e:
-        print_warning(f"Migration preview failed: {e}")
-        logger.debug("OpenClaw migration preview error", exc_info=True)
-        return False
-
-    # Display the full preview
-    preview_summary = preview_report.get("summary", {})
-    preview_count = preview_summary.get("migrated", 0)
-
-    if preview_count == 0:
-        print()
-        print_info("Nothing to import from OpenClaw.")
-        return False
-
-    print()
-    print_header(f"Migration Preview — {preview_count} item(s) would be imported")
-    print_info("No changes have been made yet. Review the list below:")
-    print()
-    _print_migration_preview(preview_report)
-
-    # ── Phase 2: Confirm and execute ──
-    if not prompt_yes_no("Proceed with migration?", default=False):
-        print_info(
-            "Migration cancelled. You can run it later with: talaria claw migrate"
-        )
-        print_info(
-            "Use --dry-run to preview again, or --preset minimal for a lighter import."
-        )
-        return False
-
-    # Execute the migration — overwrite=False so existing Talaria configs are
-    # preserved. The user saw the preview; conflicts are skipped by default.
-    try:
-        migrator = mod.Migrator(
-            source_root=openclaw_dir.resolve(),
-            target_root=talaria_home.resolve(),
-            execute=True,
-            workspace_target=None,
-            overwrite=False,  # preserve existing Talaria config
-            migrate_secrets=True,
-            output_dir=None,
-            selected_options=selected,
-            preset_name="full",
-        )
-        report = migrator.migrate()
-    except Exception as e:
-        print_warning(f"Migration failed: {e}")
-        logger.debug("OpenClaw migration error", exc_info=True)
-        return False
-
-    # Print final summary
-    summary = report.get("summary", {})
-    migrated = summary.get("migrated", 0)
-    skipped = summary.get("skipped", 0)
-    conflicts = summary.get("conflict", 0)
-    errors = summary.get("error", 0)
-
-    print()
-    if migrated:
-        print_success(f"Imported {migrated} item(s) from OpenClaw.")
-    if conflicts:
-        print_info(f"Skipped {conflicts} item(s) that already exist in Talaria (use talaria claw migrate --overwrite to force).")
-    if skipped:
-        print_info(f"Skipped {skipped} item(s) (not found or unchanged).")
-    if errors:
-        print_warning(f"{errors} item(s) had errors — check the migration report.")
-
-    output_dir = report.get("output_dir")
-    if output_dir:
-        print_info(f"Full report saved to: {output_dir}")
-
-    print_success("Migration complete! Continuing with setup...")
-    return True
-
-
 # =============================================================================
 # Main Wizard Orchestrator
 # =============================================================================
@@ -2128,7 +1729,6 @@ def run_setup_wizard(args):
     Supports full, quick, and section-specific setup:
       talaria setup           — full or quick (auto-detected)
       talaria setup model     — just model/provider
-      talaria setup tts       — just text-to-speech
       talaria setup terminal  — just terminal backend
       talaria setup gateway   — just messaging platforms
       talaria setup tools     — just tool configuration
@@ -2236,14 +1836,11 @@ def run_setup_wizard(args):
         )
     )
 
-    migration_ran = False
-
     if is_existing:
         # Existing install — default is the full-wizard reconfigure flow.
         # Every prompt shows the current value as its default, so pressing
         # Enter keeps it.  Opt into `--quick` for the narrow "just fill in
-        # missing items" flow (useful after a partial OpenClaw migration
-        # or when a required API key got cleared).
+        # missing items" flow (useful when a required API key got cleared).
         if quick_requested:
             _run_quick_setup(config, talaria_home)
             return
@@ -2269,11 +1866,6 @@ def run_setup_wizard(args):
             print_info("No existing configuration found — running first-time setup.")
             print()
 
-        # Offer OpenClaw migration before configuration begins
-        migration_ran = _offer_openclaw_migration(talaria_home)
-        if migration_ran:
-            config = load_config()
-
         setup_mode = prompt_choice("How would you like to set up Talaria?", [
             "Quick setup — provider, model & messaging (recommended)",
             "Full setup — configure everything",
@@ -2292,23 +1884,14 @@ def run_setup_wizard(args):
     print()
     print_info("You can edit these files directly or use 'talaria config edit'")
 
-    if migration_ran:
-        print()
-        print_info("Settings were imported from OpenClaw.")
-        print_info("Each section below will show what was imported — press Enter to keep,")
-        print_info("or choose to reconfigure if needed.")
-
     # Section 1: Model & Provider
-    if not (migration_ran and _skip_configured_section(config, "model", "Model & Provider")):
-        setup_model_provider(config)
+    setup_model_provider(config)
 
     # Section 2: Terminal Backend
-    if not (migration_ran and _skip_configured_section(config, "terminal", "Terminal Backend")):
-        setup_terminal_backend(config)
+    setup_terminal_backend(config)
 
     # Section 3: Messaging Platforms
-    if not (migration_ran and _skip_configured_section(config, "gateway", "Messaging Platforms")):
-        setup_gateway(config)
+    setup_gateway(config)
 
     # Apply sensible defaults for advanced sections (tools, agent settings).
     # Configure them explicitly with: talaria setup tools | agent.

@@ -605,9 +605,7 @@ install_node() {
 install_system_packages() {
     # Detect what's missing
     HAS_RIPGREP=false
-    HAS_FFMPEG=false
     local need_ripgrep=false
-    local need_ffmpeg=false
 
     log_info "Checking ripgrep (fast file search)..."
     if command -v rg &> /dev/null; then
@@ -617,30 +615,17 @@ install_system_packages() {
         need_ripgrep=true
     fi
 
-    log_info "Checking ffmpeg (TTS voice messages)..."
-    if command -v ffmpeg &> /dev/null; then
-        local ffmpeg_ver=$(ffmpeg -version 2>/dev/null | head -1 | awk '{print $3}')
-        log_success "ffmpeg $ffmpeg_ver found"
-        HAS_FFMPEG=true
-    else
-        need_ffmpeg=true
-    fi
-
     # Termux always needs the Android build toolchain for the tested pip path,
-    # even when ripgrep/ffmpeg are already present.
+    # even when ripgrep is already present.
     if [ "$DISTRO" = "termux" ]; then
         local termux_pkgs=(clang rust make pkg-config libffi openssl)
         if [ "$need_ripgrep" = true ]; then
             termux_pkgs+=("ripgrep")
         fi
-        if [ "$need_ffmpeg" = true ]; then
-            termux_pkgs+=("ffmpeg")
-        fi
 
         log_info "Installing Termux packages: ${termux_pkgs[*]}"
         if pkg install -y "${termux_pkgs[@]}" >/dev/null; then
             [ "$need_ripgrep" = true ] && HAS_RIPGREP=true && log_success "ripgrep installed"
-            [ "$need_ffmpeg" = true ]  && HAS_FFMPEG=true  && log_success "ffmpeg installed"
             log_success "Termux build dependencies installed"
             return 0
         fi
@@ -651,7 +636,7 @@ install_system_packages() {
     fi
 
     # Nothing to install — done
-    if [ "$need_ripgrep" = false ] && [ "$need_ffmpeg" = false ]; then
+    if [ "$need_ripgrep" = false ]; then
         return 0
     fi
 
@@ -662,10 +647,6 @@ install_system_packages() {
         desc_parts+=("ripgrep for faster file search")
         pkgs+=("ripgrep")
     fi
-    if [ "$need_ffmpeg" = true ]; then
-        desc_parts+=("ffmpeg for TTS voice messages")
-        pkgs+=("ffmpeg")
-    fi
     local description
     description=$(IFS=" and "; echo "${desc_parts[*]}")
 
@@ -675,7 +656,6 @@ install_system_packages() {
             log_info "Installing ${pkgs[*]} via Homebrew..."
             if brew install "${pkgs[@]}"; then
                 [ "$need_ripgrep" = true ] && HAS_RIPGREP=true && log_success "ripgrep installed"
-                [ "$need_ffmpeg" = true ]  && HAS_FFMPEG=true  && log_success "ffmpeg installed"
                 return 0
             fi
         fi
@@ -705,7 +685,6 @@ install_system_packages() {
             log_info "Installing ${pkgs[*]}..."
             if $install_cmd; then
                 [ "$need_ripgrep" = true ] && HAS_RIPGREP=true && log_success "ripgrep installed"
-                [ "$need_ffmpeg" = true ]  && HAS_FFMPEG=true  && log_success "ffmpeg installed"
                 return 0
             fi
         # Passwordless sudo — just install
@@ -713,7 +692,6 @@ install_system_packages() {
             log_info "Installing ${pkgs[*]}..."
             if sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a $install_cmd; then
                 [ "$need_ripgrep" = true ] && HAS_RIPGREP=true && log_success "ripgrep installed"
-                [ "$need_ffmpeg" = true ]  && HAS_FFMPEG=true  && log_success "ffmpeg installed"
                 return 0
             fi
         # sudo needs password — ask once for everything
@@ -725,7 +703,6 @@ install_system_packages() {
                 if prompt_yes_no "Install ${description}? (requires sudo)" "no"; then
                     if sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a $install_cmd; then
                         [ "$need_ripgrep" = true ] && HAS_RIPGREP=true && log_success "ripgrep installed"
-                        [ "$need_ffmpeg" = true ]  && HAS_FFMPEG=true  && log_success "ffmpeg installed"
                         return 0
                     fi
                 fi
@@ -741,7 +718,6 @@ install_system_packages() {
                 if prompt_yes_no "Install ${description}?" "yes"; then
                     if sudo DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a $install_cmd < /dev/tty; then
                         [ "$need_ripgrep" = true ] && HAS_RIPGREP=true && log_success "ripgrep installed"
-                        [ "$need_ffmpeg" = true ]  && HAS_FFMPEG=true  && log_success "ffmpeg installed"
                         return 0
                     fi
                 fi
@@ -767,10 +743,6 @@ install_system_packages() {
     if [ "$HAS_RIPGREP" = false ] && [ "$need_ripgrep" = true ]; then
         log_warn "ripgrep not installed (file search will use grep fallback)"
         show_manual_install_hint "ripgrep"
-    fi
-    if [ "$HAS_FFMPEG" = false ] && [ "$need_ffmpeg" = true ]; then
-        log_warn "ffmpeg not installed (TTS voice messages will be limited)"
-        show_manual_install_hint "ffmpeg"
     fi
 }
 

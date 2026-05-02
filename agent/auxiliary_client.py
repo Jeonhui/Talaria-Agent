@@ -276,18 +276,8 @@ _AI_GATEWAY_HEADERS = {
     "User-Agent": f"TalariaAgent/{_TALARIA_VERSION}",
 }
 
-# Nous Portal extra_body for product attribution.
-# Callers should pass this as extra_body in chat.completions.create()
-# when the auxiliary client is backed by Nous Portal.
-NOUS_EXTRA_BODY = {"tags": ["product=talaria-agent"]}
-
-# Set at resolve time — True if the auxiliary client points to Nous Portal
-auxiliary_is_nous: bool = False
-
 # Default auxiliary models per provider
 _OPENROUTER_MODEL = "google/gemini-3-flash-preview"
-_NOUS_MODEL = "google/gemini-3-flash-preview"
-_NOUS_DEFAULT_BASE_URL = "https://inference-api.nousresearch.com/v1"
 _ANTHROPIC_DEFAULT_BASE_URL = "https://api.anthropic.com"
 _AUTH_JSON_PATH = get_talaria_home() / "auth.json"
 
@@ -935,81 +925,6 @@ def _maybe_wrap_anthropic(
     )
 
 
-def _read_nous_auth() -> Optional[dict]:
-    """Read and validate ~/.talaria/auth.json for an active Nous provider.
-
-    Returns the provider state dict if Nous is active with tokens,
-    otherwise None.
-    """
-    pool_present, entry = _select_pool_entry("nous")
-    if pool_present:
-        if entry is None:
-            return None
-        return {
-            "access_token": getattr(entry, "access_token", ""),
-            "refresh_token": getattr(entry, "refresh_token", None),
-            "agent_key": getattr(entry, "agent_key", None),
-            "inference_base_url": _pool_runtime_base_url(entry, _NOUS_DEFAULT_BASE_URL),
-            "portal_base_url": getattr(entry, "portal_base_url", None),
-            "client_id": getattr(entry, "client_id", None),
-            "scope": getattr(entry, "scope", None),
-            "token_type": getattr(entry, "token_type", "Bearer"),
-            "source": "pool",
-        }
-
-    try:
-        if not _AUTH_JSON_PATH.is_file():
-            return None
-        data = json.loads(_AUTH_JSON_PATH.read_text())
-        if data.get("active_provider") != "nous":
-            return None
-        provider = data.get("providers", {}).get("nous", {})
-        # Must have at least an access_token or agent_key
-        if not provider.get("agent_key") and not provider.get("access_token"):
-            return None
-        return provider
-    except Exception as exc:
-        logger.debug("Could not read Nous auth: %s", exc)
-        return None
-
-
-def _nous_api_key(provider: dict) -> str:
-    """Extract the best API key from a Nous provider state dict."""
-    return provider.get("agent_key") or provider.get("access_token", "")
-
-
-def _nous_base_url() -> str:
-    """Resolve the Nous inference base URL from env or default."""
-    return os.getenv("NOUS_INFERENCE_BASE_URL", _NOUS_DEFAULT_BASE_URL)
-
-
-def _resolve_nous_runtime_api(*, force_refresh: bool = False) -> Optional[tuple[str, str]]:
-    """Return fresh Nous runtime credentials when available.
-
-    This mirrors the main agent's 401 recovery path and keeps auxiliary
-    clients aligned with the singleton auth store + mint flow instead of
-    relying only on whatever raw tokens happen to be sitting in auth.json
-    or the credential pool.
-    """
-    try:
-        from talaria_cli.auth import resolve_nous_runtime_credentials
-
-        creds = resolve_nous_runtime_credentials(
-            min_key_ttl_seconds=max(60, int(os.getenv("TALARIA_NOUS_MIN_KEY_TTL_SECONDS", "1800"))),
-            timeout_seconds=float(os.getenv("TALARIA_NOUS_TIMEOUT_SECONDS", "15")),
-            force_mint=force_refresh,
-        )
-    except Exception as exc:
-        logger.debug("Auxiliary Nous runtime credential resolution failed: %s", exc)
-        return None
-
-    api_key = str(creds.get("api_key") or "").strip()
-    base_url = str(creds.get("base_url") or "").strip().rstrip("/")
-    if not api_key or not base_url:
-        return None
-    return api_key, base_url
-
-
 def _read_codex_access_token() -> Optional[str]:
     """Read a valid, non-expired Codex OAuth access token from Talaria auth store.
 
@@ -1174,72 +1089,6 @@ def _describe_openrouter_unavailable() -> str:
     if not str(os.getenv("OPENROUTER_API_KEY") or "").strip():
         return "OPENROUTER_API_KEY not set"
     return "no usable OpenRouter credentials found"
-
-
-def _try_nous(vision: bool = False) -> Tuple[Optional[OpenAI], Optional[str]]:
-    # Check cross-session rate limit guard before attempting Nous —
-    # if another session already recorded a 429, skip Nous entirely
-    # to avoid piling more requests onto the tapped RPH bucket.
-    try:
-        from agent.nous_rate_guard import nous_rate_limit_remaining
-        _remaining = nous_rate_limit_remaining()
-        if _remaining is not None and _remaining > 0:
-            logger.debug(
-                "Auxiliary: skipping Nous Portal (rate-limited, resets in %.0fs)",
-                _remaining,
-            )
-            return None, None
-    except Exception:
-        pass
-
-    nous = _read_nous_auth()
-    runtime = _resolve_nous_runtime_api(force_refresh=False)
-    if runtime is None and not nous:
-        return None, None
-    global auxiliary_is_nous
-    auxiliary_is_nous = True
-    logger.debug("Auxiliary client: Nous Portal")
-
-    # Ask the Portal which model it currently recommends for this task type.
-    # The /api/nous/recommended-models endpoint is the authoritative source:
-    # it distinguishes paid vs free tier recommendations, and get_nous_recommended_aux_model
-    # auto-detects the caller's tier via check_nous_free_tier().  Fall back to
-    # _NOUS_MODEL (google/gemini-3-flash-preview) when the Portal is unreachable
-    # or returns a null recommendation for this task type.
-    model = _NOUS_MODEL
-    try:
-        from talaria_cli.models import get_nous_recommended_aux_model
-        recommended = get_nous_recommended_aux_model(vision=vision)
-        if recommended:
-            model = recommended
-            logger.debug(
-                "Auxiliary/%s: using Portal-recommended model %s",
-                "vision" if vision else "text", model,
-            )
-        else:
-            logger.debug(
-                "Auxiliary/%s: no Portal recommendation, falling back to %s",
-                "vision" if vision else "text", model,
-            )
-    except Exception as exc:
-        logger.debug(
-            "Auxiliary/%s: recommended-models lookup failed (%s); "
-            "falling back to %s",
-            "vision" if vision else "text", exc, model,
-        )
-
-    if runtime is not None:
-        api_key, base_url = runtime
-    else:
-        api_key = _nous_api_key(nous or {})
-        base_url = str((nous or {}).get("inference_base_url") or _nous_base_url()).rstrip("/")
-    return (
-        OpenAI(
-            api_key=api_key,
-            base_url=base_url,
-        ),
-        model,
-    )
 
 
 def _read_main_model() -> str:
@@ -1519,7 +1368,6 @@ def _try_anthropic() -> Tuple[Optional[Any], Optional[str]]:
 
 _AUTO_PROVIDER_LABELS = {
     "_try_openrouter": "openrouter",
-    "_try_nous": "nous",
     "_try_custom_endpoint": "local/custom",
     "_resolve_api_key_provider": "api-key",
 }
@@ -1557,7 +1405,6 @@ def _get_provider_chain() -> List[tuple]:
     """
     return [
         ("openrouter", _try_openrouter),
-        ("nous", _try_nous),
         ("local/custom", _try_custom_endpoint),
         ("api-key", _resolve_api_key_provider),
     ]
@@ -1694,18 +1541,6 @@ def _refresh_provider_credentials(provider: str) -> bool:
                 return False
             _evict_cached_clients(normalized)
             return True
-        if normalized == "nous":
-            from talaria_cli.auth import resolve_nous_runtime_credentials
-
-            creds = resolve_nous_runtime_credentials(
-                min_key_ttl_seconds=max(60, int(os.getenv("TALARIA_NOUS_MIN_KEY_TTL_SECONDS", "1800"))),
-                timeout_seconds=float(os.getenv("TALARIA_NOUS_TIMEOUT_SECONDS", "15")),
-                force_mint=True,
-            )
-            if not str(creds.get("api_key", "") or "").strip():
-                return False
-            _evict_cached_clients(normalized)
-            return True
         if normalized == "anthropic":
             from agent.anthropic_adapter import read_claude_code_credentials, _refresh_oauth_token, resolve_anthropic_token
 
@@ -1745,7 +1580,7 @@ def _try_payment_fallback(
     if main_provider and main_provider.lower() in skip:
         skip_labels.add(main_provider.lower())
     # Map common resolved_provider values back to chain labels.
-    _alias_to_label = {"openrouter": "openrouter", "nous": "nous",
+    _alias_to_label = {"openrouter": "openrouter",
                        "openai-codex": "openai-codex", "codex": "openai-codex",
                        "custom": "local/custom", "local/custom": "local/custom"}
     skip_chain_labels = {_alias_to_label.get(s, s) for s in skip_labels}
@@ -1784,8 +1619,7 @@ def _resolve_auto(main_runtime: Optional[Dict[str, Any]] = None) -> Tuple[Option
       2. OpenRouter → Nous → custom → Codex → API-key providers (fallback
          chain, only used when the main provider has no working client).
     """
-    global auxiliary_is_nous, _stale_base_url_warned
-    auxiliary_is_nous = False  # Reset — _try_nous() will set True if it wins
+    global _stale_base_url_warned
     runtime = _normalize_main_runtime(main_runtime)
     runtime_provider = runtime.get("provider", "")
     runtime_model = runtime.get("model", "")
@@ -2050,23 +1884,6 @@ def resolve_provider_client(
                 "resolve_provider_client: openrouter requested but %s",
                 _describe_openrouter_unavailable(),
             )
-            return None, None
-        final_model = _normalize_resolved_model(model or default, provider)
-        return (_to_async_client(client, final_model, is_vision=is_vision) if async_mode
-                else (client, final_model))
-
-    # ── Nous Portal (OAuth) ──────────────────────────────────────────
-    if provider == "nous":
-        # Detect vision tasks: either explicit model override from
-        # _PROVIDER_VISION_MODELS, or caller passed a known vision model.
-        _is_vision = (
-            model in _PROVIDER_VISION_MODELS.values()
-            or (model or "").strip().lower() == "mimo-v2-omni"
-        )
-        client, default = _try_nous(vision=_is_vision)
-        if client is None:
-            logger.warning("resolve_provider_client: nous requested "
-                           "but Nous Portal not configured (run: talaria auth)")
             return None, None
         final_model = _normalize_resolved_model(model or default, provider)
         return (_to_async_client(client, final_model, is_vision=is_vision) if async_mode
@@ -2407,8 +2224,6 @@ def resolve_provider_client(
 
     elif pconfig.auth_type in ("oauth_device_code", "oauth_external"):
         # OAuth providers — route through their specific try functions
-        if provider == "nous":
-            return resolve_provider_client("nous", model, async_mode)
         if provider == "openai-codex":
             return resolve_provider_client("openai-codex", model, async_mode)
         # Other OAuth providers not directly supported
@@ -2469,7 +2284,6 @@ def get_async_text_auxiliary_client(task: str = "", *, main_runtime: Optional[Di
 
 _VISION_AUTO_PROVIDER_ORDER = (
     "openrouter",
-    "nous",
 )
 
 
@@ -2486,8 +2300,6 @@ def _resolve_strict_vision_backend(
         return resolve_provider_client("copilot", model, is_vision=True)
     if provider == "openrouter":
         return _try_openrouter()
-    if provider == "nous":
-        return _try_nous(vision=True)
     if provider == "openai-codex":
         # Route through resolve_provider_client so the caller's explicit
         # model is used.  There is no safe default Codex model (shifting
@@ -2587,17 +2399,7 @@ def resolve_vision_provider_client(
         main_model = _read_main_model()
         if main_provider and main_provider not in ("auto", ""):
             vision_model = _PROVIDER_VISION_MODELS.get(main_provider, main_model)
-            if main_provider == "nous":
-                sync_client, default_model = _resolve_strict_vision_backend(
-                    main_provider, vision_model
-                )
-                if sync_client is not None:
-                    logger.info(
-                        "Vision auto-detect: using main provider %s (%s)",
-                        main_provider, default_model or resolved_model or main_model,
-                    )
-                    return _finalize(main_provider, sync_client, default_model)
-            elif main_provider in _PROVIDERS_WITHOUT_VISION:
+            if main_provider in _PROVIDERS_WITHOUT_VISION:
                 # Kimi Coding Plan's /coding endpoint (Anthropic Messages wire)
                 # does not accept image input — Kimi's own docs say "Current
                 # model does not support image input, switch to a model with
@@ -2650,12 +2452,8 @@ def resolve_vision_provider_client(
 
 
 def get_auxiliary_extra_body() -> dict:
-    """Return extra_body kwargs for auxiliary API calls.
-    
-    Includes Nous Portal product tags when the auxiliary client is backed
-    by Nous Portal. Returns empty dict otherwise.
-    """
-    return dict(NOUS_EXTRA_BODY) if auxiliary_is_nous else {}
+    """Return extra_body kwargs for auxiliary API calls."""
+    return {}
 
 
 def auxiliary_max_tokens_param(value: int) -> dict:
@@ -2670,7 +2468,6 @@ def auxiliary_max_tokens_param(value: int) -> dict:
     or_key = os.getenv("OPENROUTER_API_KEY")
     # Only use max_completion_tokens for direct OpenAI custom endpoints
     if (not or_key
-            and _read_nous_auth() is None
             and base_url_hostname(custom_base) == "api.openai.com"):
         return {"max_completion_tokens": value}
     return {"max_tokens": value}
@@ -2726,50 +2523,6 @@ def _store_cached_client(cache_key: tuple, client: Any, default_model: Optional[
             except Exception:
                 pass
         _client_cache[cache_key] = (client, default_model, bound_loop)
-
-
-def _refresh_nous_auxiliary_client(
-    *,
-    cache_provider: str,
-    model: Optional[str],
-    async_mode: bool,
-    base_url: Optional[str] = None,
-    api_key: Optional[str] = None,
-    api_mode: Optional[str] = None,
-    main_runtime: Optional[Dict[str, Any]] = None,
-    is_vision: bool = False,
-) -> Tuple[Optional[Any], Optional[str]]:
-    """Refresh Nous runtime creds, rebuild the client, and replace the cache entry."""
-    runtime = _resolve_nous_runtime_api(force_refresh=True)
-    if runtime is None:
-        return None, model
-
-    fresh_key, fresh_base_url = runtime
-    sync_client = OpenAI(api_key=fresh_key, base_url=fresh_base_url)
-    final_model = model
-
-    current_loop = None
-    if async_mode:
-        try:
-            import asyncio as _aio
-            current_loop = _aio.get_event_loop()
-        except RuntimeError:
-            pass
-        client, final_model = _to_async_client(sync_client, final_model or "", is_vision=is_vision)
-    else:
-        client = sync_client
-
-    cache_key = _client_cache_key(
-        cache_provider,
-        async_mode=async_mode,
-        base_url=base_url,
-        api_key=api_key,
-        api_mode=api_mode,
-        main_runtime=main_runtime,
-        is_vision=is_vision,
-    )
-    _store_cached_client(cache_key, client, final_model, bound_loop=current_loop)
-    return client, final_model
 
 
 def neuter_async_httpx_del() -> None:
@@ -3207,8 +2960,6 @@ def _build_call_kwargs(
 
     # Provider-specific extra_body
     merged_extra = dict(extra_body or {})
-    if provider == "nous" or auxiliary_is_nous:
-        merged_extra.setdefault("tags", []).extend(["product=talaria-agent"])
     if merged_extra:
         kwargs["extra_body"] = merged_extra
 
@@ -3422,34 +3173,9 @@ def call_llm(
                     raise
                 first_err = retry_err
 
-        # ── Nous auth refresh parity with main agent ──────────────────
-        client_is_nous = (
-            resolved_provider == "nous"
-            or base_url_host_matches(_base_info, "inference-api.nousresearch.com")
-        )
-        if _is_auth_error(first_err) and client_is_nous:
-            refreshed_client, refreshed_model = _refresh_nous_auxiliary_client(
-                cache_provider=resolved_provider or "nous",
-                model=final_model,
-                async_mode=False,
-                base_url=resolved_base_url,
-                api_key=resolved_api_key,
-                api_mode=resolved_api_mode,
-                main_runtime=main_runtime,
-                is_vision=(task == "vision"),
-            )
-            if refreshed_client is not None:
-                logger.info("Auxiliary %s: refreshed Nous runtime credentials after 401, retrying",
-                            task or "call")
-                if refreshed_model and refreshed_model != kwargs.get("model"):
-                    kwargs["model"] = refreshed_model
-                return _validate_llm_response(
-                    refreshed_client.chat.completions.create(**kwargs), task)
-
         # ── Auth refresh retry ───────────────────────────────────────
         if (_is_auth_error(first_err)
-                and resolved_provider not in ("auto", "", None)
-                and not client_is_nous):
+                and resolved_provider not in ("auto", "", None)):
             if _refresh_provider_credentials(resolved_provider):
                 logger.info(
                     "Auxiliary %s: refreshed %s credentials after auth error, retrying",
@@ -3714,33 +3440,9 @@ async def async_call_llm(
                     raise
                 first_err = retry_err
 
-        # ── Nous auth refresh parity with main agent ──────────────────
-        client_is_nous = (
-            resolved_provider == "nous"
-            or base_url_host_matches(_client_base, "inference-api.nousresearch.com")
-        )
-        if _is_auth_error(first_err) and client_is_nous:
-            refreshed_client, refreshed_model = _refresh_nous_auxiliary_client(
-                cache_provider=resolved_provider or "nous",
-                model=final_model,
-                async_mode=True,
-                base_url=resolved_base_url,
-                api_key=resolved_api_key,
-                api_mode=resolved_api_mode,
-                is_vision=(task == "vision"),
-            )
-            if refreshed_client is not None:
-                logger.info("Auxiliary %s (async): refreshed Nous runtime credentials after 401, retrying",
-                            task or "call")
-                if refreshed_model and refreshed_model != kwargs.get("model"):
-                    kwargs["model"] = refreshed_model
-                return _validate_llm_response(
-                    await refreshed_client.chat.completions.create(**kwargs), task)
-
         # ── Auth refresh retry (mirrors sync call_llm) ───────────────
         if (_is_auth_error(first_err)
-                and resolved_provider not in ("auto", "", None)
-                and not client_is_nous):
+                and resolved_provider not in ("auto", "", None)):
             if _refresh_provider_credentials(resolved_provider):
                 logger.info(
                     "Auxiliary %s (async): refreshed %s credentials after auth error, retrying",

@@ -290,9 +290,6 @@ def load_cli_config() -> Dict[str, Any]:
             "lifetime_seconds": 300,
             "docker_image": "nikolaik/python-nodejs:python3.11-nodejs20",
             "docker_forward_env": [],
-            "singularity_image": "docker://nikolaik/python-nodejs:python3.11-nodejs20",
-            "modal_image": "nikolaik/python-nodejs:python3.11-nodejs20",
-            "daytona_image": "nikolaik/python-nodejs:python3.11-nodejs20",
             "docker_volumes": [],  # host:container volume mounts for Docker backend
             "docker_mount_cwd_to_workspace": False,  # explicit opt-in only; default off for sandbox isolation
         },
@@ -2135,17 +2132,6 @@ class TalariaCLI:
         self.preloaded_skills: list[str] = []
         self._startup_skills_line_shown = False
 
-        # Voice mode state (also reinitialized inside run() for interactive TUI).
-        self._voice_lock = threading.Lock()
-        self._voice_mode = False
-        self._voice_tts = False
-        self._voice_recorder = None
-        self._voice_recording = False
-        self._voice_processing = False
-        self._voice_continuous = False
-        self._voice_tts_done = threading.Event()
-        self._voice_tts_done.set()
-
         # Status bar visibility (toggled via /statusbar)
         self._status_bar_visible = True
 
@@ -2417,24 +2403,6 @@ class TalariaCLI:
                 elapsed_str = f"{elapsed:.1f}s"
             return f"  {txt}  ({elapsed_str})"
         return f"  {txt}"
-
-    def _get_voice_status_fragments(self, width: Optional[int] = None):
-        """Return the voice status bar fragments for the interactive TUI."""
-        width = width or self._get_tui_terminal_width()
-        compact = self._use_minimal_tui_chrome(width=width)
-        if self._voice_recording:
-            if compact:
-                return [("class:voice-status-recording", " ● REC ")]
-            return [("class:voice-status-recording", " ● REC  Ctrl+B to stop ")]
-        if self._voice_processing:
-            if compact:
-                return [("class:voice-status", " ◉ STT ")]
-            return [("class:voice-status", " ◉ Transcribing... ")]
-        if compact:
-            return [("class:voice-status", " 🎤 Ctrl+B ")]
-        tts = " | TTS on" if self._voice_tts else ""
-        cont = " | Continuous" if self._voice_continuous else ""
-        return [("class:voice-status", f" 🎤 Voice mode{tts}{cont}  —  Ctrl+B to record ")]
 
     def _build_status_bar_text(self, width: Optional[int] = None) -> str:
         """Return a compact one-line session status string for the TUI footer."""
@@ -7592,7 +7560,7 @@ class TalariaCLI:
         _cprint(f"  ┊ {emoji} preparing {tool_name}…")
 
     # ====================================================================
-    # Tool progress callback (audio cues for voice mode)
+    # Tool progress callback
     # ====================================================================
 
     def _on_tool_progress(self, event_type: str, function_name: str = None, preview: str = None, function_args: dict = None, **kwargs):
@@ -7600,7 +7568,7 @@ class TalariaCLI:
 
         Updates the TUI spinner widget so the user can see what the agent
         is doing during tool execution (fills the gap between thinking
-        spinner and next response).  Also plays audio cue in voice mode.
+        spinner and next response).
 
         On tool.started, records a monotonic timestamp so get_spinner_text()
         can show a live elapsed timer (the TUI poll loop already invalidates
@@ -7678,20 +7646,6 @@ class TalariaCLI:
                 function_args if function_args is not None else {}
             )
             self._invalidate()
-
-        if not self._voice_mode:
-            return
-        if not function_name or function_name.startswith("_"):
-            return
-        try:
-            from tools.voice_mode import play_beep
-            threading.Thread(
-                target=play_beep,
-                kwargs={"frequency": 1200, "duration": 0.06, "count": 1},
-                daemon=True,
-            ).start()
-        except Exception:
-            pass
 
     def _on_tool_start(self, tool_call_id: str, function_name: str, function_args: dict):
         """Capture local before-state for write-capable tools."""
@@ -8235,73 +8189,7 @@ class TalariaCLI:
             # reset at the start of each user turn.
             self._reasoning_shown_this_turn = False
 
-            # --- Streaming TTS setup ---
-            # When ElevenLabs is the TTS provider and sounddevice is available,
-            # we stream audio sentence-by-sentence as the agent generates tokens
-            # instead of waiting for the full response.
-            use_streaming_tts = False
-            _streaming_box_opened = False
-            text_queue = None
-            tts_thread = None
             stream_callback = None
-            stop_event = None
-
-            if self._voice_tts:
-                try:
-                    from tools.tts_tool import (
-                        _load_tts_config as _load_tts_cfg,
-                        _get_provider as _get_prov,
-                        _import_elevenlabs,
-                        _import_sounddevice,
-                        stream_tts_to_speaker,
-                    )
-                    _tts_cfg = _load_tts_cfg()
-                    if _get_prov(_tts_cfg) == "elevenlabs":
-                        # Verify both ElevenLabs SDK and audio output are available
-                        _import_elevenlabs()
-                        _import_sounddevice()
-                        use_streaming_tts = True
-                except (ImportError, OSError):
-                    pass
-                except Exception:
-                    pass
-
-            if use_streaming_tts:
-                text_queue = queue.Queue()
-                stop_event = threading.Event()
-
-                def display_callback(sentence: str):
-                    """Called by TTS consumer when a sentence is ready to display + speak."""
-                    nonlocal _streaming_box_opened
-                    if not _streaming_box_opened:
-                        _streaming_box_opened = True
-                        w = self.console.width
-                        label = " ⚕ Talaria "
-                        fill = w - 2 - len(label)
-                        _cprint(f"\n{_ACCENT}╭─{label}{'─' * max(fill - 1, 0)}╮{_RST}")
-                    _cprint(f"{_STREAM_PAD}{sentence.rstrip()}")
-
-                tts_thread = threading.Thread(
-                    target=stream_tts_to_speaker,
-                    args=(text_queue, stop_event, self._voice_tts_done),
-                    kwargs={"display_callback": display_callback},
-                    daemon=True,
-                )
-                tts_thread.start()
-
-                def stream_callback(delta: str):
-                    if text_queue is not None:
-                        text_queue.put(delta)
-
-            # When voice mode is active, prepend a brief instruction so the
-            # model responds concisely. The prefix is API-call-local only —
-            # run_conversation persists the original clean user message.
-            _voice_prefix = ""
-            if self._voice_mode and isinstance(message, str):
-                _voice_prefix = (
-                    "[Voice input — respond concisely and conversationally, "
-                    "2-3 sentences max. No code blocks or markdown.] "
-                )
 
             def run_agent():
                 nonlocal result
@@ -8316,7 +8204,7 @@ class TalariaCLI:
                     set_secret_capture_callback(self._secret_capture_callback)
                 except Exception:
                     pass
-                agent_message = _voice_prefix + message if _voice_prefix else message
+                agent_message = message
                 # Prepend pending model switch note so the model knows about the switch
                 _msn = getattr(self, '_pending_model_switch_note', None)
                 if _msn:
@@ -8335,7 +8223,6 @@ class TalariaCLI:
                         conversation_history=self.conversation_history[:-1],  # Exclude the message we just added
                         stream_callback=stream_callback,
                         task_id=self.session_id,
-                        persist_user_message=message if _voice_prefix else None,
                     )
                 except Exception as exc:
                     logging.error("run_conversation raised: %s", exc, exc_info=True)
@@ -8386,7 +8273,6 @@ class TalariaCLI:
                             if self._clarify_state or self._clarify_freetext:
                                 continue
                             print("\n⚡ New message detected, interrupting...")
-                            # Signal TTS to stop on interrupt
                             if stop_event is not None:
                                 stop_event.set()
                             self.agent.interrupt(interrupt_msg)
@@ -8460,12 +8346,6 @@ class TalariaCLI:
             # Flush any remaining streamed text and close the box
             self._flush_stream()
 
-            # Signal end-of-text to TTS consumer and wait for it to finish
-            if use_streaming_tts and text_queue is not None:
-                text_queue.put(None)  # sentinel
-                if tts_thread is not None:
-                    tts_thread.join(timeout=120)
-
             # Drain any remaining agent output still in the StdoutProxy
             # buffer so tool/status lines render ABOVE our response box.
             # The flush pushes data into the renderer queue; the short
@@ -8528,11 +8408,6 @@ class TalariaCLI:
             if result and (result.get("failed") or result.get("partial")) and not response:
                 error_detail = result.get("error", "Unknown error")
                 response = f"Error: {error_detail}"
-                # Stop continuous voice mode on persistent errors (e.g. 429 rate limit)
-                # to avoid an infinite error → record → error loop
-                if self._voice_continuous:
-                    self._voice_continuous = False
-                    _cprint(f"\n{_DIM}Continuous voice mode stopped due to error.{_RST}")
 
             # Handle interrupt - check if we were interrupted
             pending_message = None
@@ -8583,11 +8458,7 @@ class TalariaCLI:
 
                 is_error_response = result and (result.get("failed") or result.get("partial"))
                 already_streamed = self._stream_started and self._stream_box_opened and not is_error_response
-                if use_streaming_tts and _streaming_box_opened and not is_error_response:
-                    # Text was already printed sentence-by-sentence; just close the box
-                    w = shutil.get_terminal_size().columns
-                    _cprint(f"\n{_ACCENT}╰{'─' * (w - 2)}╯{_RST}")
-                elif already_streamed:
+                if already_streamed:
                     # Response was already streamed token-by-token with box framing;
                     # _flush_stream() already closed the box. Skip Rich Panel.
                     pass
@@ -8620,16 +8491,6 @@ class TalariaCLI:
                         f"({_api_calls}/{_max_iter}) — "
                         f"response may be incomplete{_RST}"
                     )
-
-            # Speak response aloud if voice TTS is enabled
-            # Skip batch TTS when streaming TTS already handled it
-            if self._voice_tts and response and not use_streaming_tts:
-                threading.Thread(
-                    target=self._voice_speak_response,
-                    args=(response,),
-                    daemon=True,
-                ).start()
-
 
             # Re-queue the interrupt message (and any that arrived while we were
             # processing the first) as the next prompt for process_loop.
@@ -8667,21 +8528,6 @@ class TalariaCLI:
         except Exception as e:
             print(f"Error: {e}")
             return None
-        finally:
-            # Ensure streaming TTS resources are cleaned up even on error.
-            # Normal path sends the sentinel at line ~3568; this is a safety
-            # net for exception paths that skip it.  Duplicate sentinels are
-            # harmless — stream_tts_to_speaker exits on the first None.
-            if text_queue is not None:
-                try:
-                    text_queue.put_nowait(None)
-                except Exception:
-                    pass
-            if stop_event is not None:
-                stop_event.set()
-            if tts_thread is not None and tts_thread.is_alive():
-                tts_thread.join(timeout=5)
-    
     def _print_exit_summary(self):
         """Print session resume info on exit, similar to Claude Code."""
         print()
@@ -8764,18 +8610,6 @@ class TalariaCLI:
         # Icon-only custom prompts should still remain visible in special states.
         return symbol, symbol
 
-    def _audio_level_bar(self) -> str:
-        """Return a visual audio level indicator based on current RMS."""
-        _LEVEL_BARS = " ▁▂▃▄▅▆▇"
-        rec = getattr(self, "_voice_recorder", None)
-        if rec is None:
-            return ""
-        rms = rec.current_rms
-        # Normalize RMS (0-32767) to 0-7 index, with log-ish scaling
-        # Typical speech RMS is 500-5000, we cap display at ~8000
-        level = min(rms, 8000) * 7 // 8000
-        return _LEVEL_BARS[level]
-
     def _get_tui_prompt_fragments(self):
         """Return the prompt_toolkit fragments for the current interactive state."""
         symbol, state_suffix = self._get_tui_prompt_symbols()
@@ -8791,11 +8625,6 @@ class TalariaCLI:
                 return [(style, f"{icon} {extra} {state_suffix}")]
             return [(style, f"{icon} {state_suffix}")]
 
-        if self._voice_recording:
-            bar = self._audio_level_bar()
-            return _state_fragment("class:voice-recording", "●", bar)
-        if self._voice_processing:
-            return _state_fragment("class:voice-processing", "◉")
         if self._sudo_state:
             return _state_fragment("class:sudo-prompt", "🔐")
         if self._secret_state:
@@ -8810,8 +8639,6 @@ class TalariaCLI:
             return _state_fragment("class:prompt-working", self._command_spinner_frame())
         if self._agent_running:
             return _state_fragment("class:prompt-working", "⚕")
-        if self._voice_mode:
-            return _state_fragment("class:voice-prompt", "🎤")
         return [("class:prompt", symbol)]
 
     def _get_tui_prompt_text(self) -> str:
@@ -8877,7 +8704,6 @@ class TalariaCLI:
         image_bar,
         input_area,
         input_rule_bot,
-        voice_status_bar,
         completions_menu,
     ) -> list:
         """Assemble the ordered list of children for the root ``HSplit``.
@@ -8902,7 +8728,6 @@ class TalariaCLI:
                 image_bar,
                 input_area,
                 input_rule_bot,
-                voice_status_bar,
                 completions_menu,
             ] if item is not None
         ]
@@ -8940,30 +8765,6 @@ class TalariaCLI:
             _welcome_text = "Welcome to Talaria Agent! Type your message or /help for commands."
             _welcome_color = "#FFF8DC"
         self._console_print(f"[{_welcome_color}]{_welcome_text}[/]")
-        # First-time OpenClaw-residue banner — fires once if ~/.openclaw/ exists
-        # after an OpenClaw→Talaria migration (especially migrations done by
-        # OpenClaw's own tool, which doesn't archive the source directory).
-        try:
-            from agent.onboarding import (
-                OPENCLAW_RESIDUE_FLAG,
-                detect_openclaw_residue,
-                is_seen,
-                mark_seen,
-                openclaw_residue_hint_cli,
-            )
-            if not is_seen(self.config, OPENCLAW_RESIDUE_FLAG) and detect_openclaw_residue():
-                try:
-                    _resid_color = _welcome_skin.get_color("banner_dim", "#B8860B")
-                except Exception:
-                    _resid_color = "#B8860B"
-                self._console_print(f"[{_resid_color}]{openclaw_residue_hint_cli()}[/]")
-                try:
-                    from talaria_cli.config import get_config_path as _get_cfg_path_resid
-                    mark_seen(_get_cfg_path_resid(), OPENCLAW_RESIDUE_FLAG)
-                except Exception:
-                    pass  # best-effort — banner will fire again next session
-        except Exception:
-            pass  # banner is non-critical — never break startup
         # Show a random tip to help users discover features
         try:
             from talaria_cli.tips import get_random_tip
@@ -9044,17 +8845,6 @@ class TalariaCLI:
         # Clipboard image attachments (paste images into the CLI)
         self._attached_images: list[Path] = []
         self._image_counter = 0
-
-        # Voice mode state (protected by _voice_lock for cross-thread access)
-        self._voice_lock = threading.Lock()
-        self._voice_mode = False        # Whether voice mode is enabled
-        self._voice_tts = False         # Whether TTS output is enabled
-        self._voice_recorder = None     # AudioRecorder instance (lazy init)
-        self._voice_recording = False   # Whether currently recording
-        self._voice_processing = False  # Whether STT is in progress
-        self._voice_continuous = False  # Whether to auto-restart after agent responds
-        self._voice_tts_done = threading.Event()  # Signals TTS playback finished
-        self._voice_tts_done.set()  # Initially "done" (no TTS pending)
 
         # Register callbacks so terminal_tool prompts route through our UI
         set_sudo_password_callback(self._sudo_password_callback)
@@ -9424,33 +9214,13 @@ class TalariaCLI:
         @kb.add('c-c')
         def handle_ctrl_c(event):
             """Handle Ctrl+C - cancel interactive prompts, interrupt agent, or exit.
-            
+
             Priority:
-            0. Cancel active voice recording
             1. Cancel active sudo/approval/clarify prompt
             2. Interrupt the running agent (first press)
             3. Force exit (second press within 2s, or when idle)
             """
             now = time.time()
-
-            # Cancel active voice recording.
-            # Run cancel() in a background thread to prevent blocking the
-            # event loop if AudioRecorder._lock or CoreAudio takes time.
-            _should_cancel_voice = False
-            _recorder_ref = None
-            with cli_ref._voice_lock:
-                if cli_ref._voice_recording and cli_ref._voice_recorder:
-                    _recorder_ref = cli_ref._voice_recorder
-                    cli_ref._voice_recording = False
-                    cli_ref._voice_continuous = False
-                    _should_cancel_voice = True
-            if _should_cancel_voice:
-                _cprint(f"\n{_DIM}Recording cancelled.{_RST}")
-                threading.Thread(
-                    target=_recorder_ref.cancel, daemon=True
-                ).start()
-                event.app.invalidate()
-                return
 
             # Cancel sudo prompt
             if self._sudo_state:
@@ -9564,75 +9334,6 @@ class TalariaCLI:
                 os.kill(0, _sig.SIGTSTP)
             run_in_terminal(_suspend)
 
-        # Voice push-to-talk key: configurable via config.yaml (voice.record_key)
-        # Default: Ctrl+B (avoids conflict with Ctrl+R readline reverse-search)
-        # Config uses "ctrl+b" format; prompt_toolkit expects "c-b" format.
-        try:
-            from talaria_cli.config import load_config
-            _raw_key = load_config().get("voice", {}).get("record_key", "ctrl+b")
-            _voice_key = _raw_key.lower().replace("ctrl+", "c-").replace("alt+", "a-")
-        except Exception:
-            _voice_key = "c-b"
-
-        @kb.add(_voice_key)
-        def handle_voice_record(event):
-            """Toggle voice recording when voice mode is active.
-
-            IMPORTANT: This handler runs in prompt_toolkit's event-loop thread.
-            Any blocking call here (locks, sd.wait, disk I/O) freezes the
-            entire UI.  All heavy work is dispatched to daemon threads.
-            """
-            if not cli_ref._voice_mode:
-                return
-            # Always allow STOPPING a recording (even when agent is running)
-            if cli_ref._voice_recording:
-                # Manual stop via push-to-talk key: stop continuous mode
-                with cli_ref._voice_lock:
-                    cli_ref._voice_continuous = False
-                # Flag clearing is handled atomically inside _voice_stop_and_transcribe
-                event.app.invalidate()
-                threading.Thread(
-                    target=cli_ref._voice_stop_and_transcribe,
-                    daemon=True,
-                ).start()
-            else:
-                # Guard: don't START recording during agent run or interactive prompts
-                if cli_ref._agent_running:
-                    return
-                if cli_ref._clarify_state or cli_ref._sudo_state or cli_ref._approval_state:
-                    return
-                # Guard: don't start while a previous stop/transcribe cycle is
-                # still running — recorder.stop() holds AudioRecorder._lock and
-                # start() would block the event-loop thread waiting for it.
-                if cli_ref._voice_processing:
-                    return
-
-                # Interrupt TTS if playing, so user can start talking.
-                # stop_playback() is fast (just terminates a subprocess).
-                if not cli_ref._voice_tts_done.is_set():
-                    try:
-                        from tools.voice_mode import stop_playback
-                        stop_playback()
-                        cli_ref._voice_tts_done.set()
-                    except Exception:
-                        pass
-
-                with cli_ref._voice_lock:
-                    cli_ref._voice_continuous = True
-
-                # Dispatch to a daemon thread so play_beep(sd.wait),
-                # AudioRecorder.start(lock acquire), and config I/O
-                # never block the prompt_toolkit event loop.
-                def _start_recording():
-                    try:
-                        cli_ref._voice_start_recording()
-                        if hasattr(cli_ref, '_app') and cli_ref._app:
-                            cli_ref._app.invalidate()
-                    except Exception as e:
-                        _cprint(f"\n{_DIM}Voice recording failed: {e}{_RST}")
-
-                threading.Thread(target=_start_recording, daemon=True).start()
-                event.app.invalidate()
         from prompt_toolkit.keys import Keys
 
         @kb.add(Keys.BracketedPaste, eager=True)
@@ -9871,10 +9572,6 @@ class TalariaCLI:
                 return Transformation(fragments=ti.fragments)
 
         def _get_placeholder():
-            if cli_ref._voice_recording:
-                return "recording... Ctrl+B to stop, Ctrl+C to cancel"
-            if cli_ref._voice_processing:
-                return "transcribing..."
             if cli_ref._sudo_state:
                 return "type password (hidden), Enter to submit · ESC to skip"
             if cli_ref._secret_state:
@@ -9891,8 +9588,6 @@ class TalariaCLI:
                 return f"{frame} {status}"
             if cli_ref._agent_running:
                 return "msg=interrupt · /queue · /bg · /steer · Ctrl+C cancel"
-            if cli_ref._voice_mode:
-                return "type or Ctrl+B to record"
             return ""
 
         input_area.control.input_processors.append(_PlaceholderProcessor(_get_placeholder))
@@ -10350,18 +10045,6 @@ class TalariaCLI:
             height=Condition(lambda: bool(cli_ref._attached_images)),
         )
 
-        # Persistent voice mode status bar (visible only when voice mode is on)
-        def _get_voice_status():
-            return cli_ref._get_voice_status_fragments()
-
-        voice_status_bar = ConditionalContainer(
-            Window(
-                FormattedTextControl(_get_voice_status),
-                height=1,
-            ),
-            filter=Condition(lambda: cli_ref._voice_mode),
-        )
-
         status_bar = ConditionalContainer(
             Window(
                 content=FormattedTextControl(lambda: cli_ref._get_status_bar_fragments()),
@@ -10402,7 +10085,6 @@ class TalariaCLI:
                     image_bar=image_bar,
                     input_area=input_area,
                     input_rule_bot=input_rule_bot,
-                    voice_status_bar=voice_status_bar,
                     completions_menu=completions_menu,
                 )
             )
@@ -10451,12 +10133,6 @@ class TalariaCLI:
             'approval-cmd': '#AAAAAA italic',
             'approval-choice': '#AAAAAA',
             'approval-selected': '#FFD700 bold',
-            # Voice mode
-            'voice-prompt': '#87CEEB',
-            'voice-recording': '#FF4444 bold',
-            'voice-processing': '#FFA500 italic',
-            'voice-status': 'bg:#1a1a2e #87CEEB',
-            'voice-status-recording': 'bg:#1a1a2e #FF4444 bold',
         }
         style = PTStyle.from_dict(self._build_tui_style_dict())
         
@@ -10622,22 +10298,6 @@ class TalariaCLI:
 
                         app.invalidate()  # Refresh status line
 
-                        # Continuous voice: auto-restart recording after agent responds.
-                        # Dispatch to a daemon thread so play_beep (sd.wait) and
-                        # AudioRecorder.start (lock acquire) never block process_loop —
-                        # otherwise queued user input would stall silently.
-                        if self._voice_mode and self._voice_continuous and not self._voice_recording:
-                            def _restart_recording():
-                                try:
-                                    if self._voice_tts:
-                                        self._voice_tts_done.wait(timeout=60)
-                                        time.sleep(0.3)
-                                    self._voice_start_recording()
-                                    app.invalidate()
-                                except Exception as e:
-                                    _cprint(f"{_DIM}Voice auto-restart failed: {e}{_RST}")
-                            threading.Thread(target=_restart_recording, daemon=True).start()
-
                         # Drain process notifications (completions + watch matches)
                         # that arrived while the agent was running.
                         try:
@@ -10775,19 +10435,6 @@ class TalariaCLI:
                     self.agent.interrupt()
                 except Exception:
                     pass
-            # Shut down voice recorder (release persistent audio stream)
-            if hasattr(self, '_voice_recorder') and self._voice_recorder:
-                try:
-                    self._voice_recorder.shutdown()
-                except Exception:
-                    pass
-                self._voice_recorder = None
-            # Clean up old temp voice recordings
-            try:
-                from tools.voice_mode import cleanup_temp_recordings
-                cleanup_temp_recordings()
-            except Exception:
-                pass
             # Unregister callbacks to avoid dangling references
             set_sudo_password_callback(None)
             set_approval_callback(None)

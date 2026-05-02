@@ -6,8 +6,8 @@ author: Talaria Agent
 license: MIT
 metadata:
   talaria:
-    tags: [debugging, nodejs, node-inspect, cdp, breakpoints, ui-tui]
-    related_skills: [systematic-debugging, python-debugpy, debugging-talaria-tui-commands]
+    tags: [debugging, nodejs, node-inspect, cdp, breakpoints]
+    related_skills: [systematic-debugging, python-debugpy]
 ---
 
 # Node.js Inspect Debugger
@@ -26,8 +26,7 @@ Two tools, pick one:
 ## When to Use
 
 - A Node test fails and you need to see intermediate state
-- ui-tui crashes or behaves wrong and you want to inspect React/Ink state pre-render
-- tui_gateway child processes (`_SlashWorker`, PTY bridge workers) misbehave
+- An MCP server (Node-based, launched via `npx`) misbehaves
 - You need to inspect a value in a closure that `console.log` can't reach without patching
 - Perf: attach to a running process to capture a CPU profile or heap snapshot
 
@@ -166,72 +165,21 @@ Run it:
 node /tmp/cdp-debug.js
 ```
 
-Talaria-specific note: `chrome-remote-interface` is NOT in `ui-tui/package.json`. Install it to a throwaway location if you don't want to dirty the project:
+Install `chrome-remote-interface` to a throwaway location if you don't want to dirty the target project:
 
 ```bash
 mkdir -p /tmp/cdp-tools && cd /tmp/cdp-tools && npm i chrome-remote-interface
 NODE_PATH=/tmp/cdp-tools/node_modules node /tmp/cdp-debug.js
 ```
 
-## Debugging Talaria ui-tui
-
-The TUI is built Ink + tsx. Two common scenarios:
-
-### Debugging a single Ink component under dev
-
-`ui-tui/package.json` has `npm run dev` (tsx --watch). Add `--inspect-brk` by running tsx directly:
-
-```bash
-cd /home/bb/talaria-agent/ui-tui
-npm run build    # produce dist/ once so transpile isn't needed on first load
-node --inspect-brk dist/entry.js
-# In another terminal:
-node inspect -p <node pid>
-```
-
-Then inside `debug>`:
-
-```
-sb('dist/app.js', 220)     # or wherever the suspect render is
-cont
-```
-
-When it pauses, `repl` → inspect `props`, state refs, `useInput` handler values, etc.
-
-### Debugging a running `talaria --tui`
-
-The TUI spawns Node from the Python CLI. Easiest path:
-
-```bash
-# 1. Launch TUI
-talaria --tui &
-TUI_PID=$(pgrep -f 'ui-tui/dist/entry' | head -1)
-
-# 2. Enable inspector on that Node PID
-kill -SIGUSR1 "$TUI_PID"
-
-# 3. Find the WS URL
-curl -s http://127.0.0.1:9229/json/list | jq -r '.[0].webSocketDebuggerUrl'
-
-# 4. Attach
-node inspect ws://127.0.0.1:9229/<uuid>
-```
-
-Interacting with the TUI (typing in its window) continues to advance execution; your debugger can pause it on a breakpoint at any `sb(...)`.
-
-### Debugging `_SlashWorker` / PTY child processes
-
-Those are Python, not Node — use the `python-debugpy` skill for them. Only Node portions (Ink UI, tui_gateway client, tsx-run tests under `ui-tui/`) use this skill.
-
 ## Running Vitest Tests Under the Debugger
 
 ```bash
-cd /home/bb/talaria-agent/ui-tui
 # Run a single test file paused on entry
-node --inspect-brk ./node_modules/vitest/vitest.mjs run --no-file-parallelism src/app/foo.test.tsx
+node --inspect-brk ./node_modules/vitest/vitest.mjs run --no-file-parallelism path/to/foo.test.ts
 ```
 
-In another terminal: `node inspect -p <pid>`, then `sb('src/app/foo.tsx', 42)`, `cont`.
+In another terminal: `node inspect -p <pid>`, then `sb('path/to/foo.ts', 42)`, `cont`.
 
 Use `--no-file-parallelism` (vitest) or `--runInBand` (jest) so only one worker exists — debugging a pool is painful.
 

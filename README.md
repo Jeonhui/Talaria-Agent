@@ -2,7 +2,7 @@
 
 > A lean personal assistant for Discord, Slack, Telegram, CLI, and optional MCP.
 
-Talaria is a slim, opinionated fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) that drops the everything-included framework surface and keeps a small, well-defined assistant. About **30% the size** of the upstream code base.
+Talaria is a slim, opinionated fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) that drops the everything-included framework surface and keeps a small, well-defined assistant. **~71% smaller** than the upstream code base (~29% the original size).
 
 ```
         ⢠⣶⣶⣦⣄⡀
@@ -22,18 +22,25 @@ Talaria is a slim, opinionated fork of [Hermes Agent](https://github.com/NousRes
 
 | Surface | Talaria |
 |---|---|
-| **Providers** | Anthropic (Claude), OpenAI (GPT), OpenAI Codex, Xiaomi MiMo, local (LM Studio / Ollama / vLLM), custom (any OpenAI-compatible endpoint) |
+| **Providers** | Anthropic (Claude), OpenAI (GPT), OpenAI Codex, Xiaomi MiMo, OpenRouter (200+ models), local (LM Studio / Ollama / vLLM), custom (any OpenAI-compatible endpoint) |
 | **Messaging** | Discord, Slack, Telegram |
 | **Terminal backends** | local, Docker, SSH |
 | **MCP** | Supported. Zero servers shipped — add your own with `talaria mcp add`. |
 | **Skills** | Bundled `devops` + `software-development`; install more with `talaria skills install <repo>` |
-| **TUI mode** | `talaria --tui` |
 
 ## What's been removed
 
-Whole subsystems dropped to keep the assistant focused: voice (TTS/STT), the web dashboard, the Vercel AI Gateway / OpenRouter / Nous Portal aggregator paths, every messaging platform other than the three above, RL/eval harnesses, third-party memory plugins (Honcho/mem0/etc), and ~1100 lines of dead provider catalogs and OAuth flows.
+Whole subsystems dropped to keep the assistant focused:
 
-Net: **~199k Python LOC** in **298 files**, down from **~649k LOC** in **2,884 files**.
+- **Voice & TTS** — speech-to-text, text-to-speech, push-to-talk, Discord voice channels, ElevenLabs/Edge/MiniMax/NeuTTS providers
+- **Web dashboard & ink/React TUI frontend** — `talaria chat` (prompt_toolkit REPL) is the only interactive surface
+- **Aggregator paths** — Vercel AI Gateway and Nous Portal subscription system (OpenRouter is now a first-class provider with its own key)
+- **Auth flows** — Nous Portal device-code login, OpenClaw migration, the `talaria login` subcommand
+- **Backends** — Modal, Daytona, Singularity sandbox executors (only local / Docker / SSH remain)
+- **Messaging** — every platform other than Discord / Slack / Telegram (DingTalk, BlueBubbles, WhatsApp, Matrix, Signal, etc.)
+- **Other** — RL/eval harnesses, third-party memory plugins (Honcho / Mem0 / Hindsight), ~1100 lines of dead provider catalogs
+
+Net: **~187k Python LOC** in **219 files**, down from **~649k LOC** in **1,340 files** in upstream Hermes.
 
 ---
 
@@ -68,6 +75,22 @@ talaria setup
 
 ### Docker
 
+Pre-built image from GitHub Container Registry:
+
+```bash
+mkdir -p ~/.talaria
+docker run --rm -it -v ~/.talaria:/opt/data \
+    -e TALARIA_UID=$(id -u) -e TALARIA_GID=$(id -g) \
+    ghcr.io/jeonhui/talaria-agent:latest setup
+docker run -d --name talaria --restart unless-stopped \
+    --network host -v ~/.talaria:/opt/data \
+    -e TALARIA_UID=$(id -u) -e TALARIA_GID=$(id -g) \
+    ghcr.io/jeonhui/talaria-agent:latest
+docker logs -f talaria
+```
+
+Or build locally with the included compose file:
+
 ```bash
 git clone https://github.com/Jeonhui/Talaria-Agent.git
 cd Talaria-Agent
@@ -88,7 +111,6 @@ After `talaria setup`:
 
 ```bash
 talaria chat                  # interactive REPL with the agent
-talaria --tui                 # full-screen TUI
 talaria gateway run           # run the messaging gateway in the foreground
 talaria gateway start         # install + start as a background service
 talaria status                # show provider / API keys / platforms / gateway state
@@ -171,6 +193,7 @@ talaria uninstall [--full]         # remove (--full also wipes ~/.talaria)
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
 XIAOMI_API_KEY=...
+OPENROUTER_API_KEY=sk-or-...            # 200+ models via one endpoint
 LM_BASE_URL=http://localhost:11434/v1   # local Ollama / LM Studio
 
 # Discord
@@ -201,7 +224,6 @@ talaria_cli/         CLI entrypoint, setup wizard, model picker, gateway command
 agent/               agent loop, prompt builder, transports (anthropic / chat_completions / codex)
 tools/               built-in tools: terminal, file, web, browser, memory, todo, vision, MCP, skills
 gateway/             messaging gateway (Discord / Slack / Telegram adapters + session store)
-tui_gateway/         TUI WebSocket gateway used by `talaria --tui`
 plugins/             user-extensible plugin host
 cron/                cron scheduler
 skills/              bundled skills (devops, software-development)
@@ -215,7 +237,7 @@ scripts/             install / uninstall / build helpers
 
 ## Status
 
-- **Version:** v0.1.0 (2026-05-01) — first clean release after the lean refactor
+- **Version:** v0.2.0 (2026-05-03) — second lean pass: TUI backend, voice/TTS, Nous/OpenClaw/login, and Modal/Daytona/Singularity dead paths fully removed; OpenRouter promoted to first-class provider
 - **Stability:** dogfood-grade. Used personally; report issues you hit.
 - **Tests:** the `tests/` directory currently holds smoke checks only — contributions welcome.
 

@@ -441,38 +441,6 @@ def _get_orchestrator_enabled() -> bool:
     return True
 
 
-def _get_inherit_mcp_toolsets() -> bool:
-    """Whether narrowed child toolsets should keep the parent's MCP toolsets."""
-    cfg = _load_config()
-    return is_truthy_value(cfg.get("inherit_mcp_toolsets"), default=True)
-
-
-def _is_mcp_toolset_name(name: str) -> bool:
-    """Return True for canonical MCP toolsets and their registered aliases."""
-    if not name:
-        return False
-    if str(name).startswith("mcp-"):
-        return True
-    try:
-        from tools.registry import registry
-
-        target = registry.get_toolset_alias_target(str(name))
-    except Exception:
-        target = None
-    return bool(target and str(target).startswith("mcp-"))
-
-
-def _preserve_parent_mcp_toolsets(
-    child_toolsets: List[str], parent_toolsets: set[str]
-) -> List[str]:
-    """Append any parent MCP toolsets that are missing from a narrowed child."""
-    preserved = list(child_toolsets)
-    for toolset_name in sorted(parent_toolsets):
-        if _is_mcp_toolset_name(toolset_name) and toolset_name not in preserved:
-            preserved.append(toolset_name)
-    return preserved
-
-
 DEFAULT_MAX_ITERATIONS = 50
 DEFAULT_CHILD_TIMEOUT = 600  # seconds before a child agent is considered stuck
 _HEARTBEAT_INTERVAL = 30  # seconds between parent activity heartbeats during delegation
@@ -909,10 +877,6 @@ def _build_child_agent(
     if toolsets:
         # Intersect with parent — subagent must not gain tools the parent lacks
         child_toolsets = [t for t in toolsets if t in parent_toolsets]
-        if _get_inherit_mcp_toolsets():
-            child_toolsets = _preserve_parent_mcp_toolsets(
-                child_toolsets, parent_toolsets
-            )
         child_toolsets = _strip_blocked_tools(child_toolsets)
     elif parent_agent and parent_enabled is not None:
         child_toolsets = _strip_blocked_tools(parent_enabled)
@@ -1093,150 +1057,6 @@ def _build_child_agent(
             logger.debug("spawn_requested relay failed: %s", exc)
 
     return child
-
-
-def _dump_subagent_timeout_diagnostic(
-    *,
-    child: Any,
-    task_index: int,
-    timeout_seconds: float,
-    duration_seconds: float,
-    worker_thread: Optional[threading.Thread],
-    goal: str,
-) -> Optional[str]:
-    """Write a structured diagnostic dump for a subagent that timed out
-    before making any API call.
-
-    See issue #14726: users hit "subagent timed out after 300s with no response"
-    with zero API calls and no way to inspect what happened. This helper
-    writes a dedicated log under ``~/.talaria/logs/subagent-<sid>-<ts>.log``
-    capturing the child's config, system-prompt / tool-schema sizes, activity
-    tracker snapshot, and the worker thread's Python stack at timeout.
-
-    Returns the absolute path to the diagnostic file, or None on failure.
-    """
-    try:
-        from talaria_constants import get_talaria_home
-        import datetime as _dt
-        import sys as _sys
-        import traceback as _traceback
-
-        talaria_home = get_talaria_home()
-        logs_dir = talaria_home / "logs"
-        try:
-            logs_dir.mkdir(parents=True, exist_ok=True)
-        except Exception:
-            return None
-
-        subagent_id = getattr(child, "_subagent_id", None) or f"idx{task_index}"
-        ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        dump_path = logs_dir / f"subagent-timeout-{subagent_id}-{ts}.log"
-
-        lines: List[str] = []
-        def _w(line: str = "") -> None:
-            lines.append(line)
-
-        _w(f"# Subagent timeout diagnostic — issue #14726")
-        _w(f"# Generated: {_dt.datetime.now().isoformat()}")
-        _w("")
-        _w("## Timeout")
-        _w(f"  task_index:        {task_index}")
-        _w(f"  subagent_id:       {subagent_id}")
-        _w(f"  configured_timeout: {timeout_seconds}s")
-        _w(f"  actual_duration:   {duration_seconds:.2f}s")
-        _w("")
-
-        _w("## Goal")
-        _goal_preview = (goal or "").strip()
-        if len(_goal_preview) > 1000:
-            _goal_preview = _goal_preview[:1000] + " ...[truncated]"
-        _w(_goal_preview or "(empty)")
-        _w("")
-
-        _w("## Child config")
-        for attr in (
-            "model", "provider", "api_mode", "base_url", "max_iterations",
-            "quiet_mode", "skip_memory", "skip_context_files", "platform",
-            "_delegate_role", "_delegate_depth",
-        ):
-            try:
-                val = getattr(child, attr, None)
-                # Redact api_key-shaped values defensively
-                if isinstance(val, str) and attr == "base_url":
-                    pass
-                _w(f"  {attr}: {val!r}")
-            except Exception:
-                _w(f"  {attr}: <unreadable>")
-        _w("")
-
-        _w("## Toolsets")
-        enabled = getattr(child, "enabled_toolsets", None)
-        _w(f"  enabled_toolsets:  {enabled!r}")
-        tool_names = getattr(child, "valid_tool_names", None)
-        if tool_names:
-            _w(f"  loaded tool count: {len(tool_names)}")
-            try:
-                _w(f"  loaded tools:      {sorted(list(tool_names))}")
-            except Exception:
-                pass
-        _w("")
-
-        _w("## Prompt / schema sizes")
-        try:
-            sys_prompt = getattr(child, "ephemeral_system_prompt", None) \
-                or getattr(child, "system_prompt", None) \
-                or ""
-            _w(f"  system_prompt_bytes: {len(sys_prompt.encode('utf-8')) if isinstance(sys_prompt, str) else 'n/a'}")
-            _w(f"  system_prompt_chars: {len(sys_prompt) if isinstance(sys_prompt, str) else 'n/a'}")
-        except Exception as exc:
-            _w(f"  system_prompt: <error: {exc}>")
-        try:
-            tools_schema = getattr(child, "tools", None)
-            if tools_schema is not None:
-                _schema_json = json.dumps(tools_schema, default=str)
-                _w(f"  tool_schema_count: {len(tools_schema)}")
-                _w(f"  tool_schema_bytes: {len(_schema_json.encode('utf-8'))}")
-        except Exception as exc:
-            _w(f"  tool_schema: <error: {exc}>")
-        _w("")
-
-        _w("## Activity summary")
-        try:
-            summary = child.get_activity_summary()
-            for k, v in summary.items():
-                _w(f"  {k}: {v!r}")
-        except Exception as exc:
-            _w(f"  <get_activity_summary failed: {exc}>")
-        _w("")
-
-        _w("## Worker thread stack at timeout")
-        if worker_thread is not None and worker_thread.is_alive():
-            frames = _sys._current_frames()
-            worker_frame = frames.get(worker_thread.ident)
-            if worker_frame is not None:
-                stack = _traceback.format_stack(worker_frame)
-                for frame_line in stack:
-                    for sub in frame_line.rstrip().split("\n"):
-                        _w(f"  {sub}")
-            else:
-                _w("  <worker frame not available>")
-        elif worker_thread is None:
-            _w("  <no worker thread handle>")
-        else:
-            _w("  <worker thread already exited>")
-        _w("")
-
-        _w("## Notes")
-        _w("  This file is written ONLY when a subagent times out with 0 API calls.")
-        _w("  0-API-call timeouts mean the child never reached its first LLM request.")
-        _w("  Common causes: oversized prompt rejected by provider, transport hang,")
-        _w("  credential resolution stuck. See issue #14726 for context.")
-
-        dump_path.write_text("\n".join(lines), encoding="utf-8")
-        return str(dump_path)
-    except Exception as exc:
-        logger.warning("Subagent timeout diagnostic dump failed: %s", exc)
-        return None
 
 
 def _run_single_child(
@@ -1452,31 +1272,12 @@ def _run_single_child(
                 duration,
             )
 
-            # When a subagent times out BEFORE making any API call, dump a
-            # diagnostic to help users (and us) see what the child was doing.
-            # See #14726 — without this, 0-API-call hangs are black boxes.
-            diagnostic_path: Optional[str] = None
             child_api_calls = 0
             try:
                 _summary = child.get_activity_summary()
                 child_api_calls = int(_summary.get("api_call_count", 0) or 0)
             except Exception:
                 pass
-            if is_timeout and child_api_calls == 0:
-                diagnostic_path = _dump_subagent_timeout_diagnostic(
-                    child=child,
-                    task_index=task_index,
-                    timeout_seconds=float(child_timeout),
-                    duration_seconds=float(duration),
-                    worker_thread=_worker_thread_holder.get("t"),
-                    goal=goal,
-                )
-                if diagnostic_path:
-                    logger.warning(
-                        "Subagent %d 0-API-call timeout — diagnostic written to %s",
-                        task_index,
-                        diagnostic_path,
-                    )
 
             if child_progress_cb:
                 try:
@@ -1502,8 +1303,6 @@ def _run_single_child(
                         f"first LLM request (prompt construction, credential "
                         f"resolution, or transport may be stuck)."
                     )
-                    if diagnostic_path:
-                        _err += f" Diagnostic: {diagnostic_path}"
                 else:
                     _err = (
                         f"Subagent timed out after {child_timeout}s with "
@@ -1522,7 +1321,6 @@ def _run_single_child(
                 "api_calls": child_api_calls,
                 "duration_seconds": duration,
                 "_child_role": getattr(child, "_delegate_role", None),
-                "diagnostic_path": diagnostic_path,
             }
         finally:
             # Shut down executor without waiting — if the child thread

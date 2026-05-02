@@ -128,7 +128,6 @@ from agent.prompt_builder import (
     DEFAULT_AGENT_IDENTITY, PLATFORM_HINTS,
     MEMORY_GUIDANCE, SESSION_SEARCH_GUIDANCE, SKILLS_GUIDANCE,
     TALARIA_AGENT_HELP_GUIDANCE,
-    build_nous_subscription_prompt,
 )
 from agent.model_metadata import (
     fetch_model_metadata,
@@ -1254,7 +1253,7 @@ class AIAgent:
                 ]:
                     logging.getLogger(quiet_logger).setLevel(logging.ERROR)
         
-        # Internal stream callback (set during streaming TTS).
+        # Internal stream callback (set during streaming output).
         # Initialized here so _vprint can reference it before run_conversation.
         self._stream_callback = None
         # Deferred paragraph break flag — set after tool iterations so a
@@ -1271,8 +1270,7 @@ class AIAgent:
         self._current_streamed_assistant_text = ""
 
         # Optional current-turn user-message override used when the API-facing
-        # user message intentionally differs from the persisted transcript
-        # (e.g. CLI voice mode adds a temporary prefix for the live call only).
+        # user message intentionally differs from the persisted transcript.
         self._persist_user_message_idx = None
         self._persist_user_message_override = None
 
@@ -2379,7 +2377,7 @@ class AIAgent:
         """Verbose print — suppressed when actively streaming tokens.
 
         Pass ``force=True`` for error/warning messages that should always be
-        shown even during streaming playback (TTS or display).
+        shown even during streaming display.
 
         During tool execution (``_executing_tools`` is True), printing is
         allowed even with stream consumers registered because no tokens
@@ -4777,9 +4775,6 @@ class AIAgent:
         if tool_guidance:
             prompt_parts.append(" ".join(tool_guidance))
 
-        nous_subscription_prompt = build_nous_subscription_prompt(self.valid_tool_names)
-        if nous_subscription_prompt:
-            prompt_parts.append(nous_subscription_prompt)
         # Tool-use enforcement: tells the model to actually call tools instead
         # of describing intended actions.  Controlled by config.yaml
         # agent.tool_use_enforcement:
@@ -5866,41 +5861,6 @@ class AIAgent:
 
         return True
 
-    def _try_refresh_nous_client_credentials(self, *, force: bool = True) -> bool:
-        if self.api_mode != "chat_completions" or self.provider != "nous":
-            return False
-
-        try:
-            from talaria_cli.auth import resolve_nous_runtime_credentials
-
-            creds = resolve_nous_runtime_credentials(
-                min_key_ttl_seconds=max(60, int(os.getenv("TALARIA_NOUS_MIN_KEY_TTL_SECONDS", "1800"))),
-                timeout_seconds=float(os.getenv("TALARIA_NOUS_TIMEOUT_SECONDS", "15")),
-                force_mint=force,
-            )
-        except Exception as exc:
-            logger.debug("Nous credential refresh failed: %s", exc)
-            return False
-
-        api_key = creds.get("api_key")
-        base_url = creds.get("base_url")
-        if not isinstance(api_key, str) or not api_key.strip():
-            return False
-        if not isinstance(base_url, str) or not base_url.strip():
-            return False
-
-        self.api_key = api_key.strip()
-        self.base_url = base_url.strip().rstrip("/")
-        self._client_kwargs["api_key"] = self.api_key
-        self._client_kwargs["base_url"] = self.base_url
-        # Nous requests should not inherit OpenRouter-only attribution headers.
-        self._client_kwargs.pop("default_headers", None)
-
-        if not self._replace_primary_openai_client(reason="nous_credential_refresh"):
-            return False
-
-        return True
-
     def _try_refresh_copilot_client_credentials(self) -> bool:
         """Refresh Copilot credentials and rebuild the shared OpenAI client.
 
@@ -6369,7 +6329,7 @@ class AIAgent:
             logger.debug("interim_assistant_callback error", exc_info=True)
 
     def _fire_stream_delta(self, text: str) -> None:
-        """Fire all registered stream delta callbacks (display + TTS)."""
+        """Fire all registered stream delta callbacks."""
         # If a tool iteration set the break flag, prepend a single paragraph
         # break before the first real text delta.  This prevents the original
         # problem (text concatenation across tool boundaries) without stacking
@@ -10041,7 +10001,7 @@ class AIAgent:
             conversation_history (List[Dict]): Previous conversation messages (optional)
             task_id (str): Unique identifier for this task to isolate VMs between concurrent tasks (optional, auto-generated if not provided)
             stream_callback: Optional callback invoked with each text delta during streaming.
-                Used by the TTS pipeline to start audio generation before the full response.
+                Used by streaming consumers to process output before the full response.
                 When None (default), API calls use the standard non-streaming path.
             persist_user_message: Optional clean user message to store in
                 transcripts/history when user_message contains API-only
@@ -10692,7 +10652,6 @@ class AIAgent:
             max_compression_attempts = 3
             codex_auth_retry_attempted=False
             anthropic_auth_retry_attempted=False
-            nous_auth_retry_attempted=False
             copilot_auth_retry_attempted=False
             thinking_sig_retry_attempted = False
             image_shrink_retry_attempted = False
@@ -10706,53 +10665,6 @@ class AIAgent:
             api_kwargs = None  # Guard against UnboundLocalError in except handler
 
             while retry_count < max_retries:
-                # ── Nous Portal rate limit guard ──────────────────────
-                # If another session already recorded that Nous is rate-
-                # limited, skip the API call entirely.  Each attempt
-                # (including SDK-level retries) counts against RPH and
-                # deepens the rate limit hole.
-                if self.provider == "nous":
-                    try:
-                        from agent.nous_rate_guard import (
-                            nous_rate_limit_remaining,
-                            format_remaining as _fmt_nous_remaining,
-                        )
-                        _nous_remaining = nous_rate_limit_remaining()
-                        if _nous_remaining is not None and _nous_remaining > 0:
-                            _nous_msg = (
-                                f"Nous Portal rate limit active — "
-                                f"resets in {_fmt_nous_remaining(_nous_remaining)}."
-                            )
-                            self._vprint(
-                                f"{self.log_prefix}⏳ {_nous_msg} Trying fallback...",
-                                force=True,
-                            )
-                            self._emit_status(f"⏳ {_nous_msg}")
-                            if self._try_activate_fallback():
-                                retry_count = 0
-                                compression_attempts = 0
-                                primary_recovery_attempted = False
-                                continue
-                            # No fallback available — return with clear message
-                            self._persist_session(messages, conversation_history)
-                            return {
-                                "final_response": (
-                                    f"⏳ {_nous_msg}\n\n"
-                                    "No fallback provider available. "
-                                    "Try again after the reset, or add a "
-                                    "fallback provider in config.yaml."
-                                ),
-                                "messages": messages,
-                                "api_calls": api_call_count,
-                                "completed": False,
-                                "failed": True,
-                                "error": _nous_msg,
-                            }
-                    except ImportError:
-                        pass
-                    except Exception:
-                        pass  # Never let rate guard break the agent loop
-
                 try:
                     self._reset_stream_delivery_tracking()
                     api_kwargs = self._build_api_kwargs(api_messages)
@@ -10821,7 +10733,7 @@ class AIAgent:
                     ):
                         _use_streaming = False
                     elif not self._has_stream_consumers():
-                        # No display/TTS consumer. Still prefer streaming for
+                        # No display consumer. Still prefer streaming for
                         # health checking, but skip for Mock clients in tests
                         # (mocks return SimpleNamespace, not stream iterators).
                         from unittest.mock import Mock
@@ -11402,15 +11314,6 @@ class AIAgent:
                             )
                     
                     has_retried_429 = False  # Reset on success
-                    # Clear Nous rate limit state on successful request —
-                    # proves the limit has reset and other sessions can
-                    # resume hitting Nous.
-                    if self.provider == "nous":
-                        try:
-                            from agent.nous_rate_guard import clear_nous_rate_limit
-                            clear_nous_rate_limit()
-                        except Exception:
-                            pass
                     self._touch_activity(f"API call #{api_call_count} completed")
                     break  # Success, exit retry loop
 
@@ -11694,37 +11597,6 @@ class AIAgent:
                             self._vprint(f"{self.log_prefix}🔐 Codex auth refreshed after 401. Retrying request...")
                             continue
                     if (
-                        self.api_mode == "chat_completions"
-                        and self.provider == "nous"
-                        and status_code == 401
-                        and not nous_auth_retry_attempted
-                    ):
-                        nous_auth_retry_attempted = True
-                        if self._try_refresh_nous_client_credentials(force=True):
-                            print(f"{self.log_prefix}🔐 Nous agent key refreshed after 401. Retrying request...")
-                            continue
-                        # Credential refresh didn't help — show diagnostic info.
-                        # Most common causes: Portal OAuth expired/revoked,
-                        # account out of credits, or agent key blocked.
-                        from talaria_constants import display_talaria_home as _dhh_fn
-                        _dhh = _dhh_fn()
-                        _body_text = ""
-                        try:
-                            _body = getattr(api_error, "body", None) or getattr(api_error, "response", None)
-                            if _body is not None:
-                                _body_text = str(_body)[:200]
-                        except Exception:
-                            pass
-                        print(f"{self.log_prefix}🔐 Nous 401 — Portal authentication failed.")
-                        if _body_text:
-                            print(f"{self.log_prefix}   Response: {_body_text}")
-                        print(f"{self.log_prefix}   Most likely: Portal OAuth expired, account out of credits, or agent key revoked.")
-                        print(f"{self.log_prefix}   Troubleshooting:")
-                        print(f"{self.log_prefix}     • Re-authenticate: talaria login --provider nous")
-                        print(f"{self.log_prefix}     • Check credits / billing: https://portal.nousresearch.com")
-                        print(f"{self.log_prefix}     • Verify stored credentials: {_dhh}/auth.json")
-                        print(f"{self.log_prefix}     • Switch providers temporarily: /model <model> --provider openrouter")
-                    if (
                         self.provider == "copilot"
                         and status_code == 401
                         and not copilot_auth_retry_attempted
@@ -11944,71 +11816,6 @@ class AIAgent:
                                 compression_attempts = 0
                                 primary_recovery_attempted = False
                                 continue
-
-                    # ── Nous Portal: record rate limit & skip retries ─────
-                    # When Nous returns a 429 that is a genuine account-
-                    # level rate limit, record the reset time to a shared
-                    # file so ALL sessions (cron, gateway, auxiliary) know
-                    # not to pile on, then skip further retries -- each
-                    # one burns another RPH request and deepens the hole.
-                    # The retry loop's top-of-iteration guard will catch
-                    # this on the next pass and try fallback or bail.
-                    #
-                    # IMPORTANT: Nous Portal multiplexes multiple upstream
-                    # providers (DeepSeek, Kimi, MiMo, Talaria).  A 429 can
-                    # also mean an UPSTREAM provider is out of capacity
-                    # for one specific model -- transient, clears in
-                    # seconds, nothing to do with the caller's quota.
-                    # Tripping the cross-session breaker on that would
-                    # block every Nous model for minutes.  We use
-                    # ``is_genuine_nous_rate_limit`` to tell the two
-                    # apart via the 429's own x-ratelimit-* headers and
-                    # the last-known-good state captured on the previous
-                    # successful response.
-                    if (
-                        is_rate_limited
-                        and self.provider == "nous"
-                        and classified.reason == FailoverReason.rate_limit
-                        and not recovered_with_pool
-                    ):
-                        _genuine_nous_rate_limit = False
-                        try:
-                            from agent.nous_rate_guard import (
-                                is_genuine_nous_rate_limit,
-                                record_nous_rate_limit,
-                            )
-                            _err_resp = getattr(api_error, "response", None)
-                            _err_hdrs = (
-                                getattr(_err_resp, "headers", None)
-                                if _err_resp else None
-                            )
-                            _genuine_nous_rate_limit = is_genuine_nous_rate_limit(
-                                headers=_err_hdrs,
-                                last_known_state=self._rate_limit_state,
-                            )
-                            if _genuine_nous_rate_limit:
-                                record_nous_rate_limit(
-                                    headers=_err_hdrs,
-                                    error_context=error_context,
-                                )
-                            else:
-                                logging.info(
-                                    "Nous 429 looks like upstream capacity "
-                                    "(no exhausted bucket in headers or "
-                                    "last-known state) -- not tripping "
-                                    "cross-session breaker."
-                                )
-                        except Exception:
-                            pass
-                        if _genuine_nous_rate_limit:
-                            # Skip straight to max_retries -- the
-                            # top-of-loop guard will handle fallback or
-                            # bail cleanly.
-                            retry_count = max_retries
-                            continue
-                        # Upstream capacity 429: fall through to normal
-                        # retry logic.  A different model (or the same
-                        # model a moment later) will typically succeed.
 
                     is_payload_too_large = (
                         classified.reason == FailoverReason.payload_too_large
@@ -12885,7 +12692,7 @@ class AIAgent:
                     # box) before tool execution begins.  Intermediate turns may
                     # have streamed early content that opened the response box;
                     # flushing here prevents it from wrapping tool feed lines.
-                    # Only signal the display callback — TTS (_stream_callback)
+                    # Only signal the display callback — _stream_callback
                     # should NOT receive None (it uses None as end-of-stream).
                     if self.stream_delta_callback:
                         try:

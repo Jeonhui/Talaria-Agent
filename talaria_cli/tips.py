@@ -98,7 +98,7 @@ TIPS = [
     "talaria profile create work --clone copies your current config and keys to a new profile.",
     "talaria update syncs new bundled skills to ALL profiles automatically.",
     "talaria gateway install sets up Talaria as a system service (systemd/launchd).",
-    "talaria memory setup lets you configure an external memory provider (Honcho, Mem0, etc.).",
+    "talaria memory setup lets you configure an external memory provider via the plugin system.",
     "talaria webhook subscribe creates event-driven webhook routes with HMAC validation.",
 
     # --- Configuration ---
@@ -136,7 +136,6 @@ TIPS = [
     "browser_vision takes a screenshot and analyzes it with AI — works for CAPTCHAs and visual content.",
     "browser_console can evaluate JavaScript expressions in the page context.",
     "image_generate creates images with FLUX 2 Pro and automatic 2x upscaling.",
-    "text_to_speech converts text to audio — plays as voice bubbles on Telegram.",
     "send_message can reach any connected messaging platform from within a session.",
     "The todo tool helps the agent track complex multi-step tasks during a session.",
     "session_search performs full-text search across ALL past conversations.",
@@ -144,7 +143,7 @@ TIPS = [
     "mixture_of_agents routes hard problems through 4 frontier LLMs collaboratively.",
     "Terminal commands support background mode with notify_on_complete for long-running tasks.",
     "Terminal background processes support watch_patterns to alert on specific output lines.",
-    "The terminal tool supports 6 backends: local, Docker, SSH, Modal, Daytona, and Singularity.",
+    "The terminal tool supports 3 backends: local, Docker, and SSH.",
 
     # --- Profiles ---
     "Each profile gets its own config, API keys, memory, sessions, skills, and cron jobs.",
@@ -166,7 +165,7 @@ TIPS = [
     "Corrections you give the agent (\"no, do it this way\") are often auto-saved to memory.",
 
     # --- Skills ---
-    "Over 80 bundled skills covering github, creative, mlops, productivity, research, and more.",
+    "Bundled skills cover devops and software-development. Install more from GitHub with talaria skills install <repo>.",
     "Every installed skill automatically becomes a slash command — type / to see them all.",
     "talaria skills install official/security/1password installs optional skills from the repo.",
     "Skills can restrict to specific OS platforms — some only load on macOS or Linux.",
@@ -176,26 +175,15 @@ TIPS = [
 
     # --- Cron & Scheduling ---
     "Cron jobs can attach skills: talaria cron add --skill blogwatcher \"Check for new posts\".",
-    "Cron delivery targets include telegram, discord, slack, email, sms, and 12+ more platforms.",
+    "Cron delivery targets the configured messaging platform — Discord, Slack, or Telegram.",
     "If a cron response starts with [SILENT], delivery is suppressed — useful for monitoring-only jobs.",
     "Cron supports relative delays (30m), intervals (every 2h), cron expressions, and ISO timestamps.",
     "Cron jobs run in completely fresh agent sessions — prompts must be self-contained.",
 
-    # --- Voice ---
-    "Voice mode works with zero API keys if faster-whisper is installed (free local speech-to-text).",
-    "Five TTS providers available: Edge TTS (free), ElevenLabs, OpenAI, NeuTTS (free local), MiniMax.",
-    "/voice on enables voice mode in the CLI. Ctrl+B toggles push-to-talk recording.",
-    "Streaming TTS plays sentences as they generate — you don't wait for the full response.",
-    "Voice messages on Telegram, Discord, WhatsApp, and Slack are auto-transcribed.",
-
     # --- Gateway & Messaging ---
-    "Talaria runs on 18 platforms: Telegram, Discord, Slack, WhatsApp, Signal, Matrix, email, and more.",
+    "Talaria runs on Discord, Slack, and Telegram with a single configuration.",
     "talaria gateway install sets it up as a system service that starts on boot.",
-    "DingTalk uses Stream Mode — no webhooks or public URL needed.",
-    "BlueBubbles brings iMessage to Talaria via a local macOS server.",
     "Webhook routes support HMAC validation, rate limiting, and event filtering.",
-    "The API server exposes an OpenAI-compatible endpoint compatible with Open WebUI and LibreChat.",
-    "Discord voice channel mode: the bot joins VC, transcribes speech, and talks back.",
     "group_sessions_per_user: true gives each person their own session in group chats.",
     "/sethome marks a chat as the home channel for cron job deliveries.",
     "The gateway supports inactivity-based timeouts — active agents can run indefinitely.",
@@ -243,7 +231,6 @@ TIPS = [
     # --- Plugins ---
     "Three plugin types: general (tools/hooks), memory providers, and context engines.",
     "talaria plugins install owner/repo installs plugins directly from GitHub.",
-    "8 external memory providers available: Honcho, OpenViking, Mem0, Hindsight, and more.",
     "Plugin hooks include pre/post_tool_call, pre/post_llm_call, and transform_terminal_output for output canonicalization.",
 
     # --- Miscellaneous ---
@@ -257,7 +244,6 @@ TIPS = [
     "Custom providers: save named endpoints in config.yaml under custom_providers.",
     "TALARIA_EPHEMERAL_SYSTEM_PROMPT injects a system prompt that's never persisted to history.",
     "credential_pool_strategies supports fill_first, round_robin, least_used, and random rotation.",
-    "talaria login supports OAuth-based auth for Nous and OpenAI Codex providers.",
     "The API server supports both Chat Completions and Responses API with server-side state.",
     "tool_preview_length: 0 in config shows full file paths in the spinner's activity feed.",
     "talaria status --deep runs deeper diagnostic checks across all components.",
@@ -295,7 +281,7 @@ TIPS = [
     "Each profile gets its own subprocess HOME at TALARIA_HOME/home/ — isolated git, ssh, npm, gh configs.",
     "TALARIA_HOME_MODE env var (octal, e.g. 0701) sets custom directory permissions for web server traversal.",
     "Container mode: place .container-mode in TALARIA_HOME and the host CLI auto-execs into the container.",
-    "Ctrl+C has 5 priority tiers: cancel recording → cancel prompts → cancel picker → interrupt agent → exit.",
+    "Ctrl+C has 4 priority tiers: cancel prompts → cancel picker → interrupt agent → exit.",
     "Every interrupt during an agent run is logged to ~/.talaria/interrupt_debug.log with timestamps.",
     "BROWSER_CDP_URL connects browser tools to any running Chrome — accepts WebSocket, HTTP, or host:port.",
     "BROWSERBASE_ADVANCED_STEALTH=true enables advanced anti-detection with custom Chromium (Scale Plan).",
@@ -313,16 +299,13 @@ TIPS = [
     "The compressor does a cheap pre-pass: tool outputs over 200 chars are replaced with placeholders before the LLM runs.",
     "When compression fails, further attempts are paused for 10 minutes to avoid API hammering.",
     "Long dangerous commands (>70 chars) get a 'view' option in the approval prompt to see the full text first.",
-    "Audio level visualization shows ▁▂▃▄▅▆▇ bars during voice recording based on microphone RMS levels.",
     "Profile names cannot collide with existing PATH binaries — 'talaria profile create ls' would be rejected.",
     "talaria profile create backup --clone-all copies everything (config, keys, SOUL.md, memories, skills, sessions).",
-    "The voice record key is configurable via voice.record_key in config.yaml — not just Ctrl+B.",
     ".cursorrules and .cursor/rules/*.mdc files are auto-detected and loaded as project context.",
     "Context files support 10+ prompt injection patterns — invisible Unicode, 'ignore instructions', exfil attempts.",
     "GPT-5 and Codex use 'developer' role instead of 'system' in the message format.",
     "Per-task auxiliary overrides: auxiliary.vision.provider, auxiliary.compression.model, etc. in config.yaml.",
     "The auxiliary client treats 'main' as a provider alias — resolves to your actual primary provider + model.",
-    "talaria claw migrate --dry-run previews OpenClaw migration without writing anything.",
     "File paths pasted with quotes or escaped spaces are handled automatically — no manual cleanup needed.",
     "Slash commands never trigger the large-paste collapse — /command with big arguments works correctly.",
     "In interrupt mode, slash commands typed during agent execution bypass interrupt logic and run immediately.",

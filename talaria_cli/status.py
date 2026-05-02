@@ -16,10 +16,8 @@ from talaria_cli.auth import AuthError, resolve_provider
 from talaria_cli.colors import Colors, color
 from talaria_cli.config import get_env_path, get_env_value, get_talaria_home, load_config
 from talaria_cli.models import provider_label
-from talaria_cli.nous_subscription import get_nous_subscription_features
 from talaria_cli.runtime_provider import resolve_requested_provider
 from talaria_constants import OPENROUTER_MODELS_URL
-from tools.tool_backend_helpers import managed_nous_tools_enabled
 
 def check_mark(ok: bool) -> str:
     if ok:

@@ -33,7 +33,7 @@ from talaria_constants import OPENROUTER_BASE_URL
 
 
 # Providers that support OAuth login in addition to API keys.
-_OAUTH_CAPABLE_PROVIDERS = {"anthropic", "nous", "openai-codex", "qwen-oauth", "google-gemini-cli", "minimax-oauth"}
+_OAUTH_CAPABLE_PROVIDERS = {"anthropic", "openai-codex", "qwen-oauth", "google-gemini-cli", "minimax-oauth"}
 
 
 def _get_custom_provider_names() -> list:
@@ -170,7 +170,7 @@ def auth_add_command(args) -> None:
         if provider.startswith(CUSTOM_POOL_PREFIX):
             requested_type = AUTH_TYPE_API_KEY
         else:
-            requested_type = AUTH_TYPE_OAUTH if provider in {"anthropic", "nous", "openai-codex", "qwen-oauth", "google-gemini-cli", "minimax-oauth"} else AUTH_TYPE_API_KEY
+            requested_type = AUTH_TYPE_OAUTH if provider in {"anthropic", "openai-codex", "qwen-oauth", "google-gemini-cli", "minimax-oauth"} else AUTH_TYPE_API_KEY
 
     pool = load_pool(provider)
 
@@ -242,29 +242,6 @@ def auth_add_command(args) -> None:
         )
         pool.add_entry(entry)
         print(f'Added {provider} OAuth credential #{len(pool.entries())}: "{entry.label}"')
-        return
-
-    if provider == "nous":
-        creds = auth_mod._nous_device_code_login(
-            portal_base_url=getattr(args, "portal_url", None),
-            inference_base_url=getattr(args, "inference_url", None),
-            client_id=getattr(args, "client_id", None),
-            scope=getattr(args, "scope", None),
-            open_browser=not getattr(args, "no_browser", False),
-            timeout_seconds=getattr(args, "timeout", None) or 15.0,
-            insecure=bool(getattr(args, "insecure", False)),
-            ca_bundle=getattr(args, "ca_bundle", None),
-            min_key_ttl_seconds=max(60, int(getattr(args, "min_key_ttl_seconds", 5 * 60))),
-        )
-        # Honor `--label <name>` so nous matches other providers' UX.  The
-        # helper embeds this into providers.nous so that label_from_token
-        # doesn't overwrite it on every subsequent load_pool("nous").
-        custom_label = (getattr(args, "label", None) or "").strip() or None
-        entry = auth_mod.persist_nous_credentials(creds, label=custom_label)
-        shown_label = entry.label if entry is not None else label_from_token(
-            creds.get("access_token", ""), _oauth_default_label(provider, 1),
-        )
-        print(f'Saved {provider} OAuth device-code credentials: "{shown_label}"')
         return
 
     if provider == "openai-codex":

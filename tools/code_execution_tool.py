@@ -486,25 +486,18 @@ def _get_or_create_env(task_id: str):
 
         if env_type == "docker":
             image = overrides.get("docker_image") or config["docker_image"]
-        elif env_type == "singularity":
-            image = overrides.get("singularity_image") or config["singularity_image"]
-        elif env_type == "modal":
-            image = overrides.get("modal_image") or config["modal_image"]
-        elif env_type == "daytona":
-            image = overrides.get("daytona_image") or config["daytona_image"]
         else:
             image = ""
 
         cwd = overrides.get("cwd") or config["cwd"]
 
         container_config = None
-        if env_type in ("docker", "singularity", "modal", "daytona", "vercel_sandbox"):
+        if env_type == "docker":
             container_config = {
                 "container_cpu": config.get("container_cpu", 1),
                 "container_memory": config.get("container_memory", 5120),
                 "container_disk": config.get("container_disk", 51200),
                 "container_persistent": config.get("container_persistent", True),
-                "vercel_runtime": config.get("vercel_runtime", ""),
                 "docker_volumes": config.get("docker_volumes", []),
                 "docker_run_as_host_user": config.get("docker_run_as_host_user", False),
             }
@@ -1332,10 +1325,9 @@ def _load_config() -> dict:
 
     This helper is called while building the module-level execute_code schema
     during tool discovery.  Importing ``cli`` here pulls prompt_toolkit/Rich and
-    a large chunk of the classic REPL onto every agent startup path, including
-    ``talaria --tui`` where it is never used.  Read the lightweight raw config
-    instead; the config layer already caches by (mtime, size), and an absent
-    key cleanly falls back to DEFAULT_EXECUTION_MODE.
+    a large chunk of the classic REPL onto every agent startup path.  Read the
+    lightweight raw config instead; the config layer already caches by
+    (mtime, size), and an absent key cleanly falls back to DEFAULT_EXECUTION_MODE.
     """
     try:
         from talaria_cli.config import read_raw_config

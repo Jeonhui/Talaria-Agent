@@ -674,11 +674,6 @@ DEFAULT_CONFIG = {
         "personality": "kawaii",
         "resume_display": "full",
         "busy_input_mode": "interrupt",  # interrupt | queue | steer
-        # When true, `talaria --tui` auto-resumes the most recent human-
-        # facing session on launch instead of forging a fresh one.
-        # Mirrors `talaria -c` muscle memory.  Default off so existing
-        # users aren't surprised.  TALARIA_TUI_RESUME=<id> always wins.
-        "tui_auto_resume_recent": False,
         "bell_on_complete": False,
         "show_reasoning": False,
         "streaming": False,
@@ -755,12 +750,6 @@ DEFAULT_CONFIG = {
         "provider": "",    # e.g. "openrouter" (empty = inherit parent provider + credentials)
         "base_url": "",    # direct OpenAI-compatible endpoint for subagents
         "api_key": "",     # API key for delegation.base_url (falls back to OPENAI_API_KEY)
-        # When delegate_task narrows child toolsets explicitly, preserve any
-        # MCP toolsets the parent already has enabled. On by default so
-        # narrowing (e.g. toolsets=["web","browser"]) expresses "I want these
-        # extras" without silently stripping MCP tools the parent already has.
-        # Set to false for strict intersection.
-        "inherit_mcp_toolsets": True,
         "max_iterations": 50,  # per-subagent iteration cap (each subagent gets its own budget,
                                # independent of the parent's max_iterations)
         "child_timeout_seconds": 600,  # wall-clock timeout for each child agent (floor 30s,
@@ -1087,9 +1076,7 @@ DEFAULT_CONFIG = {
 # Migration only mentions vars new since the user's previous version.
 ENV_VARS_BY_VERSION: Dict[int, List[str]] = {
     3: ["FIRECRAWL_API_KEY", "BROWSERBASE_API_KEY", "BROWSERBASE_PROJECT_ID", "FAL_KEY"],
-    4: ["VOICE_TOOLS_OPENAI_KEY", "ELEVENLABS_API_KEY"],
-    5: ["WHATSAPP_ENABLED", "WHATSAPP_MODE", "WHATSAPP_ALLOWED_USERS",
-        "SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_ALLOWED_USERS"],
+    5: ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_ALLOWED_USERS"],
     10: ["TAVILY_API_KEY"],
     11: ["TERMINAL_MODAL_MODE"],
 }
@@ -2493,8 +2480,8 @@ def _deep_merge(base: dict, override: dict) -> dict:
     """Recursively merge *override* into *base*, preserving nested defaults.
 
     Keys in *override* take precedence. If both values are dicts the merge
-    recurses, so a user who overrides only ``tts.elevenlabs.voice_id`` will
-    keep the default ``tts.elevenlabs.model_id`` intact.
+    recurses, so a user who overrides only ``model.default`` will keep the
+    default ``model.provider`` intact.
     """
     result = base.copy()
     for key, value in override.items():

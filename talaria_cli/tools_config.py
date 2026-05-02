@@ -22,11 +22,7 @@ from talaria_cli.config import (
     load_config, save_config, get_env_value, save_env_value,
 )
 from talaria_cli.colors import Colors, color
-from talaria_cli.nous_subscription import (
-    apply_nous_managed_defaults,
-    get_nous_subscription_features,
-)
-from tools.tool_backend_helpers import fal_key_is_configured, managed_nous_tools_enabled
+from tools.tool_backend_helpers import fal_key_is_configured
 from utils import base_url_hostname, is_truthy_value
 
 logger = logging.getLogger(__name__)
@@ -788,12 +784,6 @@ def _toolset_has_keys(ts_key: str, config: dict = None) -> bool:
         except Exception:
             return False
 
-    if ts_key in {"web", "image_gen", "tts", "browser"}:
-        features = get_nous_subscription_features(config)
-        feature = features.features.get(ts_key)
-        if feature and (feature.available or feature.managed_by_nous):
-            return True
-
     # Check TOOL_CATEGORIES first (provider-aware)
     cat = TOOL_CATEGORIES.get(ts_key)
     if cat:
@@ -984,12 +974,11 @@ def _plugin_image_gen_providers() -> list[dict]:
 
 def _visible_providers(cat: dict, config: dict) -> list[dict]:
     """Return provider entries visible for the current auth/config state."""
-    features = get_nous_subscription_features(config)
     visible = []
     for provider in cat.get("providers", []):
-        if provider.get("managed_nous_feature") and not managed_nous_tools_enabled():
+        if provider.get("managed_nous_feature"):
             continue
-        if provider.get("requires_nous_auth") and not features.nous_auth_present:
+        if provider.get("requires_nous_auth"):
             continue
         visible.append(provider)
 
@@ -1114,33 +1103,8 @@ def _is_provider_active(provider: dict, config: dict) -> bool:
         image_cfg = config.get("image_gen", {})
         return isinstance(image_cfg, dict) and image_cfg.get("provider") == plugin_name
 
-    managed_feature = provider.get("managed_nous_feature")
-    if managed_feature:
-        features = get_nous_subscription_features(config)
-        feature = features.features.get(managed_feature)
-        if feature is None:
-            return False
-        if managed_feature == "image_gen":
-            image_cfg = config.get("image_gen", {})
-            if isinstance(image_cfg, dict):
-                configured_provider = image_cfg.get("provider")
-                if configured_provider not in (None, "", "fal"):
-                    return False
-                if image_cfg.get("use_gateway") is not None and not is_truthy_value(image_cfg.get("use_gateway"), default=False):
-                    return False
-            return feature.managed_by_nous
-        if provider.get("tts_provider"):
-            return (
-                feature.managed_by_nous
-                and cfg_get(config, "tts", "provider") == provider["tts_provider"]
-            )
-        if "browser_provider" in provider:
-            current = cfg_get(config, "browser", "cloud_provider")
-            return feature.managed_by_nous and provider["browser_provider"] == current
-        if provider.get("web_backend"):
-            current = cfg_get(config, "web", "backend")
-            return feature.managed_by_nous and current == provider["web_backend"]
-        return feature.managed_by_nous
+    if provider.get("managed_nous_feature"):
+        return False
 
     if provider.get("tts_provider"):
         return cfg_get(config, "tts", "provider") == provider["tts_provider"]
@@ -1362,12 +1326,6 @@ def _configure_provider(provider: dict, config: dict):
     env_vars = provider.get("env_vars", [])
     managed_feature = provider.get("managed_nous_feature")
 
-    if provider.get("requires_nous_auth"):
-        features = get_nous_subscription_features(config)
-        if not features.nous_auth_present:
-            _print_warning("  Nous Subscription is only available after logging into Nous Portal.")
-            return
-
     # Set TTS provider in config if applicable
     if provider.get("tts_provider"):
         tts_cfg = config.setdefault("tts", {})
@@ -1411,8 +1369,6 @@ def _configure_provider(provider: dict, config: dict):
         if provider.get("post_setup"):
             _run_post_setup(provider["post_setup"])
         _print_success(f"  {provider['name']} - no configuration needed!")
-        if managed_feature:
-            _print_info("  Requests for this tool will be billed to your Nous subscription.")
         # Plugin-registered image_gen provider: write image_gen.provider
         # and route model selection to the plugin's own catalog.
         plugin_name = provider.get("image_gen_plugin_name")
@@ -1615,12 +1571,6 @@ def _reconfigure_provider(provider: dict, config: dict):
     env_vars = provider.get("env_vars", [])
     managed_feature = provider.get("managed_nous_feature")
 
-    if provider.get("requires_nous_auth"):
-        features = get_nous_subscription_features(config)
-        if not features.nous_auth_present:
-            _print_warning("  Nous Subscription is only available after logging into Nous Portal.")
-            return
-
     if provider.get("tts_provider"):
         config.setdefault("tts", {})["provider"] = provider["tts_provider"]
         _print_success(f"  TTS provider set to: {provider['tts_provider']}")
@@ -1657,8 +1607,6 @@ def _reconfigure_provider(provider: dict, config: dict):
         if provider.get("post_setup"):
             _run_post_setup(provider["post_setup"])
         _print_success(f"  {provider['name']} - no configuration needed!")
-        if managed_feature:
-            _print_info("  Requests for this tool will be billed to your Nous subscription.")
         plugin_name = provider.get("image_gen_plugin_name")
         if plugin_name:
             _select_plugin_image_gen_provider(plugin_name, config)
@@ -1796,15 +1744,6 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
                     label = next((l for k, l, _ in _get_effective_configurable_toolsets() if k == ts), ts)
                     print(color(f"  - {label}", Colors.RED))
 
-            auto_configured = apply_nous_managed_defaults(
-                config,
-                enabled_toolsets=new_enabled,
-            )
-            if managed_nous_tools_enabled():
-                for ts_key in sorted(auto_configured):
-                    label = next((l for k, l, _ in CONFIGURABLE_TOOLSETS if k == ts_key), ts_key)
-                    print(color(f"  ✓ {label}: using your Nous subscription defaults", Colors.GREEN))
-
             # Walk through ALL selected tools that have provider options or
             # need API keys.  This ensures browser (Local vs Browserbase),
             # TTS (Edge vs OpenAI vs ElevenLabs), etc. are shown even when
@@ -1812,7 +1751,6 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
             to_configure = [
                 ts_key for ts_key in sorted(new_enabled)
                 if (TOOL_CATEGORIES.get(ts_key) or TOOLSET_ENV_REQUIREMENTS.get(ts_key))
-                and ts_key not in auto_configured
             ]
 
             if to_configure:

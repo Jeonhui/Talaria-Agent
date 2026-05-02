@@ -49,7 +49,7 @@ def _codex_curated_models() -> list[str]:
 
 
 _PROVIDER_MODELS: dict[str, list[str]] = {
-    # Talaria supports: anthropic / openai / openai-codex / xiaomi-mimo / local / custom.
+    # Talaria supports: anthropic / openai / openai-codex / xiaomi-mimo / openrouter / local / custom.
     "anthropic": [
         "claude-opus-4-7",
         "claude-opus-4-6",
@@ -77,6 +77,19 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "mimo-v2-pro",
         "mimo-v2-omni",
         "mimo-v2-flash",
+    ],
+    # OpenRouter exposes 200+ models via an OpenAI-compatible API. Curated
+    # defaults below are popular picks; the live model picker fetches the
+    # full catalog via fetch_openrouter_models() at runtime.
+    "openrouter": [
+        "anthropic/claude-opus-4",
+        "anthropic/claude-sonnet-4",
+        "openai/gpt-5",
+        "openai/gpt-5-mini",
+        "google/gemini-2-pro",
+        "meta-llama/llama-3.3-70b-instruct",
+        "deepseek/deepseek-r1",
+        "qwen/qwen-2.5-72b-instruct",
     ],
 }
 
@@ -133,6 +146,7 @@ CANONICAL_PROVIDERS: list[ProviderEntry] = [
     ProviderEntry("openai", "OpenAI", "OpenAI (GPT models)"),
     ProviderEntry("openai-codex", "OpenAI Codex", "OpenAI Codex"),
     ProviderEntry("xiaomi", "Xiaomi MiMo", "Xiaomi MiMo (MiMo models)"),
+    ProviderEntry("openrouter", "OpenRouter", "OpenRouter (200+ models via OpenAI-compatible API)"),
     ProviderEntry("lmstudio", "LM Studio", "LM Studio (local desktop model server)"),
 ]
 
@@ -738,17 +752,6 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
             pass
         if normalized == "copilot-acp":
             return list(_PROVIDER_MODELS.get("copilot", []))
-    if normalized == "nous":
-        # Try live Nous Portal /models endpoint
-        try:
-            from talaria_cli.auth import fetch_nous_models, resolve_nous_runtime_credentials
-            creds = resolve_nous_runtime_credentials()
-            if creds:
-                live = fetch_nous_models(api_key=creds.get("api_key", ""), inference_base_url=creds.get("base_url", ""))
-                if live:
-                    return live
-        except Exception:
-            pass
     if normalized == "stepfun":
         try:
             from talaria_cli.auth import resolve_api_key_provider_credentials

@@ -288,9 +288,7 @@ function Test-Node {
 
 function Install-SystemPackages {
     $script:HasRipgrep = $false
-    $script:HasFfmpeg = $false
     $needRipgrep = $false
-    $needFfmpeg = $false
 
     Write-Info "Checking ripgrep (fast file search)..."
     if (Get-Command rg -ErrorAction SilentlyContinue) {
@@ -301,15 +299,7 @@ function Install-SystemPackages {
         $needRipgrep = $true
     }
 
-    Write-Info "Checking ffmpeg (TTS voice messages)..."
-    if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
-        Write-Success "ffmpeg found"
-        $script:HasFfmpeg = $true
-    } else {
-        $needFfmpeg = $true
-    }
-
-    if (-not $needRipgrep -and -not $needFfmpeg) { return }
+    if (-not $needRipgrep) { return }
 
     # Build description and package lists for each package manager
     $descParts = @()
@@ -322,12 +312,6 @@ function Install-SystemPackages {
         $wingetPkgs += "BurntSushi.ripgrep.MSVC"
         $chocoPkgs += "ripgrep"
         $scoopPkgs += "ripgrep"
-    }
-    if ($needFfmpeg) {
-        $descParts += "ffmpeg for TTS voice messages"
-        $wingetPkgs += "Gyan.FFmpeg"
-        $chocoPkgs += "ffmpeg"
-        $scoopPkgs += "ffmpeg"
     }
 
     $description = $descParts -join " and "
@@ -350,16 +334,11 @@ function Install-SystemPackages {
             $script:HasRipgrep = $true
             $needRipgrep = $false
         }
-        if ($needFfmpeg -and (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
-            Write-Success "ffmpeg installed"
-            $script:HasFfmpeg = $true
-            $needFfmpeg = $false
-        }
-        if (-not $needRipgrep -and -not $needFfmpeg) { return }
+        if (-not $needRipgrep) { return }
     }
 
     # Fallback: choco
-    if ($hasChoco -and ($needRipgrep -or $needFfmpeg)) {
+    if ($hasChoco -and $needRipgrep) {
         Write-Info "Trying Chocolatey..."
         foreach ($pkg in $chocoPkgs) {
             try { choco install $pkg -y 2>&1 | Out-Null } catch { }
@@ -369,15 +348,10 @@ function Install-SystemPackages {
             $script:HasRipgrep = $true
             $needRipgrep = $false
         }
-        if ($needFfmpeg -and (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
-            Write-Success "ffmpeg installed via chocolatey"
-            $script:HasFfmpeg = $true
-            $needFfmpeg = $false
-        }
     }
 
     # Fallback: scoop
-    if ($hasScoop -and ($needRipgrep -or $needFfmpeg)) {
+    if ($hasScoop -and $needRipgrep) {
         Write-Info "Trying Scoop..."
         foreach ($pkg in $scoopPkgs) {
             try { scoop install $pkg 2>&1 | Out-Null } catch { }
@@ -387,21 +361,12 @@ function Install-SystemPackages {
             $script:HasRipgrep = $true
             $needRipgrep = $false
         }
-        if ($needFfmpeg -and (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
-            Write-Success "ffmpeg installed via scoop"
-            $script:HasFfmpeg = $true
-            $needFfmpeg = $false
-        }
     }
 
     # Show manual instructions for anything still missing
     if ($needRipgrep) {
         Write-Warn "ripgrep not installed (file search will use findstr fallback)"
         Write-Info "  winget install BurntSushi.ripgrep.MSVC"
-    }
-    if ($needFfmpeg) {
-        Write-Warn "ffmpeg not installed (TTS voice messages will be limited)"
-        Write-Info "  winget install Gyan.FFmpeg"
     }
 }
 
@@ -891,7 +856,7 @@ function Main {
     if (-not (Test-Python)) { throw "Python $PythonVersion not available — cannot continue" }
     if (-not (Test-Git)) { throw "Git not found — install from https://git-scm.com/download/win" }
     Test-Node              # Auto-installs if missing
-    Install-SystemPackages  # ripgrep + ffmpeg in one step
+    Install-SystemPackages  # ripgrep in one step
     
     Install-Repository
     Install-Venv

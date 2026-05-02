@@ -97,7 +97,7 @@ from tools.managed_tool_gateway import (
     read_nous_access_token as _read_nous_access_token,
     resolve_managed_tool_gateway,
 )
-from tools.tool_backend_helpers import managed_nous_tools_enabled, prefers_gateway
+from tools.tool_backend_helpers import prefers_gateway
 from tools.url_safety import is_safe_url
 from tools.website_policy import check_website_access
 
@@ -201,22 +201,12 @@ def _raise_web_backend_configuration_error() -> None:
         "Web tools are not configured. "
         "Set FIRECRAWL_API_KEY for cloud Firecrawl or set FIRECRAWL_API_URL for a self-hosted Firecrawl instance."
     )
-    if managed_nous_tools_enabled():
-        message += (
-            " With your Nous subscription you can also use the Tool Gateway — "
-            "run `talaria tools` and select Nous Subscription as the web provider."
-        )
     raise ValueError(message)
 
 
 def _firecrawl_backend_help_suffix() -> str:
     """Return optional managed-gateway guidance for Firecrawl help text."""
-    if not managed_nous_tools_enabled():
-        return ""
-    return (
-        ", or use the Nous Tool Gateway via your subscription "
-        "(FIRECRAWL_GATEWAY_URL or TOOL_GATEWAY_DOMAIN)"
-    )
+    return ""
 
 
 def _web_requires_env() -> list[str]:
@@ -228,15 +218,6 @@ def _web_requires_env() -> list[str]:
         "FIRECRAWL_API_KEY",
         "FIRECRAWL_API_URL",
     ]
-    if managed_nous_tools_enabled():
-        requires.extend(
-            [
-                "FIRECRAWL_GATEWAY_URL",
-                "TOOL_GATEWAY_DOMAIN",
-                "TOOL_GATEWAY_SCHEME",
-                "TOOL_GATEWAY_USER_TOKEN",
-            ]
-        )
     return requires
 
 

@@ -56,7 +56,6 @@ _NOISY_LOGGERS = (
     "hpack",
     "hpack.hpack",
     "grpc",
-    "modal",
     "urllib3",
     "urllib3.connectionpool",
     "websockets",
