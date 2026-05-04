@@ -1,7 +1,7 @@
 """File passthrough registry for remote terminal backends.
 
-Remote backends (Docker, Modal, SSH) create sandboxes with no host files.
-This module ensures that credential files, skill directories, and host-side
+Remote backends (Docker, SSH) create sandboxes with no host files. This
+module ensures that credential files, skill directories, and host-side
 cache directories (documents, images, audio, screenshots) are mounted or
 synced into those sandboxes so the agent can access them.
 
@@ -15,7 +15,7 @@ reference files the host side created (e.g. ``unzip`` an uploaded archive).
 Remote backends call :func:`get_credential_file_mounts`,
 :func:`get_skills_directory_mount` / :func:`iter_skills_files`, and
 :func:`get_cache_directory_mounts` / :func:`iter_cache_files` at sandbox
-creation time and before each command (for resync on Modal).
+creation time.
 """
 
 from __future__ import annotations
@@ -297,8 +297,7 @@ def iter_skills_files(
 
     Includes both the local skills dir and any external dirs configured via
     skills.external_dirs.  Skips symlinks entirely.  Preferred for backends
-    that upload files individually (Daytona, Modal) rather than mounting a
-    directory.
+    that upload files individually rather than mounting a directory.
     """
     result: List[Dict[str, str]] = []
 
@@ -379,8 +378,7 @@ def iter_cache_files(
 ) -> List[Dict[str, str]]:
     """Return individual (host_path, container_path) entries for cache files.
 
-    Used by Modal to upload files individually and resync before each command.
-    Skips symlinks.  The container paths use the new ``cache/<subdir>`` layout.
+    Skips symlinks.  The container paths use the ``cache/<subdir>`` layout.
     """
     from talaria_constants import get_talaria_dir
 

@@ -415,7 +415,6 @@ DEFAULT_CONFIG = {
     
     "terminal": {
         "backend": "local",
-        "modal_mode": "auto",
         "cwd": ".",  # Use current directory
         "timeout": 180,
         # Environment variables to pass through to sandboxed execution
@@ -456,11 +455,7 @@ DEFAULT_CONFIG = {
         # runs as a systemd service without access to the user's shell environment.
         # Example: {"SSH_AUTH_SOCK": "/run/user/1000/ssh-agent.sock"}
         "docker_env": {},
-        "singularity_image": "docker://nikolaik/python-nodejs:python3.11-nodejs20",
-        "modal_image": "nikolaik/python-nodejs:python3.11-nodejs20",
-        "daytona_image": "nikolaik/python-nodejs:python3.11-nodejs20",
-        "vercel_runtime": "node24",
-        # Container resource limits (docker, singularity, modal, daytona, vercel_sandbox — ignored for local/ssh)
+        # Container resource limits (docker only — ignored for local/ssh)
         "container_cpu": 1,
         "container_memory": 5120,       # MB (default 5GB)
         "container_disk": 51200,        # MB (default 50GB)
@@ -841,11 +836,6 @@ DEFAULT_CONFIG = {
         },
     },
 
-    # Honcho AI-native memory -- reads ~/.honcho/config.json as single source of truth.
-    # This section is only needed for talaria-specific overrides; everything else
-    # (apiKey, workspace, peerName, sessions, enabled) comes from the global config.
-    "honcho": {},
-
     # IANA timezone (e.g. "Asia/Kolkata", "America/New_York").
     # Empty string means use server-local time.
     "timezone": "",
@@ -987,13 +977,13 @@ DEFAULT_CONFIG = {
     },
 
     # Remotely-hosted model catalog manifest.  When enabled, the CLI fetches
-    # curated model lists for OpenRouter and Nous Portal from this URL,
-    # falling back to the in-repo snapshot on network failure.  Lets us
-    # update model picker lists without shipping a talaria-agent release.
-    # The default URL is served by the docs site GitHub Pages deploy.
+    # curated model lists for OpenRouter from this URL, falling back to the
+    # in-repo snapshot on network failure.  Lets you update model picker
+    # lists without shipping a talaria-agent release.  Empty by default;
+    # set ``url`` to a JSON manifest you host yourself.
     "model_catalog": {
         "enabled": True,
-        "url": "https://talaria-agent.nousresearch.com/docs/api/model-catalog.json",
+        "url": "",
         # Disk cache TTL in hours.  Beyond this, the CLI refetches on the
         # next /model or `talaria model` invocation; network failures
         # silently fall back to the stale cache.
@@ -1078,12 +1068,11 @@ ENV_VARS_BY_VERSION: Dict[int, List[str]] = {
     3: ["FIRECRAWL_API_KEY", "BROWSERBASE_API_KEY", "BROWSERBASE_PROJECT_ID", "FAL_KEY"],
     5: ["SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_ALLOWED_USERS"],
     10: ["TAVILY_API_KEY"],
-    11: ["TERMINAL_MODAL_MODE"],
 }
 
 # Required environment variables with metadata for migration prompts.
 # LLM provider is required but handled in the setup wizard's provider
-# selection step (Nous Portal / OpenRouter / Custom endpoint), so this
+# selection step (Anthropic / OpenAI / OpenRouter / Custom endpoint), so this
 # dict is intentionally empty — no single env var is universally required.
 REQUIRED_ENV_VARS = {}
 
@@ -3324,19 +3313,6 @@ def show_config():
     
     if terminal.get('backend') == 'docker':
         print(f"  Docker image: {terminal.get('docker_image', 'nikolaik/python-nodejs:python3.11-nodejs20')}")
-    elif terminal.get('backend') == 'singularity':
-        print(f"  Image:        {terminal.get('singularity_image', 'docker://nikolaik/python-nodejs:python3.11-nodejs20')}")
-    elif terminal.get('backend') == 'modal':
-        print(f"  Modal image:  {terminal.get('modal_image', 'nikolaik/python-nodejs:python3.11-nodejs20')}")
-        modal_token = get_env_value('MODAL_TOKEN_ID')
-        print(f"  Modal token:  {'configured' if modal_token else '(not set)'}")
-    elif terminal.get('backend') == 'daytona':
-        print(f"  Daytona image: {terminal.get('daytona_image', 'nikolaik/python-nodejs:python3.11-nodejs20')}")
-        daytona_key = get_env_value('DAYTONA_API_KEY')
-        print(f"  API key:      {'configured' if daytona_key else '(not set)'}")
-    elif terminal.get('backend') == 'vercel_sandbox':
-        print(f"  Vercel runtime: {terminal.get('vercel_runtime', 'node24')}")
-        print(f"  Vercel auth:    {'configured' if get_env_value('VERCEL_OIDC_TOKEN') or (get_env_value('VERCEL_TOKEN') and get_env_value('VERCEL_PROJECT_ID') and get_env_value('VERCEL_TEAM_ID')) else '(not set)'}")
     elif terminal.get('backend') == 'ssh':
         ssh_host = get_env_value('TERMINAL_SSH_HOST')
         ssh_user = get_env_value('TERMINAL_SSH_USER')
@@ -3524,12 +3500,7 @@ def set_config_value(key: str, value: str):
     # config.yaml is authoritative, but terminal_tool only reads TERMINAL_ENV etc.
     _config_to_env_sync = {
         "terminal.backend": "TERMINAL_ENV",
-        "terminal.modal_mode": "TERMINAL_MODAL_MODE",
         "terminal.docker_image": "TERMINAL_DOCKER_IMAGE",
-        "terminal.singularity_image": "TERMINAL_SINGULARITY_IMAGE",
-        "terminal.modal_image": "TERMINAL_MODAL_IMAGE",
-        "terminal.daytona_image": "TERMINAL_DAYTONA_IMAGE",
-        "terminal.vercel_runtime": "TERMINAL_VERCEL_RUNTIME",
         "terminal.docker_mount_cwd_to_workspace": "TERMINAL_DOCKER_MOUNT_CWD_TO_WORKSPACE",
         "terminal.docker_run_as_host_user": "TERMINAL_DOCKER_RUN_AS_HOST_USER",
         "terminal.cwd": "TERMINAL_CWD",

@@ -83,9 +83,8 @@ def _run_async(coro):
     """Run an async coroutine from a sync context.
 
     If the current thread already has a running event loop (e.g., inside
-    the gateway's async stack or Atropos's event loop), we spin up a
-    disposable thread so asyncio.run() can create its own loop without
-    conflicting.
+    the gateway's async stack), we spin up a disposable thread so
+    asyncio.run() can create its own loop without conflicting.
 
     For the common CLI path (no running loop), we use a persistent event
     loop so that cached async clients (httpx / AsyncOpenAI) remain bound

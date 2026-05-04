@@ -264,10 +264,6 @@ if _config_path.exists():
                 "lifetime_seconds": "TERMINAL_LIFETIME_SECONDS",
                 "docker_image": "TERMINAL_DOCKER_IMAGE",
                 "docker_forward_env": "TERMINAL_DOCKER_FORWARD_ENV",
-                "singularity_image": "TERMINAL_SINGULARITY_IMAGE",
-                "modal_image": "TERMINAL_MODAL_IMAGE",
-                "daytona_image": "TERMINAL_DAYTONA_IMAGE",
-                "vercel_runtime": "TERMINAL_VERCEL_RUNTIME",
                 "ssh_host": "TERMINAL_SSH_HOST",
                 "ssh_user": "TERMINAL_SSH_USER",
                 "ssh_port": "TERMINAL_SSH_PORT",
@@ -9575,7 +9571,7 @@ class GatewayRunner:
                     # Fresh-final applies to Telegram only — other
                     # platforms either edit in place cheaply (Discord,
                     # Slack) or don't have the timestamp-on-edit
-                    # problem.  (Ported from openclaw/openclaw#72038.)
+                    # problem.
                     _fresh_final_secs = (
                         float(getattr(_scfg, "fresh_final_after_seconds", 0.0) or 0.0)
                         if source.platform == Platform.TELEGRAM
@@ -10322,7 +10318,7 @@ class GatewayRunner:
                         # Fresh-final applies to Telegram only — other
                         # platforms either edit in place cheaply or don't
                         # have the edit-timestamp-stays-stale problem.
-                        # (Ported from openclaw/openclaw#72038.)
+                        #
                         _fresh_final_secs = (
                             float(getattr(_scfg, "fresh_final_after_seconds", 0.0) or 0.0)
                             if source.platform == Platform.TELEGRAM

@@ -2873,7 +2873,7 @@ def check_for_skill_updates(
 # Talaria centralized index source
 # ---------------------------------------------------------------------------
 
-TALARIA_INDEX_URL = "https://talaria-agent.nousresearch.com/docs/api/skills-index.json"
+TALARIA_INDEX_URL = os.environ.get("TALARIA_SKILLS_INDEX_URL", "").strip()
 TALARIA_INDEX_CACHE_FILE = INDEX_CACHE_DIR / "talaria-index.json"
 TALARIA_INDEX_TTL = 6 * 3600  # 6 hours
 
@@ -2881,10 +2881,13 @@ TALARIA_INDEX_TTL = 6 * 3600  # 6 hours
 def _load_talaria_index() -> Optional[dict]:
     """Fetch the centralized skills index, with local cache.
 
-    The index is a JSON file hosted on the docs site, rebuilt daily by CI.
-    We cache it locally for TALARIA_INDEX_TTL seconds to avoid repeated
-    downloads within a session.
+    Disabled when ``TALARIA_SKILLS_INDEX_URL`` is unset. Otherwise fetches
+    from the configured URL (a JSON manifest you host yourself) and caches
+    locally for TALARIA_INDEX_TTL seconds.
     """
+    if not TALARIA_INDEX_URL:
+        return _load_stale_index_cache()
+
     # Check local cache
     if TALARIA_INDEX_CACHE_FILE.exists():
         try:
@@ -2894,7 +2897,7 @@ def _load_talaria_index() -> Optional[dict]:
         except (OSError, json.JSONDecodeError):
             pass
 
-    # Fetch from docs site
+    # Fetch from configured index URL
     try:
         resp = httpx.get(TALARIA_INDEX_URL, timeout=15, follow_redirects=True)
         if resp.status_code != 200:

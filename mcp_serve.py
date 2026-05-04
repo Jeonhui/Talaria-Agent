@@ -5,12 +5,10 @@ Starts a stdio MCP server that lets any MCP client (Claude Code, Cursor, Codex,
 etc.) list conversations, read message history, send messages, poll for live
 events, and manage approval requests across all connected platforms.
 
-Matches OpenClaw's 9-tool MCP channel bridge surface:
+Tools:
   conversations_list, conversation_get, messages_read, attachments_fetch,
   events_poll, events_wait, messages_send, permissions_list_open,
-  permissions_respond
-
-Plus: channels_list (Talaria-specific extra)
+  permissions_respond, channels_list
 
 Usage:
     talaria mcp serve
@@ -186,8 +184,7 @@ class EventBridge:
     """Background poller that watches SessionDB for new messages and
     maintains an in-memory event queue with waiter support.
 
-    This is the Talaria equivalent of OpenClaw's WebSocket gateway bridge.
-    Instead of WebSocket events, we poll the SQLite database for changes.
+    Polls the SQLite database for changes rather than using WebSocket events.
     """
 
     def __init__(self):
@@ -440,8 +437,7 @@ def create_mcp_server(event_bridge: Optional[EventBridge] = None) -> "FastMCP":
         "talaria",
         instructions=(
             "Talaria Agent messaging bridge. Use these tools to interact with "
-            "conversations across Telegram, Discord, Slack, WhatsApp, Signal, "
-            "Matrix, and other connected platforms."
+            "conversations across Discord, Slack, and Telegram."
         ),
     )
 

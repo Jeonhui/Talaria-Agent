@@ -73,9 +73,6 @@ export VIRTUAL_ENV="$(pwd)/venv"
 # Install with all extras (messaging, cron, CLI menus, dev tools)
 uv pip install -e ".[all,dev]"
 
-# Optional: RL training submodule
-# git submodule update --init tinker-atropos && uv pip install -e "./tinker-atropos"
-
 # Optional: browser tools
 npm install
 ```
@@ -134,7 +131,7 @@ talaria-agent/
 │   ├── main.py                   # Entry point, argument parsing, command dispatch
 │   ├── config.py                 # Config management, migration, env var definitions
 │   ├── setup.py                  # Interactive setup wizard
-│   ├── auth.py                   # Provider resolution, OAuth, Nous Portal
+│   ├── auth.py                   # Provider resolution and OAuth
 │   ├── models.py                 # OpenRouter model selection lists
 │   ├── banner.py                 # Welcome banner, ASCII art
 │   ├── commands.py               # Central slash command registry (CommandDef), autocomplete, gateway helpers
@@ -157,25 +154,21 @@ talaria-agent/
 │   ├── skill_tools.py            # Skill search, load, manage
 │   └── environments/             # Terminal execution backends
 │       ├── base.py                   # BaseEnvironment ABC
-│       ├── local.py, docker.py, ssh.py, singularity.py, modal.py, daytona.py
+│       ├── local.py, docker.py, ssh.py
 │
 ├── gateway/                  # Messaging gateway
 │   ├── run.py                    # GatewayRunner — platform lifecycle, message routing, cron
 │   ├── config.py                 # Platform configuration resolution
 │   ├── session.py                # Session store, context prompts, reset policies
 │   └── platforms/                # Platform adapters
-│       ├── telegram.py, discord_adapter.py, slack.py, whatsapp.py
+│       ├── discord.py, slack.py, telegram.py
 │
-├── scripts/                  # Installer and bridge scripts
+├── scripts/                  # Installer scripts
 │   ├── install.sh                # Linux/macOS installer
-│   ├── install.ps1               # Windows PowerShell installer
-│   └── whatsapp-bridge/          # Node.js WhatsApp bridge (Baileys)
+│   └── install.ps1               # Windows PowerShell installer
 │
 ├── skills/                   # Bundled skills (copied to ~/.talaria/skills/ on install)
-├── optional-skills/          # Official optional skills (discoverable via hub, not activated by default)
-├── environments/             # RL training environments (Atropos integration)
 ├── tests/                    # Test suite
-├── website/                  # Documentation site (talaria-agent.nousresearch.com)
 │
 ├── cli-config.yaml.example   # Example configuration (copied to ~/.talaria/config.yaml)
 └── AGENTS.md                 # Development guide for AI coding assistants
@@ -187,13 +180,12 @@ talaria-agent/
 |------|---------|
 | `~/.talaria/config.yaml` | Settings (model, terminal, toolsets, compression, etc.) |
 | `~/.talaria/.env` | API keys and secrets |
-| `~/.talaria/auth.json` | OAuth credentials (Nous Portal) |
+| `~/.talaria/auth.json` | OAuth credentials |
 | `~/.talaria/skills/` | All active skills (bundled + hub-installed + agent-created) |
 | `~/.talaria/memories/` | Persistent memory (MEMORY.md, USER.md) |
 | `~/.talaria/state.db` | SQLite session database |
 | `~/.talaria/sessions/` | JSON session logs |
 | `~/.talaria/cron/` | Scheduled job data |
-| `~/.talaria/whatsapp/session/` | WhatsApp bridge credentials |
 
 ---
 
@@ -222,7 +214,7 @@ User message → AIAgent._run_agent_loop()
 - **Toolset grouping**: Tools are grouped into toolsets (`web`, `terminal`, `file`, `browser`, etc.) that can be enabled/disabled per platform.
 - **Session persistence**: All conversations are stored in SQLite (`talaria_state.py`) with full-text search and unique session titles. JSON logs go to `~/.talaria/sessions/`.
 - **Ephemeral injection**: System prompts and prefill messages are injected at API call time, never persisted to the database or logs.
-- **Provider abstraction**: The agent works with any OpenAI-compatible API. Provider resolution happens at init time (Nous Portal OAuth, OpenRouter API key, or custom endpoint).
+- **Provider abstraction**: The agent works with any OpenAI-compatible API. Provider resolution happens at init time (OpenRouter API key, Anthropic, OpenAI, or custom endpoint).
 - **Provider routing**: When using OpenRouter, `provider_routing` in config.yaml controls provider selection (sort by throughput/latency/price, allow/ignore specific providers, data retention policies). These are injected as `extra_body.provider` in API requests.
 
 ---

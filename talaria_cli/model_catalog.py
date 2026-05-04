@@ -1,9 +1,9 @@
 """Remote model catalog fetcher.
 
 The Talaria docs site hosts a JSON manifest of curated models for providers
-we want to update without shipping a release (currently OpenRouter and
-Nous Portal). This module fetches, validates, and caches that manifest,
-falling back to the in-repo hardcoded lists when the network is unavailable.
+we want to update without shipping a release (currently OpenRouter). This
+module fetches, validates, and caches that manifest, falling back to the
+in-repo hardcoded lists when the network is unavailable.
 
 Pipeline
 --------
@@ -13,9 +13,9 @@ Pipeline
    - Fetches the master URL if disk cache is stale or missing.
    - On any fetch failure, keeps using the stale cache (or empty dict).
 
-2. ``get_curated_openrouter_models()`` / ``get_curated_nous_models()`` —
-   thin accessors returning the shapes existing callers expect. Each
-   falls back to the in-repo hardcoded list on any lookup failure.
+2. ``get_curated_openrouter_models()`` — thin accessor returning the shape
+   existing callers expect. Falls back to the in-repo hardcoded list on
+   any lookup failure.
 
 Schema (version 1)
 ------------------
@@ -32,8 +32,7 @@ Schema (version 1)
             {"id": "vendor/model", "description": "recommended",
              "metadata": {...}}          # free-form, model-level
           ]
-        },
-        "nous": {...}
+        }
       }
     }
 
@@ -61,9 +60,7 @@ logger = logging.getLogger(__name__)
 # Constants
 # ---------------------------------------------------------------------------
 
-DEFAULT_CATALOG_URL = (
-    "https://talaria-agent.nousresearch.com/docs/api/model-catalog.json"
-)
+DEFAULT_CATALOG_URL = ""
 DEFAULT_TTL_HOURS = 24
 DEFAULT_FETCH_TIMEOUT = 8.0
 SUPPORTED_SCHEMA_VERSION = 1
@@ -115,6 +112,8 @@ def _cache_path() -> Path:
 
 def _fetch_manifest(url: str, timeout: float) -> dict[str, Any] | None:
     """HTTP GET the manifest URL and return a parsed dict, or None on failure."""
+    if not url:
+        return None
     try:
         req = urllib.request.Request(
             url,
@@ -303,22 +302,6 @@ def get_curated_openrouter_models() -> list[tuple[str, str]] | None:
             continue
         desc = str(m.get("description") or "")
         out.append((mid, desc))
-    return out or None
-
-
-def get_curated_nous_models() -> list[str] | None:
-    """Return Nous Portal's curated list of model ids from the manifest.
-
-    Returns ``None`` when the manifest is unavailable.
-    """
-    block = _get_provider_block("nous")
-    if not block:
-        return None
-    out: list[str] = []
-    for m in block.get("models", []):
-        mid = str(m.get("id") or "").strip()
-        if mid:
-            out.append(mid)
     return out or None
 
 

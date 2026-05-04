@@ -131,18 +131,6 @@ TOOLSETS = {
         "includes": []
     },
     
-    "rl": {
-        "description": "RL training tools for running reinforcement learning on Tinker-Atropos",
-        "tools": [
-            "rl_list_environments", "rl_select_environment",
-            "rl_get_current_config", "rl_edit_config",
-            "rl_start_training", "rl_check_status",
-            "rl_stop_training", "rl_get_results",
-            "rl_list_runs", "rl_test_inference"
-        ],
-        "includes": []
-    },
-    
     "file": {
         "description": "File manipulation tools: read, write, patch (with fuzzy matching), and search (content + files)",
         "tools": ["read_file", "write_file", "patch", "search_files"],
@@ -184,9 +172,6 @@ TOOLSETS = {
         "tools": ["delegate_task"],
         "includes": []
     },
-
-    # "honcho" toolset removed — Honcho is now a memory provider plugin.
-    # Tools are injected via MemoryManager, not the toolset system.
 
     "homeassistant": {
         "description": "Home Assistant smart home control and monitoring",

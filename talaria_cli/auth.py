@@ -88,7 +88,7 @@ QWEN_ACCESS_TOKEN_REFRESH_SKEW_SECONDS = 120
 DEFAULT_SPOTIFY_ACCOUNTS_BASE_URL = "https://accounts.spotify.com"
 DEFAULT_SPOTIFY_API_BASE_URL = "https://api.spotify.com/v1"
 DEFAULT_SPOTIFY_REDIRECT_URI = "http://127.0.0.1:43827/spotify/callback"
-SPOTIFY_DOCS_URL = "https://talaria-agent.nousresearch.com/docs/user-guide/features/spotify"
+SPOTIFY_DOCS_URL = "https://github.com/Jeonhui/Talaria-Agent"
 SPOTIFY_DASHBOARD_URL = "https://developer.spotify.com/dashboard"
 SPOTIFY_ACCESS_TOKEN_REFRESH_SKEW_SECONDS = 120
 DEFAULT_SPOTIFY_SCOPE = " ".join((
@@ -313,14 +313,6 @@ PROVIDER_REGISTRY: Dict[str, ProviderConfig] = {
         inference_base_url="https://integrate.api.nvidia.com/v1",
         api_key_env_vars=("NVIDIA_API_KEY",),
         base_url_env_var="NVIDIA_BASE_URL",
-    ),
-    "ai-gateway": ProviderConfig(
-        id="ai-gateway",
-        name="Vercel AI Gateway",
-        auth_type="api_key",
-        inference_base_url="https://ai-gateway.vercel.sh/v1",
-        api_key_env_vars=("AI_GATEWAY_API_KEY",),
-        base_url_env_var="AI_GATEWAY_BASE_URL",
     ),
     "opencode-zen": ProviderConfig(
         id="opencode-zen",
@@ -3352,7 +3344,7 @@ def _minimax_oauth_login(
     if _is_remote_session():
         open_browser = False
 
-    print(f"Starting Talaria login via MiniMax ({region}) OAuth...")
+    print(f"Starting MiniMax ({region}) OAuth flow...")
     print(f"Portal: {portal_base_url}")
 
     with httpx.Client(timeout=httpx.Timeout(timeout_seconds),
@@ -3513,20 +3505,6 @@ def get_minimax_oauth_auth_status() -> Dict[str, Any]:
         "region": state.get("region", "global"),
         "expires_at": state.get("expires_at"),
     }
-
-
-def _login_minimax_oauth(args, pconfig: ProviderConfig) -> None:
-    """CLI entry for MiniMax OAuth login."""
-    region = getattr(args, "region", None) or "global"
-    open_browser = not getattr(args, "no_browser", False)
-    timeout = getattr(args, "timeout", None) or 15.0
-    try:
-        _minimax_oauth_login(
-            region=region, open_browser=open_browser, timeout_seconds=timeout,
-        )
-    except AuthError as exc:
-        print(format_auth_error(exc))
-        raise SystemExit(1)
 
 
 def logout_command(args) -> None:

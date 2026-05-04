@@ -29,9 +29,9 @@ COPILOT_REASONING_EFFORTS_GPT5 = ["minimal", "low", "medium", "high"]
 COPILOT_REASONING_EFFORTS_O_SERIES = ["low", "medium", "high"]
 
 
-# Talaria does not bundle a Vercel AI Gateway / OpenRouter aggregator
-# snapshot. The list is kept as an empty placeholder so model_switch can
-# still reference it when building curated catalogs.
+# Talaria does not bundle a static OpenRouter snapshot — the live picker
+# fetches the model catalog at runtime. Keep as an empty placeholder so
+# model_switch can still reference it when building curated catalogs.
 OPENROUTER_MODELS: list[tuple[str, str]] = []
 
 
@@ -92,37 +92,6 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "qwen/qwen-2.5-72b-instruct",
     ],
 }
-
-# ---------------------------------------------------------------------------
-# Nous Portal free-model helper
-# ---------------------------------------------------------------------------
-# The Nous Portal models endpoint is the source of truth for which models
-# are currently offered (free or paid). We trust whatever it returns and
-# surface it to users as-is — no local allowlist filtering.
-
-
-
-def check_nous_free_tier() -> bool:
-    """Talaria does not check Nous tier — always returns False."""
-    return False
-
-
-def partition_nous_models_by_tier(
-    model_ids: list[str], _free_tier: bool = False
-) -> tuple[list[str], list[str]]:
-    """Talaria does not partition by Nous tier — returns (ids, [])."""
-    return list(model_ids), []
-
-
-def ai_gateway_model_ids(*, force_refresh: bool = False) -> list[str]:
-    """Talaria does not use the Vercel AI Gateway."""
-    return []
-
-
-def get_curated_nous_model_ids() -> list[str]:
-    """Talaria does not curate a Nous catalog."""
-    return []
-
 
 def get_pricing_for_provider(
     _provider: str, *, force_refresh: bool = False
@@ -320,7 +289,7 @@ def _model_in_provider_catalog(name_lower: str, providers: set[str]) -> bool:
 
 
 _AGGREGATOR_PROVIDERS = frozenset(
-    {"nous", "openrouter", "ai-gateway", "copilot", "kilocode"}
+    {"openrouter", "copilot", "kilocode"}
 )
 
 
@@ -657,8 +626,8 @@ def _resolve_copilot_catalog_api_key() -> str:
 #   - "nous": curated list and Portal /models endpoint are the source of
 #     truth for the subscription tier.
 # Also excluded: providers that already have dedicated live-endpoint
-# branches below (copilot, anthropic, ai-gateway, ollama-cloud, custom,
-# stepfun, openai-codex) — those paths handle freshness themselves.
+# branches below (copilot, anthropic, ollama-cloud, custom, stepfun,
+# openai-codex) — those paths handle freshness themselves.
 _MODELS_DEV_PREFERRED: frozenset[str] = frozenset({
     "opencode-go",
     "opencode-zen",

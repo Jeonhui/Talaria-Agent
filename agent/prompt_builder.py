@@ -144,7 +144,7 @@ DEFAULT_AGENT_IDENTITY = (
 TALARIA_AGENT_HELP_GUIDANCE = (
     "If the user asks about configuring, setting up, or using Talaria Agent "
     "itself, load the `talaria-agent` skill with skill_view(name='talaria-agent') "
-    "before answering. Docs: https://talaria-agent.nousresearch.com/docs"
+    "before answering. Docs: https://github.com/Jeonhui/Talaria-Agent"
 )
 
 MEMORY_GUIDANCE = (

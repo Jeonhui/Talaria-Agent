@@ -120,8 +120,7 @@ def _strip_reasoning_tags(text: str) -> str:
 
     Also strips tool-call XML blocks some open models leak into visible
     content (``<tool_call>``, ``<function_calls>``, Gemma-style
-    ``<function name="…">…</function>``). Ported from
-    openclaw/openclaw#67318.
+    ``<function name="…">…</function>``).
     """
     cleaned = text
     for tag in _REASONING_TAGS:
@@ -146,7 +145,7 @@ def _strip_reasoning_tags(text: str) -> str:
             cleaned,
             flags=re.IGNORECASE,
         )
-    # Tool-call XML blocks (openclaw/openclaw#67318).
+    # Tool-call XML blocks.
     for tc_tag in ("tool_call", "tool_calls", "tool_result",
                    "function_call", "function_calls"):
         cleaned = re.sub(
@@ -429,7 +428,7 @@ def load_cli_config() -> Dict[str, Any]:
                         defaults[key] = file_config[key]
 
             # Second: carry over keys from file_config that aren't in defaults
-            # (e.g. platform_toolsets, provider_routing, memory, honcho, etc.)
+            # (e.g. platform_toolsets, provider_routing, memory, etc.)
             for key in file_config:
                 if key not in defaults and key != "model":
                     defaults[key] = file_config[key]
@@ -461,8 +460,8 @@ def load_cli_config() -> Dict[str, Any]:
     # Handle special cwd values: "." or "auto" means use current working directory.
     # Only resolve to the host's CWD for the local backend where the host
     # filesystem is directly accessible.  For ALL remote/container backends
-    # (ssh, docker, modal, singularity), the host path doesn't exist on the
-    # target -- remove the key so terminal_tool.py uses its per-backend default.
+    # (ssh, docker), the host path doesn't exist on the target -- remove the
+    # key so terminal_tool.py uses its per-backend default.
     #
     # GUARD: If TERMINAL_CWD is already set to a real absolute path (by the
     # gateway's config bridge earlier in the process), don't clobber it.
@@ -1647,18 +1646,17 @@ TALARIA_AGENT_LOGO = """[bold #FFD700]
 [/]"""
 
 # ASCII Art - Talaria winged sandal (Greek sandal w/ ankle loop + thin sole)
-TALARIA_CADUCEUS = """[bold #FFD700]⠀⠀⢀⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[bold #FFD700]⠀⠈⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠉⠛⠿⣿⣿⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣿⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣿⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+TALARIA_CADUCEUS = """[bold #FFD700]⠀⠀⠀⠀⢀⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[bold #FFD700]⠀⠀⠈⢿⣷⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#FFD700]⠀⠀⠀⠀⠀⠉⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
 [#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⡀⠀⠀⠈⠙⠿⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡾⠋⠉⠙⠳⣦⡀⠀⠀⠀⠈⠙⢿⣿⣆⡀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠘⡇⠀⠀⠀⠀⠀⠈⠻⠿⠃⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣄⡀⠀⢀⡴⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⢀⣀⣤⣤⣤⣤⣤⣤⣤⣤⣬⣷⣶⣟⣁⣤⣤⣤⣤⣤⣤⣄⣀⡀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠈⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁⠀⠀⠀[/]"""
+[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⢀⣠⣤⣄⡀⠀⠀⠀⠀⠀⠈⠙⠿⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀[/]
+[#CD7F32]⠀⠀⠀⠀⠀⢠⣾⠟⠉⠉⠻⣷⡀⠀⠀⠀⠀⠀⠀⠈⠹⢿⣿⣷⡀⠀⠀⠀⠀⠀[/]
+[#CD7F32]⠀⠀⠀⠀⠀⢸⣿⣄⣀⣀⣠⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠿⠿⠀⠀⠀⠀⠀[/]
+[#B8860B]⠀⠀⠀⢀⣀⣤⣤⣤⣤⣤⣤⣤⣬⣷⣶⣟⣁⣤⣤⣤⣤⣤⣤⣄⣀⡀⠀⠀⠀⠀[/]
+[#B8860B]⠀⠀⠀⠀⠈⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁⠀⠀⠀⠀[/]"""
 
 
 def _build_compact_banner() -> str:
@@ -7240,7 +7238,7 @@ class TalariaCLI:
 
         if self.verbose:
             logging.getLogger().setLevel(logging.DEBUG)
-            for noisy in ('openai', 'openai._base_client', 'httpx', 'httpcore', 'asyncio', 'hpack', 'grpc', 'modal'):
+            for noisy in ('openai', 'openai._base_client', 'httpx', 'httpcore', 'asyncio', 'hpack', 'grpc'):
                 logging.getLogger(noisy).setLevel(logging.WARNING)
         else:
             logging.getLogger().setLevel(logging.INFO)
@@ -8776,9 +8774,6 @@ class TalariaCLI:
 
         self.show_banner()
 
-        # One-line Honcho session indicator (TTY-only, not captured by agent).
-        # Only show when the user explicitly configured Honcho for Talaria
-        # (not auto-enabled from a stray HONCHO_API_KEY env var).
         # If resuming a session, load history and display it immediately
         # so the user has context before typing their first message.
         if self._resumed:

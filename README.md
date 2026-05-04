@@ -5,18 +5,17 @@
 Talaria is a slim, opinionated fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) that drops the everything-included framework surface and keeps a small, well-defined assistant. **~71% smaller** than the upstream code base (~29% the original size).
 
 ```
-  ⢀⣄
- ⠈⢿⣿⣷⣦⣄⡀
-   ⠉⠛⠿⣿⣿⣶⣦⣄⡀
-       ⠈⠉⠻⢿⣿⣿⣶⣦⣄⡀
-            ⠈⠙⠻⢿⣿⣿⣶⣦⣄⡀
+    ⢀⣄
+   ⠈⢿⣷⣄⡀
+       ⠉⠻⢿⣿⣷⣦⣄⡀
+           ⠈⠙⠻⢿⣿⣷⣦⣄⡀
+              ⠈⠙⠻⢿⣿⣷⣦⣄⡀
                  ⠈⠙⠻⢿⣿⣷⣦⣄⡀
-         ⢀⣀⣀⣀⡀   ⠈⠙⠿⣿⣿⣦⡀
-       ⢠⡾⠋⠉⠙⠳⣦⡀     ⠈⠙⢿⣿⣆⡀
-       ⢸⡇      ⠘⡇         ⠈⠻⠿⠃
-       ⠈⠳⣄  ⢀⡴⠋
-   ⢀⣀⣤⣤⣤⣤⣤⣤⣤⣤⣬⣷⣶⣟⣁⣤⣤⣤⣤⣤⣤⣄⣀⡀
-       ⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁
+       ⢀⣠⣤⣄⡀          ⠈⠙⠿⣿⣿⣦⡀
+     ⢠⣾⠟⠉⠉⠻⣷⡀           ⠈⠹⢿⣿⣷⡀
+     ⢸⣿⣄⣀⣀⣠⣿⡇                ⠘⠿⠿
+   ⢀⣀⣤⣤⣤⣤⣤⣤⣤⣬⣷⣶⣟⣁⣤⣤⣤⣤⣤⣤⣄⣀⡀
+       ⠈⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁
 ```
 
 ## What ships
@@ -41,7 +40,7 @@ Whole subsystems dropped to keep the assistant focused:
 - **Messaging** — every platform other than Discord / Slack / Telegram (DingTalk, BlueBubbles, WhatsApp, Matrix, Signal, etc.)
 - **Other** — RL/eval harnesses, third-party memory plugins (Honcho / Mem0 / Hindsight), ~1100 lines of dead provider catalogs
 
-Net: **~187k Python LOC** in **219 files**, down from **~649k LOC** in **1,340 files** in upstream Hermes.
+Net: **~186k Python LOC** in **218 files**, down from **~649k LOC** in **1,340 files** in upstream Hermes.
 
 ---
 
@@ -238,7 +237,10 @@ scripts/             install / uninstall / build helpers
 
 ## Status
 
-- **Version:** v0.2.0 (2026-05-03) — second lean pass: TUI backend, voice/TTS, Nous/OpenClaw/login, and Modal/Daytona/Singularity dead paths fully removed; OpenRouter promoted to first-class provider
+- **Version:** v0.2.2 (2026-05-04) — third lean pass: residual config defaults, dead branches, and stale comments swept (Vercel AI Gateway plumbing, Modal/Daytona/Singularity/Vercel sandbox config + env mappings, RL/Atropos toolset infrastructure, Honcho profile migration, broken Vercel sandbox import, AI Gateway provider entry, ~13 user-facing URL fixes). Net **~-810 LOC** across 61 files.
+- **Past releases:**
+  - v0.2.1 (2026-05-03) — winged sandal banner polish (ASCII art refined: wing on heel, foot extending right)
+  - v0.2.0 (2026-05-03) — second lean pass: TUI backend, voice/TTS, Nous/OpenClaw/login, and Modal/Daytona/Singularity dead paths fully removed; OpenRouter promoted to first-class provider
 - **Stability:** dogfood-grade. Used personally; report issues you hit.
 - **Tests:** the `tests/` directory currently holds smoke checks only — contributions welcome.
 

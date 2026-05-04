@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import os
 
-from utils import is_truthy_value
-
 
 _DEFAULT_BROWSER_PROVIDER = "local"
 
@@ -14,21 +12,6 @@ def normalize_browser_cloud_provider(value: object | None) -> str:
     """Return a normalized browser provider key."""
     provider = str(value or _DEFAULT_BROWSER_PROVIDER).strip().lower()
     return provider or _DEFAULT_BROWSER_PROVIDER
-
-
-def prefers_gateway(config_section: str) -> bool:
-    """Return True when the user opted into the Tool Gateway for this tool.
-
-    Reads ``<section>.use_gateway`` from config.yaml.  Never raises.
-    """
-    try:
-        from talaria_cli.config import load_config
-        section = (load_config() or {}).get(config_section)
-        if isinstance(section, dict):
-            return is_truthy_value(section.get("use_gateway"), default=False)
-    except Exception:
-        pass
-    return False
 
 
 def fal_key_is_configured() -> bool:

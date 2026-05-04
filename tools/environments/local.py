@@ -98,13 +98,6 @@ def _build_provider_env_blocklist() -> frozenset:
         "GITHUB_APP_ID",
         "GITHUB_APP_PRIVATE_KEY_PATH",
         "GITHUB_APP_INSTALLATION_ID",
-        "MODAL_TOKEN_ID",
-        "MODAL_TOKEN_SECRET",
-        "DAYTONA_API_KEY",
-        "VERCEL_OIDC_TOKEN",
-        "VERCEL_TOKEN",
-        "VERCEL_PROJECT_ID",
-        "VERCEL_TEAM_ID",
     })
     return frozenset(blocked)
 

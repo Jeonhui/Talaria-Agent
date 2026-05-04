@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Build the Talaria Model Catalog — a centralized JSON manifest of curated models.
 
-This script reads the in-repo hardcoded curated lists (``OPENROUTER_MODELS``,
-``_PROVIDER_MODELS["nous"]``) and writes them to a JSON manifest that the
-Talaria CLI fetches at runtime. Publishing the catalog through the docs site
-lets maintainers update model lists without shipping a Talaria release.
+This script reads the in-repo hardcoded curated list (``OPENROUTER_MODELS``)
+and writes it to a JSON manifest that the Talaria CLI fetches at runtime.
+Publishing the catalog through the docs site lets maintainers update model
+lists without shipping a Talaria release.
 
-The runtime fetcher falls back to the same in-repo hardcoded lists if the
+The runtime fetcher falls back to the same in-repo hardcoded list if the
 manifest is unreachable, so this script is a convenience for keeping the
 manifest in sync — not a source of truth.
 
@@ -15,9 +15,6 @@ Usage::
     python scripts/build_model_catalog.py
 
 Output: ``website/static/api/model-catalog.json``
-
-Live URL (after ``deploy-site.yml`` runs on merge to main):
-``https://talaria-agent.nousresearch.com/docs/api/model-catalog.json``
 """
 
 from __future__ import annotations
@@ -33,7 +30,7 @@ sys.path.insert(0, REPO_ROOT)
 # Ensure TALARIA_HOME is set for imports that touch it at module level.
 os.environ.setdefault("TALARIA_HOME", os.path.join(os.path.expanduser("~"), ".talaria"))
 
-from talaria_cli.models import OPENROUTER_MODELS, _PROVIDER_MODELS  # noqa: E402
+from talaria_cli.models import OPENROUTER_MODELS  # noqa: E402
 
 OUTPUT_PATH = os.path.join(REPO_ROOT, "website", "static", "api", "model-catalog.json")
 CATALOG_VERSION = 1
@@ -45,7 +42,6 @@ def build_catalog() -> dict:
         "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "metadata": {
             "source": "talaria-agent repo",
-            "docs": "https://talaria-agent.nousresearch.com/docs/reference/model-catalog",
         },
         "providers": {
             "openrouter": {
@@ -59,19 +55,6 @@ def build_catalog() -> dict:
                 "models": [
                     {"id": mid, "description": desc}
                     for mid, desc in OPENROUTER_MODELS
-                ],
-            },
-            "nous": {
-                "metadata": {
-                    "display_name": "Nous Portal",
-                    "note": (
-                        "Free-tier gating is determined live via Portal pricing "
-                        "(partition_nous_models_by_tier), not this manifest."
-                    ),
-                },
-                "models": [
-                    {"id": mid}
-                    for mid in _PROVIDER_MODELS.get("nous", [])
                 ],
             },
         },

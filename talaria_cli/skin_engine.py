@@ -41,7 +41,6 @@ All fields are optional. Missing values inherit from the ``default`` skin.
       session_label: "#DAA520"           # Session label color
       session_border: "#8B8682"          # Session ID dim color
       status_bar_bg: "#1a1a2e"          # TUI status/usage bar background
-      voice_status_bg: "#1a1a2e"        # TUI voice status background
       completion_menu_bg: "#1a1a2e"      # Completion menu background
       completion_menu_current_bg: "#333355"  # Active completion row background
       completion_menu_meta_bg: "#1a1a2e"     # Completion meta column background
@@ -441,7 +440,6 @@ def get_prompt_toolkit_style_overrides() -> Dict[str, str]:
     status_warn = skin.get_color("status_bar_warn", warn)
     status_bad = skin.get_color("status_bar_bad", skin.get_color("banner_accent", warn))
     status_critical = skin.get_color("status_bar_critical", error)
-    voice_bg = skin.get_color("voice_status_bg", status_bg)
     menu_bg = skin.get_color("completion_menu_bg", "#1a1a2e")
     menu_current_bg = skin.get_color("completion_menu_current_bg", "#333355")
     menu_meta_bg = skin.get_color("completion_menu_meta_bg", menu_bg)
@@ -484,6 +482,4 @@ def get_prompt_toolkit_style_overrides() -> Dict[str, str]:
         "approval-cmd": f"{dim} italic",
         "approval-choice": dim,
         "approval-selected": f"{title} bold",
-        "voice-status": f"bg:{voice_bg} {label}",
-        "voice-status-recording": f"bg:{voice_bg} {error} bold",
     }

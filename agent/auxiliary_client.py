@@ -8,19 +8,17 @@ Resolution order for text tasks (auto mode):
   1. User's main provider + main model (used regardless of provider type —
      aggregators, direct API-key providers, native Anthropic, Codex, etc.)
   2. OpenRouter  (OPENROUTER_API_KEY)
-  3. Nous Portal (~/.talaria/auth.json active provider)
-  4. Custom endpoint (config.yaml model.base_url + OPENAI_API_KEY)
-  5. Native Anthropic
-  6. Direct API-key providers (z.ai/GLM, Kimi/Moonshot, MiniMax, MiniMax-CN)
-  7. None
+  3. Custom endpoint (config.yaml model.base_url + OPENAI_API_KEY)
+  4. Native Anthropic
+  5. Direct API-key providers (z.ai/GLM, Kimi/Moonshot, MiniMax, MiniMax-CN)
+  6. None
 
 Resolution order for vision/multimodal tasks (auto mode):
   1. Selected main provider, if it is one of the supported vision backends below
   2. OpenRouter
-  3. Nous Portal
-  4. Native Anthropic
-  5. Custom endpoint (for local vision models: Qwen-VL, LLaVA, Pixtral, etc.)
-  6. None
+  3. Native Anthropic
+  4. Custom endpoint (for local vision models: Qwen-VL, LLaVA, Pixtral, etc.)
+  5. None
 
 Codex OAuth (ChatGPT-account auth) is intentionally NOT in either
 fallback chain: OpenAI gates this endpoint behind an undocumented,
@@ -227,7 +225,6 @@ _API_KEY_PROVIDER_AUX_MODELS: Dict[str, str] = {
     "minimax-oauth": "MiniMax-M2.7-highspeed",
     "minimax-cn": "MiniMax-M2.7",
     "anthropic": "claude-haiku-4-5-20251001",
-    "ai-gateway": "google/gemini-3-flash",
     "opencode-zen": "gemini-3-flash",
     "opencode-go": "glm-5",
     "kilocode": "google/gemini-3-flash-preview",
@@ -261,19 +258,9 @@ _PROVIDERS_WITHOUT_VISION: frozenset = frozenset({
 
 # OpenRouter app attribution headers
 _OR_HEADERS = {
-    "HTTP-Referer": "https://talaria-agent.nousresearch.com",
+    "HTTP-Referer": "https://github.com/Jeonhui/Talaria-Agent",
     "X-OpenRouter-Title": "Talaria Agent",
     "X-OpenRouter-Categories": "productivity,cli-agent",
-}
-
-# Vercel AI Gateway app attribution headers. HTTP-Referer maps to
-# referrerUrl and X-Title maps to appName in the gateway's analytics.
-from talaria_cli import __version__ as _TALARIA_VERSION
-
-_AI_GATEWAY_HEADERS = {
-    "HTTP-Referer": "https://talaria-agent.nousresearch.com",
-    "X-Title": "Talaria Agent",
-    "User-Agent": f"TalariaAgent/{_TALARIA_VERSION}",
 }
 
 # Default auxiliary models per provider
@@ -2389,12 +2376,9 @@ def resolve_vision_provider_client(
         #      _PROVIDER_VISION_MODELS provides per-provider vision model
         #      overrides when the provider has a dedicated multimodal model
         #      that differs from the chat model (e.g. xiaomi → mimo-v2-omni,
-        #      zai → glm-5v-turbo). Nous is the exception: it has a dedicated
-        #      strict vision backend with tier-aware defaults, so it must not
-        #      fall through to the user's text chat model here.
+        #      zai → glm-5v-turbo).
         #   2. OpenRouter  (vision-capable aggregator fallback)
-        #   3. Nous Portal (vision-capable aggregator fallback)
-        #   4. Stop
+        #   3. Stop
         main_provider = _read_main_provider()
         main_model = _read_main_model()
         if main_provider and main_provider not in ("auto", ""):

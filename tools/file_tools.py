@@ -307,7 +307,7 @@ def _get_file_ops(task_id: str = "default") -> ShellFileOperations:
 
     Respects the TERMINAL_ENV setting -- if the task_id doesn't have an
     environment yet, creates one using the configured backend (local, docker,
-    modal, etc.) rather than always defaulting to local.
+    ssh) rather than always defaulting to local.
 
     Thread-safe: uses the same per-task creation locks as terminal_tool to
     prevent duplicate sandbox creation from concurrent tool calls.

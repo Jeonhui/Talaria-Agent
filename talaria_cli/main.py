@@ -204,7 +204,7 @@ import time as _time
 from datetime import datetime
 
 from talaria_cli import __version__, __release_date__
-from talaria_constants import AI_GATEWAY_BASE_URL, OPENROUTER_BASE_URL
+from talaria_constants import OPENROUTER_BASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -294,7 +294,7 @@ def _has_any_provider_configured() -> bool:
     except Exception:
         pass
 
-    # Check for Nous Portal OAuth credentials
+    # Check for OAuth credentials in auth.json
     auth_file = get_talaria_home() / "auth.json"
     if auth_file.exists():
         try:
@@ -1328,9 +1328,9 @@ def _aux_config_menu() -> None:
         print()
         print("  Side tasks (vision, compression, web extraction, etc.) default")
         print("  to your main chat model.  \"auto\" means \"use my main model\" —")
-        print("  Talaria only falls back to a lightweight backend (OpenRouter,")
-        print("  Nous Portal) if the main model is unavailable.  Override a")
-        print("  task below if you want it pinned to a specific provider/model.")
+        print("  Talaria only falls back to a lightweight backend (OpenRouter)")
+        print("  if the main model is unavailable.  Override a task below if")
+        print("  you want it pinned to a specific provider/model.")
         print()
 
         # Build the task menu with current settings inline
@@ -5072,7 +5072,6 @@ def _coalesce_session_name_args(argv: list) -> list:
         "uninstall",
         "profile",
         "dashboard",
-        "honcho",
         "plugins",
         "acp",
         "webhook",
@@ -5496,7 +5495,7 @@ def main():
             "Manage the fallback provider chain.  Fallback providers are tried "
             "in order when the primary model fails with rate-limit, overload, or "
             "connection errors.  See: "
-            "https://talaria-agent.nousresearch.com/docs/user-guide/features/fallback-providers"
+            "https://github.com/Jeonhui/Talaria-Agent"
         ),
     )
     fallback_subparsers = fallback_parser.add_subparsers(dest="fallback_command")
@@ -6593,8 +6592,7 @@ Examples:
         help="Configure external memory provider",
         description=(
             "Set up and manage external memory provider plugins.\n\n"
-            "Available providers: honcho, openviking, mem0, hindsight,\n"
-            "holographic, retaindb, byterover.\n\n"
+            "Install providers via 'talaria plugins install <repo>'.\n"
             "Only one external provider can be active at a time.\n"
             "Built-in memory (MEMORY.md/USER.md) is always active."
         ),

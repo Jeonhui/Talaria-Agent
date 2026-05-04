@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
-_DOCS_BASE = "https://talaria-agent.nousresearch.com/docs"
+_DOCS_BASE = "https://github.com/Jeonhui/Talaria-Agent"
 
 
 def _model_config_dict(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -99,7 +99,6 @@ _DEFAULT_PROVIDER_MODELS = {
     "arcee": ["trinity-large-thinking", "trinity-large-preview", "trinity-mini"],
     "minimax": ["MiniMax-M2.7", "MiniMax-M2.5", "MiniMax-M2.1", "MiniMax-M2"],
     "minimax-cn": ["MiniMax-M2.7", "MiniMax-M2.5", "MiniMax-M2.1", "MiniMax-M2"],
-    "ai-gateway": ["anthropic/claude-opus-4.6", "anthropic/claude-sonnet-4.6", "openai/gpt-5", "google/gemini-3-flash"],
     "kilocode": ["anthropic/claude-opus-4.6", "anthropic/claude-sonnet-4.6", "openai/gpt-5.4", "google/gemini-3-pro-preview", "google/gemini-3-flash-preview"],
     "opencode-zen": ["gpt-5.4", "gpt-5.3-codex", "claude-sonnet-4-6", "gemini-3-flash", "glm-5", "kimi-k2.5", "minimax-m2.7"],
     "opencode-go": ["kimi-k2.6", "kimi-k2.5", "glm-5.1", "glm-5", "mimo-v2.5-pro", "mimo-v2.5", "mimo-v2-pro", "mimo-v2-omni", "minimax-m2.7", "minimax-m2.5", "qwen3.6-plus", "qwen3.5-plus"],
@@ -1301,7 +1300,7 @@ def _setup_slack():
     print_info("   3. Install to Workspace: Settings → Install App")
     print_info("   4. After installing, invite the bot to channels: /invite @YourBot")
     print()
-    print_info("   Full guide: https://talaria-agent.nousresearch.com/docs/user-guide/messaging/slack/")
+    print_info(f"   Full guide: {_DOCS_BASE}")
     print()
 
     # Generate and write manifest up-front so the user can paste it into
@@ -1391,7 +1390,7 @@ def _setup_webhooks():
     print_warning("   internet. For security, run the gateway in a sandboxed environment")
     print_warning("   (Docker, VM, etc.) to limit blast radius from prompt injection.")
     print()
-    print_info("   Full guide: https://talaria-agent.nousresearch.com/docs/user-guide/messaging/webhooks/")
+    print_info(f"   Full guide: {_DOCS_BASE}")
     print()
 
     port = prompt("Webhook port (default 8644)")
@@ -1417,10 +1416,7 @@ def _setup_webhooks():
     print_info("   2. Point your service (GitHub, GitLab, etc.) at:")
     print_info("      http://your-server:8644/webhooks/<route-name>")
     print()
-    print_info("   Route configuration guide:")
-    print_info("   https://talaria-agent.nousresearch.com/docs/user-guide/messaging/webhooks/#configuring-routes")
     print()
-    print_info("   Open config in your editor:  talaria config edit")
     print_info("   Open config in your editor:  talaria config edit")
 
 
@@ -1810,7 +1806,7 @@ def run_setup_wizard(args):
     )
     print(
         color(
-            "│             ⚕ Talaria Agent Setup Wizard                │", Colors.MAGENTA
+            "│               Talaria Agent Setup Wizard                │", Colors.MAGENTA
         )
     )
     print(

@@ -698,14 +698,9 @@ def _transform_sudo_command(command: str | None) -> tuple[str | None, str | None
           returned unchanged so it fails gracefully with
           "sudo: a password is required".
 
-    Callers that drive a subprocess directly (local, ssh, docker, singularity)
-    should prepend sudo_stdin to their stdin_data and pass the merged bytes to
+    Callers that drive a subprocess directly (local, ssh, docker) should
+    prepend sudo_stdin to their stdin_data and pass the merged bytes to
     Popen's stdin pipe.
-
-    Callers that cannot pipe subprocess stdin (modal, daytona,
-    vercel_sandbox) must embed the password in the command string
-    themselves; see their execute() methods for how they handle the
-    non-None sudo_stdin case.
 
     If SUDO_PASSWORD is not set and in interactive mode (TALARIA_INTERACTIVE=1):
       Prompts user for password with 45s timeout, caches for session.
@@ -777,41 +772,29 @@ _cleanup_thread = None
 _cleanup_running = False
 
 # Per-task environment overrides registry.
-# Allows environments (e.g., TerminalBench2Env) to specify a custom Docker/Modal
-# image for a specific task_id BEFORE the agent loop starts. When the terminal or
-# file tools create a new sandbox for that task_id, they check this registry first
-# and fall back to the TERMINAL_MODAL_IMAGE (etc.) env var if no override is set.
+# External code (benchmark harnesses, plugins) can specify a custom Docker
+# image or cwd for a specific task_id BEFORE the agent loop starts. When the
+# terminal or file tools create a new sandbox for that task_id, they check
+# this registry first and fall back to the global config when no override is
+# set.
 #
-# This is never exposed to the model -- only infrastructure code calls it.
+# Never exposed to the model — only infrastructure code calls it.
 # Thread-safe because each task_id is unique per rollout.
 _task_env_overrides: Dict[str, Dict[str, Any]] = {}
 
 
 def register_task_env_overrides(task_id: str, overrides: Dict[str, Any]):
-    """
-    Register environment overrides for a specific task/rollout.
-
-    Called by Atropos environments before the agent loop to configure
-    per-task sandbox settings (e.g., a custom Dockerfile for the Modal image).
+    """Register environment overrides for a specific task.
 
     Supported override keys:
-        - modal_image: str -- Path to Dockerfile or Docker Hub image name
-        - docker_image: str -- Docker image name
-        - cwd: str -- Working directory inside the sandbox
-
-    Args:
-        task_id: The rollout's unique task identifier
-        overrides: Dict of config keys to override
+        - docker_image: str — Docker image name
+        - cwd: str — Working directory inside the sandbox
     """
     _task_env_overrides[task_id] = overrides
 
 
 def clear_task_env_overrides(task_id: str):
-    """
-    Clear environment overrides for a task after rollout completes.
-
-    Called during cleanup to avoid stale entries accumulating.
-    """
+    """Clear environment overrides for a task after it completes."""
     _task_env_overrides.pop(task_id, None)
 
 
@@ -827,12 +810,10 @@ def _resolve_container_task_id(task_id: Optional[str]) -> str:
     ``"default"`` here so subagents share the parent's long-lived container
     (one bash, one /workspace, one set of installed packages).
 
-    Exception: RL / benchmark environments (TerminalBench2, TalariaSweEnv, ...)
-    call ``register_task_env_overrides(task_id, {...})`` to request a
-    per-task Docker/Modal image. When an override is registered for a
-    task_id, we honour it by returning the task_id unchanged -- those
-    rollouts need their own isolated sandbox, which is the whole point of
-    the override.
+    Exception: external code that calls ``register_task_env_overrides(
+    task_id, {...})`` to request a per-task Docker image gets the
+    task_id back unchanged — those callers need their own isolated
+    sandbox, which is the whole point of the override.
     """
     if task_id and task_id in _task_env_overrides:
         return task_id
@@ -989,8 +970,8 @@ def _cleanup_inactive_envs(lifetime_seconds: int = 300):
         pass
 
     # Phase 1: collect stale entries and remove them from tracking dicts while
-    # holding the lock.  Do NOT call env.cleanup() inside the lock -- Modal and
-    # Docker teardown can block for 10-15s, which would stall every concurrent
+    # holding the lock.  Do NOT call env.cleanup() inside the lock -- Docker
+    # teardown can block for 10-15s, which would stall every concurrent
     # terminal/file tool call waiting on _env_lock.
     envs_to_stop = []  # list of (task_id, env) pairs
 
@@ -1008,7 +989,7 @@ def _cleanup_inactive_envs(lifetime_seconds: int = 300):
                 _creation_locks.pop(task_id, None)
 
     # Phase 2: stop the actual sandboxes OUTSIDE the lock so other tool calls
-    # are not blocked while Modal/Docker sandboxes shut down.
+    # are not blocked while Docker sandboxes shut down.
     for task_id, env in envs_to_stop:
         # Invalidate stale file_ops cache entry (Bug fix: prevents
         # ShellFileOperations from referencing a dead sandbox)
@@ -1085,9 +1066,9 @@ def is_persistent_env(task_id: str) -> bool:
     cross-turn persistence (``persistent_filesystem=True``).
 
     Used by the agent loop to skip per-turn teardown for backends whose whole
-    point is to survive between turns (docker with ``container_persistent``,
-    daytona, modal, etc.). Non-persistent backends (e.g. Morph) still get torn
-    down at end-of-turn to prevent leakage. The idle reaper
+    point is to survive between turns (docker with ``container_persistent``).
+    Non-persistent backends still get torn down at end-of-turn to prevent
+    leakage. The idle reaper
     (``_cleanup_inactive_envs``) handles persistent envs once they exceed
     ``terminal.lifetime_seconds``.
     """
@@ -1458,7 +1439,7 @@ def terminal_tool(
         # Get or create environment.
         # Use a per-task creation lock so concurrent tool calls for the same
         # task_id wait for the first one to finish creating the sandbox,
-        # instead of each creating their own (wasting Modal resources).
+        # instead of each creating their own.
         with _env_lock:
             if effective_task_id in _active_environments:
                 _last_activity[effective_task_id] = time.time()
@@ -1903,9 +1884,6 @@ if __name__ == "__main__":
         "(local/docker/ssh)"
     )
     print(f"  TERMINAL_DOCKER_IMAGE: {os.getenv('TERMINAL_DOCKER_IMAGE', default_img)}")
-    print(f"  TERMINAL_SINGULARITY_IMAGE: {os.getenv('TERMINAL_SINGULARITY_IMAGE', f'docker://{default_img}')}")
-    print(f"  TERMINAL_MODAL_IMAGE: {os.getenv('TERMINAL_MODAL_IMAGE', default_img)}")
-    print(f"  TERMINAL_DAYTONA_IMAGE: {os.getenv('TERMINAL_DAYTONA_IMAGE', default_img)}")
     print(f"  TERMINAL_CWD: {os.getenv('TERMINAL_CWD', os.getcwd())}")
     from talaria_constants import display_talaria_home as _dhh
     print(f"  TERMINAL_SANDBOX_DIR: {os.getenv('TERMINAL_SANDBOX_DIR', f'{_dhh()}/sandboxes')}")

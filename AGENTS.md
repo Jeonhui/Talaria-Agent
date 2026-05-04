@@ -32,25 +32,21 @@ talaria-agent/
 ├── agent/                # Agent internals (provider adapters, memory, caching, compression, etc.)
 ├── talaria_cli/           # CLI subcommands, setup wizard, plugins loader, skin engine
 ├── tools/                # Tool implementations — auto-discovered via tools/registry.py
-│   └── environments/     # Terminal backends (local, docker, ssh, modal, daytona, singularity)
+│   └── environments/     # Terminal backends (local, docker, ssh)
 ├── gateway/              # Messaging gateway — run.py + session.py + platforms/
-│   ├── platforms/        # Adapter per platform (telegram, discord, slack, whatsapp,
-│   │                     #   homeassistant, signal, matrix, mattermost, email, sms,
-│   │                     #   dingtalk, wecom, weixin, feishu, qqbot, bluebubbles,
-│   │                     #   webhook, api_server, ...). See ADDING_A_PLATFORM.md.
+│   ├── platforms/        # Adapter per platform (discord, slack, telegram).
+│   │                     # See ADDING_A_PLATFORM.md.
 │   └── builtin_hooks/    # Extension point for always-registered gateway hooks (none shipped)
 ├── plugins/              # Plugin system (see "Plugins" section below)
-│   ├── memory/           # Memory-provider plugins (honcho, mem0, supermemory, ...)
+│   ├── memory/           # Memory-provider plugins (user-installable)
 │   ├── context_engine/   # Context-engine plugins
 │   └── <others>/         # Dashboard, image-gen, disk-cleanup, examples, ...
 ├── optional-skills/      # Heavier/niche skills shipped but NOT active by default
 ├── skills/               # Built-in skills bundled with the repo
 ├── acp_adapter/          # ACP server (VS Code / Zed / JetBrains integration)
 ├── cron/                 # Scheduler — jobs.py, scheduler.py
-├── environments/         # RL training environments (Atropos)
 ├── scripts/              # run_tests.sh, release.py, auxiliary scripts
-├── website/              # Docusaurus docs site
-└── tests/                # Pytest suite (~15k tests across ~700 files as of Apr 2026)
+└── tests/                # Pytest suite
 ```
 
 **User config:** `~/.talaria/config.yaml` (settings), `~/.talaria/.env` (API keys only).
@@ -390,9 +386,9 @@ explicitly (it's idempotent).
 
 ### Memory-provider plugins (`plugins/memory/<name>/`)
 
-Separate discovery system for pluggable memory backends. Current built-in
-providers include **honcho, mem0, supermemory, byterover, hindsight,
-holographic, openviking, retaindb**.
+Separate discovery system for pluggable memory backends. Talaria ships
+only the always-on built-in (`MEMORY.md` / `USER.md`); external providers
+are user-installable via `talaria plugins install <repo>`.
 
 Each provider implements the `MemoryProvider` ABC (see `agent/memory_provider.py`)
 and is orchestrated by `agent/memory_manager.py`. Lifecycle hooks include
@@ -406,12 +402,11 @@ framework only exposes CLI commands for the **currently active** memory
 provider (read from `memory.provider` in config.yaml), so disabled
 providers don't clutter `talaria --help`.
 
-**Rule (Teknium, May 2026):** plugins MUST NOT modify core files
-(`run_agent.py`, `cli.py`, `gateway/run.py`, `talaria_cli/main.py`, etc.).
-If a plugin needs a capability the framework doesn't expose, expand the
-generic plugin surface (new hook, new ctx method) — never hardcode
-plugin-specific logic into core. PR #5295 removed 95 lines of hardcoded
-honcho argparse from `main.py` for exactly this reason.
+**Rule:** plugins MUST NOT modify core files (`run_agent.py`, `cli.py`,
+`gateway/run.py`, `talaria_cli/main.py`, etc.). If a plugin needs a
+capability the framework doesn't expose, expand the generic plugin
+surface (new hook, new ctx method) — never hardcode plugin-specific
+logic into core.
 
 ### Dashboard / context-engine / image-gen plugin directories
 

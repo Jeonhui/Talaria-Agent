@@ -4,8 +4,6 @@ Standalone Web Tools Module
 
 This module provides generic web tools that work with multiple backend providers.
 Backend is selected during ``talaria tools`` setup (web.backend in config.yaml).
-When available, Talaria can route Firecrawl calls through a Nous-hosted tool-gateway
-for Nous Subscribers only.
 
 Available tools:
 - web_search_tool: Search the web for information
@@ -14,7 +12,7 @@ Available tools:
 
 Backend compatibility:
 - Exa: https://exa.ai (search, extract)
-- Firecrawl: https://docs.firecrawl.dev/introduction (search, extract, crawl; direct or derived firecrawl-gateway.<domain> for Nous Subscribers)
+- Firecrawl: https://docs.firecrawl.dev/introduction (search, extract, crawl)
 - Parallel: https://docs.parallel.ai (search, extract)
 - Tavily: https://tavily.com (search, extract, crawl)
 
@@ -92,12 +90,6 @@ from agent.auxiliary_client import (
     get_async_text_auxiliary_client,
 )
 from tools.debug_helpers import DebugSession
-from tools.managed_tool_gateway import (
-    build_vendor_gateway_url,
-    read_nous_access_token as _read_nous_access_token,
-    resolve_managed_tool_gateway,
-)
-from tools.tool_backend_helpers import prefers_gateway
 from tools.url_safety import is_safe_url
 from tools.website_policy import check_website_access
 
@@ -130,10 +122,9 @@ def _get_backend() -> str:
         return configured
 
     # Fallback for manual / legacy config — pick the highest-priority
-    # available backend. Firecrawl also counts as available when the managed
-    # tool gateway is configured for Nous subscribers.
+    # available backend.
     backend_candidates = (
-        ("firecrawl", _has_env("FIRECRAWL_API_KEY") or _has_env("FIRECRAWL_API_URL") or _is_tool_gateway_ready()),
+        ("firecrawl", _has_env("FIRECRAWL_API_KEY") or _has_env("FIRECRAWL_API_URL")),
         ("parallel", _has_env("PARALLEL_API_KEY")),
         ("tavily", _has_env("TAVILY_API_KEY")),
         ("exa", _has_env("EXA_API_KEY")),
@@ -180,16 +171,6 @@ def _get_direct_firecrawl_config() -> Optional[tuple[Dict[str, str], tuple[str, 
     return kwargs, ("direct", api_url or None, api_key or None)
 
 
-def _get_firecrawl_gateway_url() -> str:
-    """Return configured Firecrawl gateway URL."""
-    return build_vendor_gateway_url("firecrawl")
-
-
-def _is_tool_gateway_ready() -> bool:
-    """Return True when gateway URL and a Nous Subscriber token are available."""
-    return resolve_managed_tool_gateway("firecrawl", token_reader=_read_nous_access_token) is not None
-
-
 def _has_direct_firecrawl_config() -> bool:
     """Return True when direct Firecrawl config is explicitly configured."""
     return _get_direct_firecrawl_config() is not None
@@ -202,11 +183,6 @@ def _raise_web_backend_configuration_error() -> None:
         "Set FIRECRAWL_API_KEY for cloud Firecrawl or set FIRECRAWL_API_URL for a self-hosted Firecrawl instance."
     )
     raise ValueError(message)
-
-
-def _firecrawl_backend_help_suffix() -> str:
-    """Return optional managed-gateway guidance for Firecrawl help text."""
-    return ""
 
 
 def _web_requires_env() -> list[str]:
@@ -224,33 +200,17 @@ def _web_requires_env() -> list[str]:
 def _get_firecrawl_client():
     """Get or create Firecrawl client.
 
-    When ``web.use_gateway`` is set in config, the Tool Gateway is preferred
-    even if direct Firecrawl credentials are present.  Otherwise direct
-    Firecrawl takes precedence when explicitly configured.
+    Requires direct Firecrawl credentials (``FIRECRAWL_API_KEY`` and/or
+    ``FIRECRAWL_API_URL``).
     """
     global _firecrawl_client, _firecrawl_client_config
 
     direct_config = _get_direct_firecrawl_config()
-    if direct_config is not None and not prefers_gateway("web"):
-        kwargs, client_config = direct_config
-    else:
-        managed_gateway = resolve_managed_tool_gateway(
-            "firecrawl",
-            token_reader=_read_nous_access_token,
-        )
-        if managed_gateway is None:
-            logger.error("Firecrawl client initialization failed: missing direct config and tool-gateway auth.")
-            _raise_web_backend_configuration_error()
+    if direct_config is None:
+        logger.error("Firecrawl client initialization failed: missing direct config.")
+        _raise_web_backend_configuration_error()
 
-        kwargs = {
-            "api_key": managed_gateway.nous_user_token,
-            "api_url": managed_gateway.gateway_origin,
-        }
-        client_config = (
-            "tool-gateway",
-            kwargs["api_url"],
-            managed_gateway.nous_user_token,
-        )
+    kwargs, client_config = direct_config
 
     if _firecrawl_client is not None and _firecrawl_client_config == client_config:
         return _firecrawl_client
@@ -464,27 +424,12 @@ def _extract_scrape_payload(scrape_result: Any) -> Dict[str, Any]:
 
 DEFAULT_MIN_LENGTH_FOR_SUMMARIZATION = 5000
 
-def _is_nous_auxiliary_client(client: Any) -> bool:
-    """Return True when the resolved auxiliary backend is Nous Portal."""
-    from urllib.parse import urlparse
-
-    base_url = str(getattr(client, "base_url", "") or "")
-    host = (urlparse(base_url).hostname or "").lower()
-    return host == "nousresearch.com" or host.endswith(".nousresearch.com")
-
-
 def _resolve_web_extract_auxiliary(model: Optional[str] = None) -> tuple[Optional[Any], Optional[str], Dict[str, Any]]:
     """Resolve the current web-extract auxiliary client, model, and extra body."""
     client, default_model = get_async_text_auxiliary_client("web_extract")
     configured_model = os.getenv("AUXILIARY_WEB_EXTRACT_MODEL", "").strip()
     effective_model = model or configured_model or default_model
-
-    extra_body: Dict[str, Any] = {}
-    if client is not None and _is_nous_auxiliary_client(client):
-        from agent.auxiliary_client import get_auxiliary_extra_body
-        extra_body = get_auxiliary_extra_body() or {"tags": ["product=talaria-agent"]}
-
-    return client, effective_model, extra_body
+    return client, effective_model, {}
 
 
 def _get_default_summarizer_model() -> Optional[str]:
@@ -1653,11 +1598,10 @@ async def web_crawl_tool(
             _debug.save()
             return cleaned_result
 
-        # web_crawl requires Firecrawl or the Firecrawl tool-gateway — Parallel has no crawl API
+        # web_crawl requires Firecrawl — Parallel/Exa/Tavily have no crawl API
         if not check_firecrawl_api_key():
             return json.dumps({
-                "error": "web_crawl requires Firecrawl. Set FIRECRAWL_API_KEY, FIRECRAWL_API_URL"
-                         f"{_firecrawl_backend_help_suffix()}, or use web_search + web_extract instead.",
+                "error": "web_crawl requires Firecrawl. Set FIRECRAWL_API_KEY or FIRECRAWL_API_URL, or use web_search + web_extract instead.",
                 "success": False,
             }, ensure_ascii=False)
 
@@ -1931,18 +1875,11 @@ async def web_crawl_tool(
 
 # Convenience function to check Firecrawl credentials
 def check_firecrawl_api_key() -> bool:
-    """
-    Check whether the Firecrawl backend is available.
+    """Return True when Firecrawl direct config is available.
 
-    Availability is true when either:
-    1) direct Firecrawl config (`FIRECRAWL_API_KEY` or `FIRECRAWL_API_URL`), or
-    2) Firecrawl gateway origin + Nous Subscriber access token
-       (fallback when direct Firecrawl is not configured).
-
-    Returns:
-        bool: True if direct Firecrawl or the tool-gateway can be used.
+    Direct config = ``FIRECRAWL_API_KEY`` or ``FIRECRAWL_API_URL``.
     """
-    return _has_direct_firecrawl_config() or _is_tool_gateway_ready()
+    return _has_direct_firecrawl_config()
 
 
 def check_web_api_key() -> bool:
@@ -1970,10 +1907,9 @@ if __name__ == "__main__":
     
     # Check if API keys are available
     web_available = check_web_api_key()
-    tool_gateway_available = _is_tool_gateway_ready()
     firecrawl_key_available = bool(os.getenv("FIRECRAWL_API_KEY", "").strip())
     firecrawl_url_available = bool(os.getenv("FIRECRAWL_API_URL", "").strip())
-    nous_available = check_auxiliary_model()
+    aux_available = check_auxiliary_model()
     default_summarizer_model = _get_default_summarizer_model()
 
     if web_available:
@@ -1990,20 +1926,15 @@ if __name__ == "__main__":
                 print(f"   Using self-hosted Firecrawl: {os.getenv('FIRECRAWL_API_URL').strip().rstrip('/')}")
             elif firecrawl_key_available:
                 print("   Using direct Firecrawl cloud API")
-            elif tool_gateway_available:
-                print(f"   Using Firecrawl tool-gateway: {_get_firecrawl_gateway_url()}")
             else:
                 print("   Firecrawl backend selected but not configured")
     else:
         print("❌ No web search backend configured")
-        print(
-            "Set EXA_API_KEY, PARALLEL_API_KEY, TAVILY_API_KEY, FIRECRAWL_API_KEY, FIRECRAWL_API_URL"
-            f"{_firecrawl_backend_help_suffix()}"
-        )
+        print("Set EXA_API_KEY, PARALLEL_API_KEY, TAVILY_API_KEY, FIRECRAWL_API_KEY, or FIRECRAWL_API_URL")
 
-    if not nous_available:
+    if not aux_available:
         print("❌ No auxiliary model available for LLM content processing")
-        print("Set OPENROUTER_API_KEY, configure Nous Portal, or set OPENAI_BASE_URL + OPENAI_API_KEY")
+        print("Set OPENROUTER_API_KEY, OPENAI_API_KEY, or OPENAI_BASE_URL + OPENAI_API_KEY")
         print("⚠️  Without an auxiliary model, LLM content processing will be disabled")
     else:
         print(f"✅ Auxiliary model available: {default_summarizer_model}")
@@ -2012,8 +1943,8 @@ if __name__ == "__main__":
         exit(1)
 
     print("🛠️  Web tools ready for use!")
-    
-    if nous_available:
+
+    if aux_available:
         print(f"🧠 LLM content processing available with {default_summarizer_model}")
         print(f"   Default min length for processing: {DEFAULT_MIN_LENGTH_FOR_SUMMARIZATION} chars")
     
@@ -2037,7 +1968,7 @@ if __name__ == "__main__":
     print("      crawl_data = await web_crawl_tool('example.com', 'Find docs')")
     print("  asyncio.run(main())")
     
-    if nous_available:
+    if aux_available:
         print("\nLLM-enhanced usage:")
         print("  # Content automatically processed for pages >5000 chars (default)")
         print("  content = await web_extract_tool(['https://python.org/about/'])")

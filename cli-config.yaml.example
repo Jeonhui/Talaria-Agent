@@ -12,24 +12,11 @@ model:
   
   # Inference provider selection:
   #   "auto"         - Auto-detect from credentials (default)
-  #   "openrouter"   - OpenRouter (requires: OPENROUTER_API_KEY or OPENAI_API_KEY)
-  #   "nous"         - Nous Portal OAuth (requires: talaria login)
-  #   "nous-api"     - Nous Portal API key (requires: NOUS_API_KEY)
   #   "anthropic"    - Direct Anthropic API (requires: ANTHROPIC_API_KEY)
+  #   "openai"       - Direct OpenAI API (requires: OPENAI_API_KEY)
   #   "openai-codex" - OpenAI Codex (requires: talaria auth)
-  #   "copilot"      - GitHub Copilot / GitHub Models (requires: GITHUB_TOKEN)
-  #   "gemini"      - Use Google AI Studio direct (requires: GOOGLE_API_KEY or GEMINI_API_KEY)
-  #   "zai"         - Use z.ai / ZhipuAI GLM models (requires: GLM_API_KEY)
-  #   "kimi-coding"  - Kimi / Moonshot AI (requires: KIMI_API_KEY)
-  #   "minimax"      - MiniMax global (requires: MINIMAX_API_KEY)
-  #   "minimax-cn"   - MiniMax China (requires: MINIMAX_CN_API_KEY)
-  #   "huggingface"  - Hugging Face Inference (requires: HF_TOKEN)
-  #   "nvidia"       - NVIDIA NIM / build.nvidia.com (requires: NVIDIA_API_KEY)
+  #   "openrouter"   - OpenRouter (requires: OPENROUTER_API_KEY)
   #   "xiaomi"       - Xiaomi MiMo (requires: XIAOMI_API_KEY)
-  #   "arcee"        - Arcee AI Trinity models (requires: ARCEEAI_API_KEY)
-  #   "ollama-cloud" - Ollama Cloud (requires: OLLAMA_API_KEY — https://ollama.com/settings)
-  #   "kilocode"     - KiloCode gateway (requires: KILOCODE_API_KEY)
-  #   "ai-gateway"   - Vercel AI Gateway (requires: AI_GATEWAY_API_KEY)
   #   "lmstudio"     - LM Studio local server (optional: LM_API_KEY, defaults to http://127.0.0.1:1234/v1)
   #
   # Local servers (LM Studio, Ollama, vLLM, llama.cpp):
@@ -192,47 +179,9 @@ terminal:
 #     - "GITHUB_TOKEN"
 #     - "NPM_TOKEN"
 
-# -----------------------------------------------------------------------------
-# OPTION 4: Singularity/Apptainer container
-# Commands run in a Singularity container (common in HPC environments)
-# Great for: HPC clusters, shared compute environments
-# -----------------------------------------------------------------------------
-# terminal:
-#   backend: "singularity"
-#   cwd: "/workspace"  # Path INSIDE the container (default: /root)
-#   timeout: 180
-#   lifetime_seconds: 300
-#   singularity_image: "docker://nikolaik/python-nodejs:python3.11-nodejs20"
-
-# -----------------------------------------------------------------------------
-# OPTION 5: Modal cloud execution
-# Commands run on Modal's cloud infrastructure
-# Great for: GPU access, scalable compute, serverless execution
-# -----------------------------------------------------------------------------
-# terminal:
-#   backend: "modal"
-#   cwd: "/workspace"  # Path INSIDE the sandbox (default: /root)
-#   timeout: 180
-#   lifetime_seconds: 300
-#   modal_image: "nikolaik/python-nodejs:python3.11-nodejs20"
-
-# -----------------------------------------------------------------------------
-# OPTION 6: Daytona cloud execution
-# Commands run in Daytona cloud sandboxes
-# Great for: Cloud dev environments, persistent workspaces, team collaboration
-# Requires: pip install daytona, DAYTONA_API_KEY env var
-# -----------------------------------------------------------------------------
-# terminal:
-#   backend: "daytona"
-#   cwd: "~"
-#   timeout: 180
-#   lifetime_seconds: 300
-#   daytona_image: "nikolaik/python-nodejs:python3.11-nodejs20"
-#   container_disk: 10240          # Daytona max is 10GB per sandbox
-
 #
-# --- Container resource limits (docker, singularity, modal, daytona -- ignored for local/ssh) ---
-# These settings apply to all container backends. They control the resources
+# --- Container resource limits (docker only -- ignored for local/ssh) ---
+# These settings apply to the docker backend. They control the resources
 # allocated to the sandbox and whether its filesystem persists across sessions.
   container_cpu: 1              # CPU cores
   container_memory: 5120        # Memory in MB (5120 = 5GB)
@@ -346,12 +295,12 @@ prompt_caching:
 # Talaria uses lightweight "auxiliary" models for side tasks: image analysis,
 # browser screenshot analysis, web page summarization, and context compression.
 #
-# By default these use Gemini Flash via OpenRouter or Nous Portal and are
-# auto-detected from your credentials.  You do NOT need to change anything
-# here for normal usage.
+# By default these use Gemini Flash via OpenRouter and are auto-detected
+# from your credentials.  You do NOT need to change anything here for
+# normal usage.
 #
-# WARNING: Overriding these with providers other than OpenRouter or Nous Portal
-# is EXPERIMENTAL and may not work.  Not all models/providers support vision,
+# WARNING: Overriding these with providers other than OpenRouter is
+# EXPERIMENTAL and may not work.  Not all models/providers support vision,
 # produce usable summaries, or accept the same API format.  Change at your own
 # risk — if things break, reset to "auto" / empty values.
 #
@@ -360,20 +309,16 @@ prompt_caching:
 # local endpoint for compression (just needs text).
 #
 # Provider options:
-#   "auto"       - Best available: OpenRouter → Nous Portal → main endpoint (default)
+#   "auto"       - Best available: OpenRouter → main endpoint (default)
 #   "openrouter" - Force OpenRouter (requires OPENROUTER_API_KEY)
-#   "nous"       - Force Nous Portal (requires: talaria login)
-#   "gemini"      - Force Google AI Studio direct (requires: GOOGLE_API_KEY or GEMINI_API_KEY)
-#   "ollama-cloud" - Ollama Cloud (requires: OLLAMA_API_KEY)
 #   "codex"       - Force Codex OAuth (requires: talaria model → Codex).
 #                  Uses gpt-5.3-codex which supports vision.
 #   "main"       - Use your custom endpoint (OPENAI_BASE_URL + OPENAI_API_KEY).
 #                  Works with OpenAI API, local models, or any OpenAI-compatible
 #                  endpoint.  Also falls back to Codex OAuth and API-key providers.
 #
-# Model: leave empty to use the provider's default.  When empty, OpenRouter
-# uses "google/gemini-3-flash-preview" and Nous uses "gemini-3-flash".
-# Other providers pick a sensible default automatically.
+# Model: leave empty to use the provider's default.  Other providers pick a
+# sensible default automatically.
 #
 # auxiliary:
 #   # Image analysis: vision_analyze tool + browser screenshots
@@ -532,7 +477,7 @@ agent:
   # Enable verbose logging
   verbose: false
   
-  # Reasoning effort level (OpenRouter and Nous Portal)
+  # Reasoning effort level (OpenRouter)
   # Controls how much "thinking" the model does before responding.
   # Options: "xhigh" (max), "high", "medium", "low", "minimal", "none" (disable)
   reasoning_effort: "medium"
@@ -570,7 +515,7 @@ agent:
 #   - A preset like "talaria-cli" or "talaria-telegram" (curated tool set)
 #   - A list of individual toolsets to compose your own (see list below)
 #
-# Supported platform keys: cli, telegram, discord, whatsapp, slack, qqbot, teams
+# Supported platform keys: cli, discord, slack, telegram
 #
 # Examples:
 #
@@ -592,27 +537,16 @@ agent:
 #     discord: [web, vision, skills, todo]
 #
 # If not set, defaults are:
-#   cli:           talaria-cli            (everything + cronjob management)
-#   telegram:      talaria-telegram       (terminal, file, web, vision, image, tts, browser, skills, todo, cronjob, messaging)
-#   discord:       talaria-discord        (same as telegram)
-#   whatsapp:      talaria-whatsapp       (same as telegram)
-#   slack:         talaria-slack          (same as telegram)
-#   signal:        talaria-signal         (same as telegram)
-#   homeassistant: talaria-homeassistant  (same as telegram)
-#   qqbot:            talaria-qqbot            (same as telegram)
-#   teams:            talaria-teams            (same as telegram)
+#   cli:      talaria-cli      (everything + cronjob management)
+#   telegram: talaria-telegram (terminal, file, web, vision, image, browser, skills, todo, cronjob, messaging)
+#   discord:  talaria-discord  (same as telegram)
+#   slack:    talaria-slack    (same as telegram)
 #
 platform_toolsets:
   cli: [talaria-cli]
   telegram: [talaria-telegram]
   discord: [talaria-discord]
-  whatsapp: [talaria-whatsapp]
   slack: [talaria-slack]
-  signal: [talaria-signal]
-  homeassistant: [talaria-homeassistant]
-  qqbot: [talaria-qqbot]
-  yuanbao: [talaria-yuanbao]
-  teams: [talaria-teams]
 
 # =============================================================================
 # Gateway Platform Settings
@@ -649,14 +583,12 @@ platform_toolsets:
 #   todo         - todo (in-memory task planning, no deps)
 #   tts          - text_to_speech  (Edge TTS free, or ELEVENLABS/OPENAI/MINIMAX/MISTRAL key)
 #   cronjob      - cronjob (create/list/update/pause/resume/run/remove scheduled tasks)
-#   rl           - rl_list_environments, rl_start_training, etc. (requires TINKER_API_KEY)
 #
 # PRESETS (curated bundles):
-#   talaria-cli       - All of the above except rl + send_message
+#   talaria-cli       - All of the above + send_message
 #   talaria-telegram  - terminal, file, web, vision, image_gen, tts, browser,
 #                      skills, todo, cronjob, send_message
 #   talaria-discord   - Same as talaria-telegram
-#   talaria-whatsapp  - Same as talaria-telegram
 #   talaria-slack     - Same as talaria-telegram
 #
 # COMPOSITE:
@@ -676,9 +608,8 @@ platform_toolsets:
 #   todo         - Task planning and tracking for multi-step work
 #   memory       - Persistent memory across sessions (personal notes + user profile)
 #   session_search - Search and recall past conversations (FTS5 + Gemini Flash summarization)
-#   tts          - Text-to-speech (Edge TTS free, ElevenLabs, OpenAI, MiniMax, Mistral)
+#   tts          - Text-to-speech (configurable per provider)
 #   cronjob      - Schedule and manage automated tasks (CLI-only)
-#   rl           - RL training tools (Tinker-Atropos)
 #
 # Composite toolsets:
 #   debugging    - terminal + web + file (for troubleshooting)
@@ -811,21 +742,7 @@ delegation:
   # model: "google/gemini-3-flash-preview"    # Override model for subagents (empty = inherit parent)
   # provider: "openrouter"                    # Override provider for subagents (empty = inherit parent)
   #                                           # Resolves full credentials (base_url, api_key) automatically.
-  #                                           # Supported: openrouter, nous, zai, kimi-coding, minimax
-
-# =============================================================================
-# Honcho Integration (Cross-Session User Modeling)
-# =============================================================================
-# AI-native persistent memory via Honcho (https://honcho.dev/).
-# Builds a deeper understanding of the user across sessions and tools.
-# Runs alongside USER.md — additive, not a replacement.
-#
-# Requires: pip install honcho-ai
-# Config: ~/.honcho/config.json (shared with Claude Code, Cursor, etc.)
-# API key: HONCHO_API_KEY in ~/.talaria/.env or ~/.honcho/config.json
-#
-# Talaria-specific overrides (optional — most config comes from ~/.honcho/config.json):
-# honcho: {}
+  #                                           # Supported: anthropic, openai, openrouter, xiaomi, custom
 
 # =============================================================================
 # Display

@@ -111,10 +111,9 @@ _COMMAND_TAIL = r'(?:\s*(?:&&|\|\||;).*)?$'
 # box off.
 #
 # Hardline only applies to environments that can actually damage the host
-# (local, ssh, container-host cron).  Containerized backends (docker,
-# singularity, modal, daytona) already bypass the dangerous-command layer
-# because nothing they do can touch the host, so we leave that behavior
-# alone.
+# (local, ssh, container-host cron).  Containerized backends (docker)
+# already bypass the dangerous-command layer because nothing they do can
+# touch the host, so we leave that behavior alone.
 #
 # The list is deliberately tiny — only things with no recovery path:
 # filesystem destruction rooted at /, raw block device overwrites, kernel

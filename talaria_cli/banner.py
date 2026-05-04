@@ -76,18 +76,17 @@ TALARIA_AGENT_LOGO = """[bold #FFD700]
    ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝
 [/]"""
 
-TALARIA_CADUCEUS = """[bold #FFD700]⠀⠀⢀⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[bold #FFD700]⠀⠈⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠉⠛⠿⣿⣿⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠈⠉⠻⢿⣿⣿⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣿⣶⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+TALARIA_CADUCEUS = """[bold #FFD700]⠀⠀⠀⠀⢀⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[bold #FFD700]⠀⠀⠈⢿⣷⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#FFD700]⠀⠀⠀⠀⠀⠉⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
+[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
 [#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣀⣀⣀⡀⠀⠀⠈⠙⠿⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⡾⠋⠉⠙⠳⣦⡀⠀⠀⠀⠈⠙⢿⣿⣆⡀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠘⡇⠀⠀⠀⠀⠀⠈⠻⠿⠃⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠳⣄⡀⠀⢀⡴⠋⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⢀⣀⣤⣤⣤⣤⣤⣤⣤⣤⣬⣷⣶⣟⣁⣤⣤⣤⣤⣤⣤⣄⣀⡀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠈⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁⠀⠀⠀[/]"""
+[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⢀⣠⣤⣄⡀⠀⠀⠀⠀⠀⠈⠙⠿⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀[/]
+[#CD7F32]⠀⠀⠀⠀⠀⢠⣾⠟⠉⠉⠻⣷⡀⠀⠀⠀⠀⠀⠀⠈⠹⢿⣿⣷⡀⠀⠀⠀⠀⠀[/]
+[#CD7F32]⠀⠀⠀⠀⠀⢸⣿⣄⣀⣀⣠⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠿⠿⠀⠀⠀⠀⠀[/]
+[#B8860B]⠀⠀⠀⢀⣀⣤⣤⣤⣤⣤⣤⣤⣬⣷⣶⣟⣁⣤⣤⣤⣤⣤⣤⣄⣀⡀⠀⠀⠀⠀[/]
+[#B8860B]⠀⠀⠀⠀⠈⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁⠀⠀⠀⠀[/]"""
 
 
 
@@ -422,7 +421,7 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
 
     _, unavailable_toolsets = check_tool_availability(quiet=True)
     disabled_tools = set()
-    # Tools whose toolset has a check_fn are lazy-initialized (e.g. honcho,
+    # Tools whose toolset has a check_fn are lazy-initialized (e.g.
     # homeassistant) — they show as unavailable at banner time because the
     # check hasn't run yet, but they aren't misconfigured.
     lazy_tools = set()

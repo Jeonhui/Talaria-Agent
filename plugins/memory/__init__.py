@@ -308,9 +308,8 @@ class _ProviderCollector:
 def _get_active_memory_provider() -> Optional[str]:
     """Read the active memory provider name from config.yaml.
 
-    Returns the provider name (e.g. ``"honcho"``) or None if no
-    external provider is configured.  Lightweight — only reads config,
-    no plugin loading.
+    Returns the provider name (string) or None if no external provider
+    is configured. Lightweight — only reads config, no plugin loading.
     """
     try:
         from talaria_cli.config import load_config

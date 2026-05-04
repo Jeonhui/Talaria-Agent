@@ -23,7 +23,7 @@ from talaria_cli.config import (
 )
 from talaria_cli.colors import Colors, color
 from tools.tool_backend_helpers import fal_key_is_configured
-from utils import base_url_hostname, is_truthy_value
+from utils import base_url_hostname
 
 logger = logging.getLogger(__name__)
 
@@ -118,16 +118,6 @@ TOOL_CATEGORIES = {
         "icon": "🔍",
         "providers": [
             {
-                "name": "Nous Subscription",
-                "badge": "subscription",
-                "tag": "Managed Firecrawl billed to your subscription",
-                "web_backend": "firecrawl",
-                "env_vars": [],
-                "requires_nous_auth": True,
-                "managed_nous_feature": "web",
-                "override_env_vars": ["FIRECRAWL_API_KEY", "FIRECRAWL_API_URL"],
-            },
-            {
                 "name": "Firecrawl Cloud",
                 "badge": "★ recommended",
                 "tag": "Full-featured search, extract, and crawl",
@@ -178,17 +168,6 @@ TOOL_CATEGORIES = {
         "name": "Browser Automation",
         "icon": "🌐",
         "providers": [
-            {
-                "name": "Nous Subscription (Browser Use cloud)",
-                "badge": "subscription",
-                "tag": "Managed Browser Use billed to your subscription",
-                "env_vars": [],
-                "browser_provider": "browser-use",
-                "requires_nous_auth": True,
-                "managed_nous_feature": "browser",
-                "override_env_vars": ["BROWSER_USE_API_KEY"],
-                "post_setup": "agent_browser",
-            },
             {
                 "name": "Local Browser",
                 "badge": "★ recommended · free",
@@ -420,35 +399,6 @@ def _run_post_setup(post_setup_key: str):
         except Exception as exc:
             _print_warning(f"    Spotify login failed: {exc}")
             _print_info("    Run manually: talaria auth spotify")
-
-    elif post_setup_key == "rl_training":
-        try:
-            __import__("tinker_atropos")
-        except ImportError:
-            tinker_dir = PROJECT_ROOT / "tinker-atropos"
-            if tinker_dir.exists() and (tinker_dir / "pyproject.toml").exists():
-                _print_info("    Installing tinker-atropos submodule...")
-                import subprocess
-                uv_bin = shutil.which("uv")
-                if uv_bin:
-                    result = subprocess.run(
-                        [uv_bin, "pip", "install", "--python", sys.executable, "-e", str(tinker_dir)],
-                        capture_output=True, text=True
-                    )
-                else:
-                    result = subprocess.run(
-                        [sys.executable, "-m", "pip", "install", "-e", str(tinker_dir)],
-                        capture_output=True, text=True
-                    )
-                if result.returncode == 0:
-                    _print_success("    tinker-atropos installed")
-                else:
-                    _print_warning("    tinker-atropos install failed - run manually:")
-                    _print_info('      uv pip install -e "./tinker-atropos"')
-            else:
-                _print_warning("    tinker-atropos submodule not found - run:")
-                _print_info("      git submodule update --init --recursive")
-                _print_info('      uv pip install -e "./tinker-atropos"')
 
     elif post_setup_key == "langfuse":
         # Install the langfuse SDK.
@@ -974,16 +924,10 @@ def _plugin_image_gen_providers() -> list[dict]:
 
 def _visible_providers(cat: dict, config: dict) -> list[dict]:
     """Return provider entries visible for the current auth/config state."""
-    visible = []
-    for provider in cat.get("providers", []):
-        if provider.get("managed_nous_feature"):
-            continue
-        if provider.get("requires_nous_auth"):
-            continue
-        visible.append(provider)
+    visible = list(cat.get("providers", []))
 
-    # Inject plugin-registered image_gen backends (OpenAI today, more
-    # later) so the picker lists them alongside FAL / Nous Subscription.
+    # Inject plugin-registered image_gen backends so the picker lists them
+    # alongside the built-in providers.
     if cat.get("name") == "Image Generation":
         visible.extend(_plugin_image_gen_providers())
 
@@ -1103,9 +1047,6 @@ def _is_provider_active(provider: dict, config: dict) -> bool:
         image_cfg = config.get("image_gen", {})
         return isinstance(image_cfg, dict) and image_cfg.get("provider") == plugin_name
 
-    if provider.get("managed_nous_feature"):
-        return False
-
     if provider.get("tts_provider"):
         return cfg_get(config, "tts", "provider") == provider["tts_provider"]
     if "browser_provider" in provider:
@@ -1122,7 +1063,6 @@ def _is_provider_active(provider: dict, config: dict) -> bool:
         return (
             provider["imagegen_backend"] == "fal"
             and configured_provider in (None, "", "fal")
-            and not is_truthy_value(image_cfg.get("use_gateway"), default=False)
         )
     return False
 
@@ -1316,7 +1256,6 @@ def _select_plugin_image_gen_provider(plugin_name: str, config: dict) -> None:
         img_cfg = {}
         config["image_gen"] = img_cfg
     img_cfg["provider"] = plugin_name
-    img_cfg["use_gateway"] = False
     _print_success(f"  image_gen.provider set to: {plugin_name}")
     _configure_imagegen_model_for_plugin(plugin_name, config)
 
@@ -1324,13 +1263,11 @@ def _select_plugin_image_gen_provider(plugin_name: str, config: dict) -> None:
 def _configure_provider(provider: dict, config: dict):
     """Configure a single provider - prompt for API keys and set config."""
     env_vars = provider.get("env_vars", [])
-    managed_feature = provider.get("managed_nous_feature")
 
     # Set TTS provider in config if applicable
     if provider.get("tts_provider"):
         tts_cfg = config.setdefault("tts", {})
         tts_cfg["provider"] = provider["tts_provider"]
-        tts_cfg["use_gateway"] = bool(managed_feature)
 
     # Set browser cloud provider in config if applicable
     if "browser_provider" in provider:
@@ -1342,28 +1279,12 @@ def _configure_provider(provider: dict, config: dict):
         elif bp:
             browser_cfg["cloud_provider"] = bp
             _print_success(f"  Browser cloud provider set to: {bp}")
-        browser_cfg["use_gateway"] = bool(managed_feature)
 
     # Set web search backend in config if applicable
     if provider.get("web_backend"):
         web_cfg = config.setdefault("web", {})
         web_cfg["backend"] = provider["web_backend"]
-        web_cfg["use_gateway"] = bool(managed_feature)
         _print_success(f"  Web backend set to: {provider['web_backend']}")
-
-    # For tools without a specific config key (e.g. image_gen), still
-    # track use_gateway so the runtime knows the user's intent.
-    if managed_feature and managed_feature not in ("web", "tts", "browser"):
-        config.setdefault(managed_feature, {})["use_gateway"] = True
-    elif not managed_feature:
-        # User picked a non-gateway provider — find which category this
-        # belongs to and clear use_gateway if it was previously set.
-        for cat_key, cat in TOOL_CATEGORIES.items():
-            if provider in cat.get("providers", []):
-                section = config.get(cat_key)
-                if isinstance(section, dict) and section.get("use_gateway"):
-                    section["use_gateway"] = False
-                break
 
     if not env_vars:
         if provider.get("post_setup"):
@@ -1569,7 +1490,6 @@ def _configure_tool_category_for_reconfig(ts_key: str, cat: dict, config: dict):
 def _reconfigure_provider(provider: dict, config: dict):
     """Reconfigure a provider - update API keys."""
     env_vars = provider.get("env_vars", [])
-    managed_feature = provider.get("managed_nous_feature")
 
     if provider.get("tts_provider"):
         config.setdefault("tts", {})["provider"] = provider["tts_provider"]
@@ -1589,20 +1509,6 @@ def _reconfigure_provider(provider: dict, config: dict):
         config.setdefault("web", {})["backend"] = provider["web_backend"]
         _print_success(f"  Web backend set to: {provider['web_backend']}")
 
-    if managed_feature and managed_feature not in ("web", "tts", "browser"):
-        section = config.setdefault(managed_feature, {})
-        if not isinstance(section, dict):
-            section = {}
-            config[managed_feature] = section
-        section["use_gateway"] = True
-    elif not managed_feature:
-        for cat_key, cat in TOOL_CATEGORIES.items():
-            if provider in cat.get("providers", []):
-                section = config.get(cat_key)
-                if isinstance(section, dict) and section.get("use_gateway"):
-                    section["use_gateway"] = False
-                break
-
     if not env_vars:
         if provider.get("post_setup"):
             _run_post_setup(provider["post_setup"])
@@ -1619,7 +1525,6 @@ def _reconfigure_provider(provider: dict, config: dict):
                 img_cfg = config.setdefault("image_gen", {})
                 if isinstance(img_cfg, dict):
                     img_cfg["provider"] = "fal"
-                    img_cfg["use_gateway"] = False
         return
 
     for var in env_vars:
@@ -1650,7 +1555,6 @@ def _reconfigure_provider(provider: dict, config: dict):
             img_cfg = config.setdefault("image_gen", {})
             if isinstance(img_cfg, dict):
                 img_cfg["provider"] = "fal"
-                img_cfg["use_gateway"] = False
 
 
 def _reconfigure_simple_requirements(ts_key: str):
@@ -1718,7 +1622,7 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
     print(color("⚕ Talaria Tool Configuration", Colors.CYAN, Colors.BOLD))
     print(color("  Enable or disable tools per platform.", Colors.DIM))
     print(color("  Tools that need API keys will be configured when enabled.", Colors.DIM))
-    print(color("  Guide: https://talaria-agent.nousresearch.com/docs/user-guide/features/tools", Colors.DIM))
+    print(color("  Guide: https://github.com/Jeonhui/Talaria-Agent", Colors.DIM))
     print()
 
     # ── First-time install: linear flow, no platform menu ──

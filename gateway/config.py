@@ -277,8 +277,8 @@ class StreamingConfig:
     edit_interval: float = 1.0    # Seconds between message edits (Telegram rate-limits at ~1/s)
     buffer_threshold: int = 40    # Chars before forcing an edit
     cursor: str = " ▉"           # Cursor shown during streaming
-    # Ported from openclaw/openclaw#72038.  When >0, the final edit for
-    # a long-running streamed response is delivered as a fresh message
+    # When >0, the final edit for a long-running streamed response is
+    # delivered as a fresh message
     # if the original preview has been visible for at least this many
     # seconds, so the platform's visible timestamp reflects completion
     # time instead of the preview creation time.  Currently applied to
@@ -961,8 +961,7 @@ def _validate_gateway_config(config: "GatewayConfig") -> None:
                 platform.value, env_name,
             )
 
-    # Reject known-weak placeholder tokens.
-    # Ported from openclaw/openclaw#64586: users who copy .env.example
+    # Reject known-weak placeholder tokens — users who copy .env.example
     # without changing placeholder values get a clear startup error instead
     # of a confusing "auth failed" from the platform API.
     try:

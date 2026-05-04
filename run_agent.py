@@ -978,7 +978,7 @@ class AIAgent:
                 NOTE: Anthropic Sonnet 4.6+ and Opus 4.6+ reject a conversation that ends on an
                 assistant-role message (400 error).  For those models use structured outputs or
                 output_config.format instead of a trailing-assistant prefill.
-            platform (str): The interface platform the user is on (e.g. "cli", "telegram", "discord", "whatsapp").
+            platform (str): The interface platform the user is on (e.g. "cli", "telegram", "discord", "slack").
                 Used to inject platform-specific formatting hints into the system prompt.
             skip_context_files (bool): If True, skip auto-injection of SOUL.md, AGENTS.md, and .cursorrules
                 into the system prompt. Use this for batch processing and data generation to avoid
@@ -999,7 +999,7 @@ class AIAgent:
         self.verbose_logging = verbose_logging
         self.quiet_mode = quiet_mode
         self.ephemeral_system_prompt = ephemeral_system_prompt
-        self.platform = platform  # "cli", "telegram", "discord", "whatsapp", etc.
+        self.platform = platform  # "cli", "telegram", "discord", "slack", etc.
         self._user_id = user_id  # Platform user identifier (gateway sessions)
         self._user_name = user_name
         self._chat_id = chat_id
@@ -1392,7 +1392,7 @@ class AIAgent:
                 effective_base = base_url
                 if base_url_host_matches(effective_base, "openrouter.ai"):
                     client_kwargs["default_headers"] = {
-                        "HTTP-Referer": "https://talaria-agent.nousresearch.com",
+                        "HTTP-Referer": "https://github.com/Jeonhui/Talaria-Agent",
                         "X-OpenRouter-Title": "Talaria Agent",
                         "X-OpenRouter-Categories": "productivity,cli-agent",
                     }
@@ -1689,7 +1689,6 @@ class AIAgent:
                             "agent_context": "primary",
                         }
                         # Thread session title for memory provider scoping
-                        # (e.g. honcho uses this to derive chat-scoped session keys)
                         if self._session_db:
                             try:
                                 _st = self._session_db.get_session_title(self.session_id)
@@ -1710,7 +1709,7 @@ class AIAgent:
                             _init_kwargs["chat_type"] = self._chat_type
                         if self._thread_id:
                             _init_kwargs["thread_id"] = self._thread_id
-                        # Thread gateway session key for stable per-chat Honcho session isolation
+                        # Thread gateway session key for per-chat session isolation
                         if self._gateway_session_key:
                             _init_kwargs["gateway_session_key"] = self._gateway_session_key
                         # Profile identity for per-profile provider scoping
@@ -1734,8 +1733,7 @@ class AIAgent:
         # Skip tools whose names already exist (plugins may register the
         # same tools via ctx.register_tool(), which lands in self.tools
         # through get_tool_definitions()).  Duplicate function names cause
-        # 400 errors on providers that enforce unique names (e.g. Xiaomi
-        # MiMo via Nous Portal).
+        # 400 errors on providers that enforce unique names.
         if self._memory_manager and self.tools is not None:
             _existing_tool_names = {
                 t.get("function", {}).get("name")
@@ -2949,10 +2947,10 @@ class AIAgent:
           * ``<function_call>…</function_call>``
           * ``<function_calls>…</function_calls>``
           * ``<function name="…">…</function>`` (Gemma style)
-        Ported from openclaw/openclaw#67318. The ``<function>`` variant is
-        boundary-gated (only strips when the tag sits at start-of-line or
-        after punctuation and carries a ``name="..."`` attribute) so prose
-        mentions like "Use <function> in JavaScript" are preserved.
+        The ``<function>`` variant is boundary-gated (only strips when the
+        tag sits at start-of-line or after punctuation and carries a
+        ``name="..."`` attribute) so prose mentions like "Use <function> in
+        JavaScript" are preserved.
         """
         if not content:
             return ""
@@ -2964,9 +2962,9 @@ class AIAgent:
         content = re.sub(r'<reasoning>.*?</reasoning>', '', content, flags=re.DOTALL | re.IGNORECASE)
         content = re.sub(r'<REASONING_SCRATCHPAD>.*?</REASONING_SCRATCHPAD>', '', content, flags=re.DOTALL | re.IGNORECASE)
         content = re.sub(r'<thought>.*?</thought>', '', content, flags=re.DOTALL | re.IGNORECASE)
-        # 1b. Tool-call XML blocks (openclaw/openclaw#67318). Handle the
-        #     generic tag names first — they have no attribute gating since
-        #     a literal <tool_call> in prose is already vanishingly rare.
+        # 1b. Tool-call XML blocks. Handle the generic tag names first —
+        #     they have no attribute gating since a literal <tool_call> in
+        #     prose is already vanishingly rare.
         for _tc_name in ("tool_call", "tool_calls", "tool_result",
                           "function_call", "function_calls"):
             content = re.sub(
@@ -3007,8 +3005,7 @@ class AIAgent:
         )
         # 3b. Stray tool-call closers. (We do NOT strip bare <function> or
         #     unterminated <function name="..."> because a truncated tail
-        #     during streaming may still be valuable to the user; matches
-        #     OpenClaw's intentional asymmetry.)
+        #     during streaming may still be valuable to the user.)
         content = re.sub(
             r'</(?:tool_call|tool_calls|tool_result|function_call|function_calls|function)>\s*',
             '',
@@ -3554,9 +3551,9 @@ class AIAgent:
                 self._emit_auxiliary_failure("background review", e)
             finally:
                 # Background review agents can initialize memory providers
-                # (for example Hindsight) that own their own network clients.
-                # Explicitly stop those providers before closing the agent so
-                # their aiohttp sessions do not leak until GC/process exit.
+                # that own their own network clients. Explicitly stop those
+                # providers before closing the agent so their aiohttp
+                # sessions do not leak until GC/process exit.
                 # Then close all remaining resources (httpx client,
                 # subprocesses, etc.) so GC doesn't try to clean them up on a
                 # dead asyncio event loop (which produces "Event loop is
@@ -5948,12 +5945,10 @@ class AIAgent:
         return True
 
     def _apply_client_headers_for_base_url(self, base_url: str) -> None:
-        from agent.auxiliary_client import _AI_GATEWAY_HEADERS, _OR_HEADERS
+        from agent.auxiliary_client import _OR_HEADERS
 
         if base_url_host_matches(base_url, "openrouter.ai"):
             self._client_kwargs["default_headers"] = dict(_OR_HEADERS)
-        elif base_url_host_matches(base_url, "ai-gateway.vercel.sh"):
-            self._client_kwargs["default_headers"] = dict(_AI_GATEWAY_HEADERS)
         elif base_url_host_matches(base_url, "api.routermint.com"):
             self._client_kwargs["default_headers"] = _routermint_headers()
         elif base_url_host_matches(base_url, "api.githubcopilot.com"):
@@ -8230,12 +8225,8 @@ class AIAgent:
 
         OpenRouter forwards unknown extra_body fields to upstream providers.
         Some providers/routes reject `reasoning` with 400s, so gate it to
-        known reasoning-capable model families and direct Nous Portal.
+        known reasoning-capable model families.
         """
-        if base_url_host_matches(self._base_url_lower, "nousresearch.com"):
-            return True
-        if base_url_host_matches(self._base_url_lower, "ai-gateway.vercel.sh"):
-            return True
         if (
             base_url_host_matches(self._base_url_lower, "models.github.ai")
             or base_url_host_matches(self._base_url_lower, "api.githubcopilot.com")
@@ -8880,10 +8871,9 @@ class AIAgent:
             logger.debug("context engine on_session_start (compression): %s", _ce_err)
 
         # Notify memory providers of the compression-driven session_id rotation
-        # so provider-cached per-session state (Hindsight's _document_id,
-        # accumulated turn buffers, counters) refreshes. reset=False because
-        # the logical conversation continues; only the id and DB row rolled
-        # over. See #6672.
+        # so provider-cached per-session state (document ids, accumulated turn
+        # buffers, counters) refreshes. reset=False because the logical
+        # conversation continues; only the id and DB row rolled over.
         try:
             _old_sid = locals().get("old_session_id")
             if _old_sid and self._memory_manager:
@@ -9638,7 +9628,7 @@ class AIAgent:
                     elif self._should_emit_quiet_tool_messages():
                         self._vprint(f"  {cute_msg}")
             elif self._memory_manager and self._memory_manager.has_tool(function_name):
-                # Memory provider tools (hindsight_retain, honcho_search, etc.)
+                # Memory provider tools (registered by external plugins).
                 # These are not in the tool registry — route through MemoryManager.
                 spinner = None
                 if self._should_emit_quiet_tool_messages() and self._should_start_quiet_spinner():

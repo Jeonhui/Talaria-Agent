@@ -149,12 +149,8 @@ talaria webhook subscribe pr-review \
   --deliver github_comment
 ```
 
-Full automation templates gallery: [talaria-agent.nousresearch.com/docs/guides/automation-templates](https://talaria-agent.nousresearch.com/docs/guides/automation-templates)
-
-Documentation: [talaria-agent.nousresearch.com](https://talaria-agent.nousresearch.com)
-
 GitHub: [github.com/Jeonhui/Talaria-Agent](https://github.com/Jeonhui/Talaria-Agent)
 
 ---
 
-*Talaria Agent is built by [Nous Research](https://nousresearch.com). Open source, model-agnostic, runs on your infrastructure.*
+*Talaria Agent — a slim fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent). Open source, model-agnostic, runs on your infrastructure.*

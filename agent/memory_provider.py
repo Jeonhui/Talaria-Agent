@@ -5,9 +5,9 @@ external provider is active at a time alongside the always-on built-in
 memory (MEMORY.md / USER.md). The MemoryManager enforces this limit.
 
 Built-in memory is always active as the first provider and cannot be removed.
-External providers (Honcho, Hindsight, Mem0, etc.) are additive — they never
-disable the built-in store. Only one external provider runs at a time to
-prevent tool schema bloat and conflicting memory backends.
+External providers (added via plugins) are additive — they never disable the
+built-in store. Only one external provider runs at a time to prevent tool
+schema bloat and conflicting memory backends.
 
 Registration:
   1. Built-in: BuiltinMemoryProvider — always present, not removable.
@@ -46,7 +46,7 @@ class MemoryProvider(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
-        """Short identifier for this provider (e.g. 'builtin', 'honcho', 'hindsight')."""
+        """Short identifier for this provider (e.g. 'builtin', 'my-plugin')."""
 
     # -- Core lifecycle (implement these) ------------------------------------
 
