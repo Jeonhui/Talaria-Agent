@@ -237,10 +237,7 @@ scripts/             install / uninstall / build helpers
 
 ## Status
 
-- **Version:** v0.2.2 (2026-05-04) — third lean pass: residual config defaults, dead branches, and stale comments swept (Vercel AI Gateway plumbing, Modal/Daytona/Singularity/Vercel sandbox config + env mappings, RL/Atropos toolset infrastructure, Honcho profile migration, broken Vercel sandbox import, AI Gateway provider entry, ~13 user-facing URL fixes). Net **~-810 LOC** across 61 files.
-- **Past releases:**
-  - v0.2.1 (2026-05-03) — winged sandal banner polish (ASCII art refined: wing on heel, foot extending right)
-  - v0.2.0 (2026-05-03) — second lean pass: TUI backend, voice/TTS, Nous/OpenClaw/login, and Modal/Daytona/Singularity dead paths fully removed; OpenRouter promoted to first-class provider
+- **Version:** v0.1.0 (2026-05-05) — first clean Talaria release after the lean refactor.
 - **Stability:** dogfood-grade. Used personally; report issues you hit.
 - **Tests:** the `tests/` directory currently holds smoke checks only — contributions welcome.
 
