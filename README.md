@@ -26,7 +26,7 @@ Talaria is a slim, opinionated fork of [Hermes Agent](https://github.com/NousRes
 | **Messaging** | Discord, Slack, Telegram |
 | **Terminal backends** | local, Docker, SSH |
 | **MCP** | Supported. Zero servers shipped — add your own with `talaria mcp add`. |
-| **Skills** | Bundled `devops` + `software-development`; install more with `talaria skills install <repo>` |
+| **Skills** | Bundled `configuration` + `devops` + `software-development`; install more with `talaria skills install <repo>` |
 
 ## What's been removed
 
@@ -38,7 +38,7 @@ Whole subsystems dropped to keep the assistant focused:
 - **Auth flows** — Nous Portal device-code login, OpenClaw migration, the `talaria login` subcommand
 - **Backends** — Modal, Daytona, Singularity sandbox executors (only local / Docker / SSH remain)
 - **Messaging** — every platform other than Discord / Slack / Telegram (DingTalk, BlueBubbles, WhatsApp, Matrix, Signal, etc.)
-- **Other** — RL/eval harnesses, third-party memory plugins (Honcho / Mem0 / Hindsight), ~1100 lines of dead provider catalogs
+- **Other** — RL/eval harnesses, third-party memory plugins (Honcho / Mem0 / Hindsight), the official `optional-skills/` registry, ~2200 lines of dead provider catalogs and unused detectors
 
 Net: **~186k Python LOC** in **218 files**, down from **~649k LOC** in **1,340 files** in upstream Hermes.
 

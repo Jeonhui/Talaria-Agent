@@ -55,7 +55,6 @@ _EXTRA_ENV_KEYS = frozenset({
 import yaml
 
 from talaria_cli.colors import Colors, color
-from talaria_cli.default_soul import DEFAULT_SOUL_MD
 from talaria_cli.branding import BRAND_EMOJI
 
 

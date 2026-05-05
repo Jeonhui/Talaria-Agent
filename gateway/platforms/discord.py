@@ -12,13 +12,7 @@ Uses discord.py library for:
 import asyncio
 import logging
 import os
-import struct
-import subprocess
-import tempfile
-import threading
-import time
-from collections import defaultdict
-from typing import Callable, Dict, Optional, Any
+from typing import Dict, Optional, Any
 
 from talaria_cli.branding import BRAND_EMOJI, default_branding
 

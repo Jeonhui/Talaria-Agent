@@ -8,7 +8,6 @@ import os
 import sys
 import subprocess
 import shutil
-import importlib.util
 from pathlib import Path
 
 from talaria_cli.config import get_project_root, get_talaria_home, get_env_path

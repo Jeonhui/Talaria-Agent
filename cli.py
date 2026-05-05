@@ -19,12 +19,10 @@ import re
 import shutil
 import sys
 import json
-import re
 import concurrent.futures
 import base64
 import atexit
 import errno
-import tempfile
 import time
 import uuid
 import textwrap
@@ -1641,18 +1639,6 @@ def _get_chat_console() -> "ChatConsole":
         _shared_chat_console = ChatConsole()
     return _shared_chat_console
 
-    @contextmanager
-    def status(self, *_args, **_kwargs):
-        """Provide a no-op Rich-compatible status context.
-
-        Some slash command helpers use ``console.status(...)`` when running in
-        the standalone CLI. Interactive chat routes those helpers through
-        ``ChatConsole()``, which historically only implemented ``print()``.
-        Returning a silent context manager keeps slash commands compatible
-        without duplicating the higher-level busy indicator already shown by
-        ``TalariaCLI._busy_command()``.
-        """
-        yield self
 
 def _build_compact_banner() -> str:
     """Build a compact banner that fits the current terminal width."""

@@ -22,7 +22,6 @@ import re
 import shlex
 import sys
 import signal
-import tempfile
 import threading
 import time
 from collections import OrderedDict
@@ -629,22 +628,6 @@ def _check_unavailable_skill(command_name: str) -> str | None:
                         f"Enable it with: `talaria skills config`"
                     )
 
-        # Check optional skills (shipped with repo but not installed)
-        from talaria_constants import get_optional_skills_dir
-        repo_root = Path(__file__).resolve().parent.parent
-        optional_dir = get_optional_skills_dir(repo_root / "optional-skills")
-        if optional_dir.exists():
-            for skill_md in optional_dir.rglob("SKILL.md"):
-                name = skill_md.parent.name.lower().replace("_", "-")
-                if name == normalized:
-                    # Build install path: official/<category>/<name>
-                    rel = skill_md.parent.relative_to(optional_dir)
-                    parts = list(rel.parts)
-                    install_path = f"official/{'/'.join(parts)}"
-                    return (
-                        f"The **{command_name}** skill is available but not installed.\n"
-                        f"Install it with: `talaria skills install {install_path}`"
-                    )
     except Exception:
         pass
     return None

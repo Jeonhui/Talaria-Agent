@@ -57,20 +57,6 @@ def get_default_talaria_root() -> Path:
     return env_path
 
 
-def get_optional_skills_dir(default: Path | None = None) -> Path:
-    """Return the optional-skills directory, honoring package-manager wrappers.
-
-    Packaged installs may ship ``optional-skills`` outside the Python package
-    tree and expose it via ``TALARIA_OPTIONAL_SKILLS``.
-    """
-    override = os.getenv("TALARIA_OPTIONAL_SKILLS", "").strip()
-    if override:
-        return Path(override)
-    if default is not None:
-        return default
-    return get_talaria_home() / "optional-skills"
-
-
 def get_talaria_dir(new_subpath: str, old_name: str) -> Path:
     """Resolve a Talaria subdirectory with backward compatibility.
 

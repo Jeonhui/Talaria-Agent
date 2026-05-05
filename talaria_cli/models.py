@@ -13,7 +13,6 @@ import urllib.request
 import urllib.error
 import time
 from difflib import get_close_matches
-from pathlib import Path
 from typing import Any, NamedTuple, Optional
 
 from talaria_cli import __version__ as _TALARIA_VERSION

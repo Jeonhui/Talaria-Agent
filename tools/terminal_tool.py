@@ -24,7 +24,6 @@ Usage:
     result = terminal_tool("python server.py", background=True)
 """
 
-import importlib.util
 import json
 import logging
 import os

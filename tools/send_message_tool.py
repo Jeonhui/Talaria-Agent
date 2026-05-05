@@ -426,7 +426,6 @@ async def _send_via_adapter(platform, pconfig, chat_id, chunk):
         if runner:
             adapter = runner.adapters.get(platform)
             if adapter:
-                from gateway.platforms.base import SendResult
                 result = await adapter.send(chat_id=chat_id, content=chunk)
                 if result.success:
                     return {"success": True, "message_id": result.message_id}

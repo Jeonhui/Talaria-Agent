@@ -11,5 +11,5 @@ Provides subcommands for:
 - talaria cron          - Manage cron jobs
 """
 
-__version__ = "0.1.4"
+__version__ = "0.2.0"
 __release_date__ = "2026.5.5"

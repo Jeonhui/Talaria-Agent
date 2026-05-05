@@ -27,7 +27,6 @@ Usage:
 """
 
 import argparse
-import json
 import os
 import shutil
 import subprocess
@@ -210,7 +209,6 @@ import time as _time
 from datetime import datetime
 
 from talaria_cli import __version__, __release_date__
-from talaria_constants import OPENROUTER_BASE_URL
 
 logger = logging.getLogger(__name__)
 

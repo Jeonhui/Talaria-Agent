@@ -43,8 +43,6 @@ Bundled skills (in `skills/`) ship with every Talaria install. They should be **
 - Document handling, web research, common dev workflows, system administration
 - Used regularly by a wide range of people
 
-If your skill is official and useful but not universally needed (e.g., a paid service integration, a heavyweight dependency), put it in **`optional-skills/`** — it ships with the repo but isn't activated by default. Users can discover it via `talaria skills browse` (labeled "official") and install it with `talaria skills install` (no third-party warning, builtin trust).
-
 If your skill is specialized, community-contributed, or niche, it's better suited for a **Skills Hub** — upload it to a skills registry and share it via GitHub Discussions or your own channel. Users can install it with `talaria skills install`.
 
 ---
@@ -293,7 +291,7 @@ If it's a new toolset, add it to `toolsets.py` and to the relevant platform pres
 
 ## Adding a Skill
 
-Bundled skills live in `skills/` organized by category. Official optional skills use the same structure in `optional-skills/`:
+Bundled skills live in `skills/` organized by category:
 
 ```
 skills/

@@ -11,18 +11,15 @@ Modular wizard with independently-runnable sections:
 Config files are stored in ~/.talaria/ for easy access.
 """
 
-import importlib.util
-import json
 import logging
 import os
 import shutil
 import sys
 import copy
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 from utils import base_url_hostname
-from talaria_constants import get_optional_skills_dir
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +134,6 @@ from talaria_cli.config import (
     load_config,
     save_config,
     save_env_value,
-    remove_env_value,
     get_env_value,
     ensure_talaria_home,
 )
@@ -792,7 +788,6 @@ def setup_model_provider(config: dict, *, quick: bool = False):
 
 def setup_terminal_backend(config: dict):
     """Configure the terminal execution backend."""
-    import platform as _platform
     print_header("Terminal Backend")
     print_info("Choose where Talaria runs shell commands and code.")
     print_info("This affects tool execution, file access, and isolation.")
@@ -800,7 +795,6 @@ def setup_terminal_backend(config: dict):
     print()
 
     current_backend = cfg_get(config, "terminal", "backend", default="local")
-    is_linux = _platform.system() == "Linux"
 
     # Build backend choices with descriptions
     terminal_choices = [
@@ -809,7 +803,6 @@ def setup_terminal_backend(config: dict):
         "SSH - run on a remote machine",
     ]
     idx_to_backend = {0: "local", 1: "docker", 2: "ssh"}
-    backend_to_idx = {"local": 0, "docker": 1, "ssh": 2}
 
     next_idx = 3
 

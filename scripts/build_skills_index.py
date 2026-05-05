@@ -35,7 +35,6 @@ from tools.skills_hub import (
     GitHubAuth,
     GitHubSource,
     SkillsShSource,
-    OptionalSkillSource,
     WellKnownSkillSource,
     ClawHubSource,
     ClaudeMarketplaceSource,
@@ -254,7 +253,6 @@ def main():
 
     skills_sh_source = SkillsShSource(auth=auth)
     sources = {
-        "official": OptionalSkillSource(),
         "well-known": WellKnownSkillSource(),
         "github": GitHubSource(auth=auth),
         "clawhub": ClawHubSource(),

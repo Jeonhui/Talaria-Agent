@@ -28,7 +28,7 @@ import os
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from talaria_constants import get_talaria_home
 
@@ -355,7 +355,7 @@ def archive_skill(skill_name: str) -> Tuple[bool, str]:
 
     try:
         skill_dir.rename(dest)
-    except OSError as e:
+    except OSError:
         # Cross-device — fall back to shutil.move
         import shutil
         try:

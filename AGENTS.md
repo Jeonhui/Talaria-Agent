@@ -41,7 +41,6 @@ talaria-agent/
 │   ├── memory/           # Memory-provider plugins (user-installable)
 │   ├── context_engine/   # Context-engine plugins
 │   └── <others>/         # Dashboard, image-gen, disk-cleanup, examples, ...
-├── optional-skills/      # Heavier/niche skills shipped but NOT active by default
 ├── skills/               # Built-in skills bundled with the repo
 ├── acp_adapter/          # ACP server (VS Code / Zed / JetBrains integration)
 ├── cron/                 # Scheduler — jobs.py, scheduler.py
@@ -419,20 +418,9 @@ into `agent/image_gen_provider.py`.
 
 ## Skills
 
-Two parallel surfaces:
-
 - **`skills/`** — built-in skills shipped and loadable by default.
-  Organized by category directories (e.g. `skills/github/`, `skills/mlops/`).
-- **`optional-skills/`** — heavier or niche skills shipped with the repo but
-  NOT active by default. Installed explicitly via
-  `talaria skills install official/<category>/<skill>`. Adapter lives in
-  `tools/skills_hub.py` (`OptionalSkillSource`). Categories include
-  `autonomous-ai-agents`, `blockchain`, `communication`, `creative`,
-  `devops`, `email`, `health`, `mcp`, `migration`, `mlops`, `productivity`,
-  `research`, `security`, `web-development`.
-
-When reviewing skill PRs, check which directory they target — heavy-dep or
-niche skills belong in `optional-skills/`.
+  Organized by category directories (e.g. `skills/configuration/`,
+  `skills/devops/`, `skills/software-development/`).
 
 ### SKILL.md frontmatter
 
