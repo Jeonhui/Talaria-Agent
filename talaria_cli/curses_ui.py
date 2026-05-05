@@ -137,7 +137,11 @@ def curses_checklist(
                         pass
 
                 stdscr.refresh()
-                key = stdscr.getch()
+                try:
+                    key = stdscr.getch()
+                except KeyboardInterrupt:
+                    result_holder[0] = cancel_returns
+                    return
 
                 if key in (curses.KEY_UP, ord("k")):
                     cursor = (cursor - 1) % len(items)
@@ -148,11 +152,14 @@ def curses_checklist(
                 elif key in (curses.KEY_ENTER, 10, 13):
                     result_holder[0] = set(chosen)
                     return
-                elif key in (27, ord("q")):
+                elif key in (3, 27, ord("q")):
                     result_holder[0] = cancel_returns
                     return
 
-        curses.wrapper(_draw)
+        try:
+            curses.wrapper(_draw)
+        except KeyboardInterrupt:
+            return cancel_returns
         flush_stdin()
         return result_holder[0] if result_holder[0] is not None else cancel_returns
 
@@ -261,7 +268,11 @@ def curses_radiolist(
                         pass
 
                 stdscr.refresh()
-                key = stdscr.getch()
+                try:
+                    key = stdscr.getch()
+                except KeyboardInterrupt:
+                    result_holder[0] = cancel_returns
+                    return
 
                 if key in (curses.KEY_UP, ord("k")):
                     cursor = (cursor - 1) % len(items)
@@ -270,11 +281,14 @@ def curses_radiolist(
                 elif key in (ord(" "), curses.KEY_ENTER, 10, 13):
                     result_holder[0] = cursor
                     return
-                elif key in (27, ord("q")):
+                elif key in (3, 27, ord("q")):
                     result_holder[0] = cancel_returns
                     return
 
-        curses.wrapper(_draw)
+        try:
+            curses.wrapper(_draw)
+        except KeyboardInterrupt:
+            return cancel_returns
         flush_stdin()
         return result_holder[0] if result_holder[0] is not None else cancel_returns
 
@@ -382,7 +396,11 @@ def curses_single_select(
                         pass
 
                 stdscr.refresh()
-                key = stdscr.getch()
+                try:
+                    key = stdscr.getch()
+                except KeyboardInterrupt:
+                    result_holder[0] = None
+                    return
 
                 if key in (curses.KEY_UP, ord("k")):
                     cursor = (cursor - 1) % len(all_items)
@@ -391,11 +409,14 @@ def curses_single_select(
                 elif key in (curses.KEY_ENTER, 10, 13):
                     result_holder[0] = cursor
                     return
-                elif key in (27, ord("q")):
+                elif key in (3, 27, ord("q")):
                     result_holder[0] = None
                     return
 
-        curses.wrapper(_draw)
+        try:
+            curses.wrapper(_draw)
+        except KeyboardInterrupt:
+            return None
         flush_stdin()
         if result_holder[0] is not None and result_holder[0] >= cancel_idx:
             return None
