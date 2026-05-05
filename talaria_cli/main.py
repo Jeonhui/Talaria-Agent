@@ -905,14 +905,25 @@ def cmd_gateway(args):
 def cmd_setup(args):
     """Interactive setup wizard."""
     from talaria_cli.setup import run_setup_wizard
+    from talaria_cli.setup_apply import snapshot_setup_state, apply_setup_changes
 
-    run_setup_wizard(args)
+    before = snapshot_setup_state()
+    try:
+        run_setup_wizard(args)
+    finally:
+        apply_setup_changes(before)
 
 
 def cmd_model(args):
     """Select default model — starts with provider selection, then model picker."""
     _require_tty("model")
-    select_provider_and_model(args=args)
+    from talaria_cli.setup_apply import snapshot_setup_state, apply_setup_changes
+
+    before = snapshot_setup_state()
+    try:
+        select_provider_and_model(args=args)
+    finally:
+        apply_setup_changes(before)
 
 
 def select_provider_and_model(args=None):
