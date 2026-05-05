@@ -132,6 +132,7 @@ def _strip_yaml_frontmatter(content: str) -> str:
 # =========================================================================
 
 from talaria_cli.branding import (
+    DEFAULT_AGENT_IDENTITY,
     DEFAULT_REPO_HTTPS_URL as _AGENT_DOCS_URL,
     build_agent_identity,
     default_branding as _default_branding,
