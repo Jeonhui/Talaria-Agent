@@ -45,28 +45,37 @@ BANNER_HERO_ART = """[bold #FFD700]... hero art line 1[/]
 
 ### 1.3 Color palette
 
+The shipped default is the **Sky Messenger** palette (deep sky blue,
+cloud-white text, silver/cyan accents — matching the Hermes / winged-
+sandal theme without the warm-gold treatment). Replace any value to
+re-skin.
+
 ```python
 DEFAULT_COLORS = {
-    "banner_border": "#CD7F32",
-    "banner_title":  "#FFD700",
-    "banner_accent": "#FFBF00",
-    "banner_dim":    "#B8860B",
-    "banner_text":   "#FFF8DC",
-    "ui_accent":     "#FFBF00",
-    "ui_label":      "#DAA520",
-    "ui_ok":         "#4caf50",
-    "ui_error":      "#ef5350",
-    "ui_warn":       "#ffa726",
-    "prompt":        "#FFF8DC",
-    "input_rule":    "#CD7F32",
-    "response_border": "#FFD700",
-    "status_bar_bg": "#1a1a2e",
-    "session_label": "#DAA520",
-    "session_border": "#8B8682",
+    # Sky Messenger
+    "banner_border":   "#1E5A88",  # deep sky blue — panel frame
+    "banner_title":    "#E8F4FF",  # cloud white — version label
+    "banner_accent":   "#5DADE2",  # bright sky blue — section headers
+    "banner_dim":      "#5A7894",  # muted slate-blue — labels, separators
+    "banner_text":     "#EAF6FF",  # soft cloud white — body text
+    "ui_accent":       "#7FCDEE",  # cyan-silver
+    "ui_label":        "#A8C9DD",  # silver-blue
+    "ui_ok":           "#7FB39C",  # sage mint — success
+    "ui_error":        "#D86B6B",  # dusty coral — error
+    "ui_warn":         "#E8C770",  # pale gold — warning
+    "prompt":          "#EAF6FF",  # matches banner_text
+    "input_rule":      "#1E5A88",  # matches banner_border
+    "response_border": "#5DADE2",  # sky blue — response box border
+    "status_bar_bg":   "#0F1E33",  # deep night sky
+    "session_label":   "#A8C9DD",
+    "session_border":  "#456079",
 }
 ```
 
 Used throughout banner, status bar, response box, prompt input area.
+
+For a different mood, swap the whole dict — e.g. ``Greek marble`` (white
++ deep navy), ``Mediterranean dusk`` (terracotta + sea blue), etc.
 
 ### 1.4 Branding strings
 
@@ -160,22 +169,63 @@ name = get_display_name()           # config value, then OS user, then "user"
 name = get_display_name(default="") # config value only; "" if not set
 ```
 
+#### Reseeding ``SOUL.md`` after a config change
+
+``SOUL.md`` is seeded **once** on first run and is never overwritten —
+that's intentional, so users can edit it freely without losing changes
+on update. The runtime system prompt always reflects the current
+``user.display_name``, so a stale SOUL.md only matters for the first
+turn of a brand-new session that hasn't loaded SOUL.md yet (rare).
+
+To regenerate the seeded SOUL.md after changing ``display_name``:
+
+```bash
+rm ~/.talaria/SOUL.md           # delete the existing file
+python -m talaria_cli.main      # next launch reseeds with the new value
+```
+
+If you've customized SOUL.md manually, back it up first.
+
 ### 1.9 Custom banner lines
 
-Top of the right column accepts arbitrary text from
-``DEFAULT_BANNER_CUSTOM_LINES``. See [§4 Banner layout
-toggles](#4-banner-layout-toggles) for the full list of layout flags.
+Add arbitrary text inside the right column of the welcome panel.
 
 ```python
 DEFAULT_BANNER_CUSTOM_LINES = [
     "[bold]Welcome back![/]",
-    f"User: {{display_name}}",     # render at runtime in code if dynamic
+    "User: johnny",
     "[#FF8C00]⚠ Beta build[/]",
 ]
+
+DEFAULT_BANNER_CUSTOM_POSITION = "top"   # or "bottom"
 ```
 
-Each list entry is one line. Rich markup is preserved. An empty list
-removes the section entirely.
+- Each list entry is one line. Rich markup is preserved.
+- Empty list removes the section entirely.
+- ``"top"`` places the lines above ``Available Tools``;
+  ``"bottom"`` places them after the ``N tools · N skills`` summary
+  (and before any update warning).
+- Toggle the whole section off via ``DEFAULT_BANNER_LAYOUT["show_custom"] = False``.
+
+Skin-level override (``~/.talaria/skins/<name>.yaml``):
+
+```yaml
+banner_custom_lines:
+  - "[bold]Production environment[/]"
+  - "Slack: #ops-alerts"
+banner_layout:
+  show_custom: true
+```
+
+Want a dynamic line (e.g. greet by name)? Build it in code where you
+seed ``DEFAULT_BANNER_CUSTOM_LINES`` — it's just a Python list:
+
+```python
+from talaria_cli.config import get_display_name
+DEFAULT_BANNER_CUSTOM_LINES = [
+    f"Welcome back, {get_display_name(default='friend')}!",
+]
+```
 
 ### 1.10 Test the rebrand
 
@@ -318,6 +368,7 @@ DEFAULT_BANNER_LAYOUT = {
     "show_model":          True,   # model name + context length
     "show_cwd":            True,   # current working directory
     "show_session_id":     True,   # "Session: <id>" line
+    "show_custom":         True,   # custom user lines (DEFAULT_BANNER_CUSTOM_LINES)
     "show_tools":          True,   # "Available Tools" section
     "show_mcp_servers":    True,   # "MCP Servers" section
     "show_skills":         True,   # "Available Skills" section
@@ -329,8 +380,9 @@ DEFAULT_BANNER_LAYOUT = {
 
 Set any value to `False` to drop that section.
 
-When the right column is empty (e.g. only `show_hero_art=True`), the banner
-auto-collapses to a single centered column so the art doesn't hug the edge.
+When one column is empty (e.g. only `show_hero_art=True`, or only
+`show_custom=True`), the banner auto-collapses to a single centered column
+so the populated side doesn't hug the edge.
 
 ### Skin-level override
 

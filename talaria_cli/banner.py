@@ -304,7 +304,9 @@ def get_latest_release_tag(repo_dir: Optional[Path] = None) -> Optional[tuple]:
 
 def format_banner_version_label() -> str:
     """Return the version label shown in the startup banner title."""
-    base = f"Talaria Agent v{VERSION} ({RELEASE_DATE})"
+    from talaria_cli.branding import default_branding
+    agent_name = default_branding("agent_name", "Talaria Agent")
+    base = f"{agent_name} v{VERSION} ({RELEASE_DATE})"
     state = get_git_banner_state()
     if not state:
         return base
@@ -468,11 +470,12 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
 
     right_lines: List[str] = []
 
-    # Custom user lines at the very top of the right column. Each entry is
-    # one line; Rich markup is preserved. Falls back to the theme default
-    # when the active skin doesn't override.
+    # Custom user lines: gather once, render at the configured position
+    # (top of right column, or bottom after summary). Skin overrides
+    # branding default; empty list = section is omitted.
+    custom_lines: List[str] = []
+    custom_position = "top"
     if show_custom:
-        custom_lines: List[str] = []
         try:
             if _bskin is not None and getattr(_bskin, "banner_custom_lines", None):
                 custom_lines = list(_bskin.banner_custom_lines)
@@ -481,9 +484,17 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
         if not custom_lines:
             from talaria_cli.branding import DEFAULT_BANNER_CUSTOM_LINES
             custom_lines = list(DEFAULT_BANNER_CUSTOM_LINES)
-        if custom_lines:
-            right_lines.extend(custom_lines)
-            right_lines.append("")  # blank separator before next section
+        try:
+            from talaria_cli.branding import DEFAULT_BANNER_CUSTOM_POSITION
+            custom_position = str(DEFAULT_BANNER_CUSTOM_POSITION).strip().lower() or "top"
+        except Exception:
+            custom_position = "top"
+        if custom_position not in ("top", "bottom"):
+            custom_position = "top"
+
+    if custom_lines and custom_position == "top":
+        right_lines.extend(custom_lines)
+        right_lines.append("")  # blank separator before next section
 
     toolsets_dict: Dict[str, list] = {}
 
@@ -607,6 +618,10 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
         summary_parts.append("/help for commands")
         right_lines.append("")
         right_lines.append(f"[dim {dim}]{' · '.join(summary_parts)}[/]")
+
+    if custom_lines and custom_position == "bottom":
+        right_lines.append("")
+        right_lines.extend(custom_lines)
 
     # Update check — use prefetched result if available
     if show_update:

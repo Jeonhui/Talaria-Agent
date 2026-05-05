@@ -26,17 +26,17 @@ BANNER_LOGO = """[bold #FFD700]
 # vertical gradient is easy. Use Braille blocks (⢀⣀⠀⣄⣆⣇ etc.) for
 # smooth diagonal strokes.
 BANNER_HERO_ART = """
-[#FFD700]                       ░████████ [/]
-[#FFD700]               ████████████████  [/]
-[#FFD700]         █████████████████░      [/]
-[#FFBF00]     ███████████████████████████ [/]
-[#FFBF00]  ░███████████████████████████   [/]
-[#FFBF00] ███████████████████░            [/]
-[#CD7F32] ███████████████████████████████ [/]
-[#CD7F32] █████████████████████████████   [/]
-[#CD7F32]  █████████████████████          [/]
-[#B8860B]   ██████████████████████        [/]
-[#B8860B]    ███████░                     [/]
+[#E8F4FF]                       ░████████ [/]
+[#E8F4FF]               ████████████████  [/]
+[#E8F4FF]         █████████████████░      [/]
+[#E8F4FF]     ███████████████████████████ [/]
+[#E8F4FF]  ░███████████████████████████   [/]
+[#E8F4FF] ███████████████████░            [/]
+[#E8F4FF] ███████████████████████████████ [/]
+[#E8F4FF] █████████████████████████████   [/]
+[#E8F4FF]  █████████████████████          [/]
+[#E8F4FF]   ██████████████████████        [/]
+[#E8F4FF]    ███████░                     [/]
 """
 
 
@@ -48,22 +48,26 @@ BANNER_HERO_ART = """
 # =========================================================================
 
 DEFAULT_COLORS = {
-    "banner_border": "#CD7F32",
-    "banner_title": "#FFD700",
-    "banner_accent": "#FFBF00",
-    "banner_dim": "#B8860B",
-    "banner_text": "#FFF8DC",
-    "ui_accent": "#FFBF00",
-    "ui_label": "#DAA520",
-    "ui_ok": "#4caf50",
-    "ui_error": "#ef5350",
-    "ui_warn": "#ffa726",
-    "prompt": "#FFF8DC",
-    "input_rule": "#CD7F32",
-    "response_border": "#FFD700",
-    "status_bar_bg": "#1a1a2e",
-    "session_label": "#DAA520",
-    "session_border": "#8B8682",
+    # Sky Messenger — Hermes crossing the sky.
+    # Deep sky-blue framing, cloud-white text, silver/cyan accents.
+    "banner_border":   "#1E5A88",  # deep sky blue — temple-like frame
+    "banner_title":    "#E8F4FF",  # cloud white — version label
+    "banner_accent":   "#5DADE2",  # bright sky blue — section headers
+    "banner_dim":      "#5A7894",  # muted slate-blue — labels, separators
+    "banner_text":     "#EAF6FF",  # soft cloud white — body text
+    # UI / status — sky-cohesive palette
+    "ui_accent":       "#7FCDEE",  # cyan-silver — matches accent vibe
+    "ui_label":        "#A8C9DD",  # silver-blue for form labels
+    "ui_ok":           "#7FB39C",  # sage mint — success (peaceful, not lime)
+    "ui_error":        "#D86B6B",  # dusty coral — error (warm contrast vs blue)
+    "ui_warn":         "#E8C770",  # pale gold — warning (gold/blue complementary)
+    "prompt":          "#EAF6FF",  # matches banner_text
+    "input_rule":      "#1E5A88",  # matches banner_border
+    "response_border": "#5DADE2",  # sky blue response box border
+    # Status bar — deep night-sky backdrop
+    "status_bar_bg":   "#0F1E33",
+    "session_label":   "#A8C9DD",
+    "session_border":  "#456079",  # muted slate, not grey
 }
 
 
@@ -181,6 +185,11 @@ DEFAULT_BANNER_LAYOUT = {
 
 DEFAULT_BANNER_CUSTOM_LINES: list = []
 
+# Where to render ``DEFAULT_BANNER_CUSTOM_LINES`` inside the right column.
+# Allowed values: ``"top"`` (above Available Tools) or ``"bottom"`` (after
+# the summary footer, before any update warning).
+DEFAULT_BANNER_CUSTOM_POSITION = "top"
+
 
 def banner_layout(key: str, fallback: bool = True) -> bool:
     """Return whether ``key`` banner section should render (theme default)."""
@@ -188,7 +197,7 @@ def banner_layout(key: str, fallback: bool = True) -> bool:
 
 
 DEFAULT_SKIN_NAME = "default"
-DEFAULT_SKIN_DESCRIPTION = "Classic Talaria — gold and kawaii"
+DEFAULT_SKIN_DESCRIPTION = "Sky Messenger — Hermes crossing the sky"
 DEFAULT_TOOL_PREFIX = "┊"
 
 DEFAULT_SKIN = {

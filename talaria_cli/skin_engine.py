@@ -96,7 +96,7 @@ USAGE
 BUILT-IN SKINS
 ==============
 
-- ``default`` — Classic Talaria gold/kawaii (the current look)
+- ``default`` — Sky Messenger (Hermes crossing the sky, blue/cloud-white)
 - ``ares``    — Crimson/bronze war-god theme with custom spinner wings
 - ``mono``    — Clean grayscale monochrome
 - ``slate``   — Cool blue developer-focused theme
