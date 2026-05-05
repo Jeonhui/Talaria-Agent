@@ -2359,6 +2359,26 @@ def _model_flow_api_key_provider(config, provider_id, current_model=""):
             print()
     else:
         print(f"  {pconfig.name} API key: {existing_key[:8]}... ✓")
+        # Offer a non-destructive opt-in to rotate. Default keeps the
+        # current key — Enter / N / Ctrl-C all leave things untouched.
+        try:
+            choice = input("  Replace key? [y/N]: ").strip().lower()
+        except (KeyboardInterrupt, EOFError):
+            choice = ""
+            print()
+        if choice in ("y", "yes") and key_env:
+            try:
+                import getpass
+                new_key = getpass.getpass(f"  New {key_env}: ").strip()
+            except (KeyboardInterrupt, EOFError):
+                new_key = ""
+                print()
+            if new_key:
+                save_env_value(key_env, new_key)
+                existing_key = new_key
+                print("  API key replaced.")
+            else:
+                print("  Kept existing key.")
         print()
 
     # Gemini free-tier gate: free-tier daily quotas (<= 250 RPD for Flash)
