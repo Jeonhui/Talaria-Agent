@@ -20,6 +20,8 @@ import time
 from collections import defaultdict
 from typing import Callable, Dict, Optional, Any
 
+from talaria_cli.branding import BRAND_EMOJI, default_branding
+
 logger = logging.getLogger(__name__)
 
 VALID_THREAD_AUTO_ARCHIVE_MINUTES = {60, 1440, 4320, 10080}
@@ -2096,7 +2098,7 @@ class DiscordAdapter(BasePlatformAdapter):
         content = re.sub(r"<@[!&]?\d+>", "", content)
         content = re.sub(r"<#\d+>", "", content)
         content = re.sub(r"\s+", " ", content).strip()
-        thread_name = content[:80] if content else "Talaria"
+        thread_name = content[:80] if content else default_branding("agent_name", "Talaria Agent")
         if len(content) > 80:
             thread_name = thread_name[:77] + "..."
 
@@ -2223,7 +2225,7 @@ class DiscordAdapter(BasePlatformAdapter):
 
             default_hint = f" (default: {default})" if default else ""
             embed = discord.Embed(
-                title="⚕ Update Needs Your Input",
+                title=f"{BRAND_EMOJI} Update Needs Your Input",
                 description=f"{prompt}{default_hint}",
                 color=discord.Color.gold(),
             )

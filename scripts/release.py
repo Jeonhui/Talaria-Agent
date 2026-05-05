@@ -898,15 +898,19 @@ def get_pr_number(subject: str) -> str:
     return None
 
 
-def generate_changelog(commits, tag_name, semver, repo_url="https://github.com/Jeonhui/Talaria-Agent",
+def generate_changelog(commits, tag_name, semver, repo_url=None,
                        prev_tag=None, first_release=False):
     """Generate markdown changelog from categorized commits."""
+    if repo_url is None:
+        from talaria_cli.branding import DEFAULT_REPO_HTTPS_URL
+        repo_url = DEFAULT_REPO_HTTPS_URL
     lines = []
 
     # Header
     now = datetime.now()
     date_str = now.strftime("%B %d, %Y")
-    lines.append(f"# Talaria Agent v{semver} ({tag_name})")
+    from talaria_cli.branding import default_branding as _gen_branding
+    lines.append(f"# {_gen_branding('agent_name', 'Talaria Agent')} v{semver} ({tag_name})")
     lines.append("")
     lines.append(f"**Release Date:** {date_str}")
     lines.append("")

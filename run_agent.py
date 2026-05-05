@@ -1391,9 +1391,10 @@ class AIAgent:
                     client_kwargs["args"] = self.acp_args
                 effective_base = base_url
                 if base_url_host_matches(effective_base, "openrouter.ai"):
+                    from talaria_cli.branding import DEFAULT_REPO_HTTPS_URL, default_branding
                     client_kwargs["default_headers"] = {
-                        "HTTP-Referer": "https://github.com/Jeonhui/Talaria-Agent",
-                        "X-OpenRouter-Title": "Talaria Agent",
+                        "HTTP-Referer": DEFAULT_REPO_HTTPS_URL,
+                        "X-OpenRouter-Title": default_branding("agent_name", "Talaria Agent"),
                         "X-OpenRouter-Categories": "productivity,cli-agent",
                     }
                 elif base_url_host_matches(effective_base, "api.routermint.com"):
@@ -4755,8 +4756,18 @@ class AIAgent:
                 _soul_loaded = True
 
         if not _soul_loaded:
-            # Fallback to hardcoded identity
-            prompt_parts = [DEFAULT_AGENT_IDENTITY]
+            # Fallback to hardcoded identity, addressed to the configured
+            # ``user.display_name`` when one is set in config.yaml. We do
+            # NOT auto-inject the OS username — opt-in via config only.
+            try:
+                from talaria_cli.config import cfg_get, load_config
+                from agent.prompt_builder import agent_identity_for
+                _user_name = cfg_get(load_config() or {}, "user", "display_name", default="")
+                if not isinstance(_user_name, str):
+                    _user_name = ""
+                prompt_parts = [agent_identity_for(_user_name.strip())]
+            except Exception:
+                prompt_parts = [DEFAULT_AGENT_IDENTITY]
 
         # Pointer to the talaria-agent skill + docs for user questions about Talaria itself.
         prompt_parts.append(TALARIA_AGENT_HELP_GUIDANCE)

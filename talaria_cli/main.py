@@ -153,6 +153,12 @@ _apply_profile_override()
 # User-managed env files should override stale shell exports on restart.
 from talaria_cli.config import get_talaria_home
 from talaria_cli.env_loader import load_talaria_dotenv
+from talaria_cli.branding import (
+    BRAND_EMOJI,
+    DEFAULT_INSTALL_SCRIPT_URL,
+    DEFAULT_REPO_HTTPS_URL,
+    default_branding,
+)
 
 load_talaria_dotenv(project_env=PROJECT_ROOT / ".env")
 
@@ -791,7 +797,7 @@ def cmd_chat(args):
     if not _has_any_provider_configured():
         print()
         print(
-            "It looks like Talaria isn't configured yet -- no API keys or providers found."
+            f"It looks like {default_branding('agent_short_name', 'Talaria')} isn't configured yet -- no API keys or providers found."
         )
         print()
         print("  Run:  talaria setup")
@@ -1328,7 +1334,7 @@ def _aux_config_menu() -> None:
         print()
         print("  Side tasks (vision, compression, web extraction, etc.) default")
         print("  to your main chat model.  \"auto\" means \"use my main model\" —")
-        print("  Talaria only falls back to a lightweight backend (OpenRouter)")
+        print(f"  {default_branding('agent_short_name', 'Talaria')} only falls back to a lightweight backend (OpenRouter)")
         print("  if the main model is unavailable.  Override a task below if")
         print("  you want it pinned to a specific provider/model.")
         print()
@@ -1753,7 +1759,7 @@ def _model_flow_custom(config):
     else:
         print(
             f"Warning: could not verify this endpoint via {probe.get('probed_url')}. "
-            f"Talaria will still save it."
+            f"{default_branding('agent_short_name', 'Talaria')} will still save it."
         )
         if probe.get("suggested_base_url"):
             suggested = probe["suggested_base_url"]
@@ -2379,7 +2385,7 @@ def _model_flow_api_key_provider(config, provider_id, current_model=""):
                     "(<= 250 requests/day for gemini-2.5-flash)."
                 )
                 print(
-                    "   Talaria typically makes 3-10 API calls per user turn "
+                    f"   {default_branding('agent_short_name', 'Talaria')} typically makes 3-10 API calls per user turn "
                     "(tool iterations + auxiliary tasks),"
                 )
                 print(
@@ -2389,7 +2395,7 @@ def _model_flow_api_key_provider(config, provider_id, current_model=""):
                 print("   an agent session.")
                 print()
                 print(
-                    "   To use Gemini with Talaria, enable billing on your "
+                    f"   To use Gemini with {default_branding('agent_short_name', 'Talaria')}, enable billing on your "
                     "Google Cloud project and regenerate"
                 )
                 print(
@@ -2593,7 +2599,7 @@ def _run_anthropic_oauth_flow(save_env_value):
             from talaria_constants import display_talaria_home as _dhh_fn
 
             print(
-                f"    Talaria will use Claude's credential store directly instead of copying a setup-token into {_dhh_fn()}/.env."
+                f"    {default_branding('agent_short_name', 'Talaria')} will use Claude's credential store directly instead of copying a setup-token into {_dhh_fn()}/.env."
             )
             return True
         return False
@@ -2920,7 +2926,7 @@ def cmd_import(args):
 
 def cmd_version(args):
     """Show version."""
-    print(f"Talaria Agent v{__version__} ({__release_date__})")
+    print(f"{default_branding('agent_name', 'Talaria Agent')} v{__version__} ({__release_date__})")
     print(f"Project: {PROJECT_ROOT}")
 
     # Show Python version
@@ -3091,7 +3097,7 @@ def _update_via_zip(args):
 
     branch = "main"
     zip_url = (
-        f"https://github.com/Jeonhui/Talaria-Agent/archive/refs/heads/{branch}.zip"
+        f"{DEFAULT_REPO_HTTPS_URL}/archive/refs/heads/{branch}.zip"
     )
 
     print("→ Downloading latest version...")
@@ -3305,7 +3311,7 @@ def _restore_stashed_changes(
         print(
             "  Restoring them may reapply local customizations onto the updated codebase."
         )
-        print("  Review the result afterward if Talaria behaves unexpectedly.")
+        print(f"  Review the result afterward if {default_branding('agent_short_name', 'Talaria')} behaves unexpectedly.")
         print("Restore local changes now? [Y/n]")
         if input_fn is not None:
             response = input_fn("Restore local changes now? [Y/n]", "y")
@@ -3369,7 +3375,7 @@ def _restore_stashed_changes(
     stash_selector = _resolve_stash_selector(git_cmd, cwd, stash_ref)
     if stash_selector is None:
         print(
-            "⚠ Local changes were restored, but Talaria couldn't find the stash entry to drop."
+            f"⚠ Local changes were restored, but {default_branding('agent_short_name', 'Talaria')} couldn't find the stash entry to drop."
         )
         print(
             "  The stash was left in place. You can remove it manually after checking the result."
@@ -3384,7 +3390,7 @@ def _restore_stashed_changes(
         )
         if drop.returncode != 0:
             print(
-                "⚠ Local changes were restored, but Talaria couldn't drop the saved stash entry."
+                f"⚠ Local changes were restored, but {default_branding('agent_short_name', 'Talaria')} couldn't drop the saved stash entry."
             )
             if drop.stdout.strip():
                 print(drop.stdout.strip())
@@ -3396,7 +3402,7 @@ def _restore_stashed_changes(
             _print_stash_cleanup_guidance(stash_ref, stash_selector)
 
     print("⚠ Local changes were restored on top of the updated codebase.")
-    print("  Review `git diff` / `git status` if Talaria behaves unexpectedly.")
+    print(f"  Review `git diff` / `git status` if {default_branding('agent_short_name', 'Talaria')} behaves unexpectedly.")
     return True
 
 
@@ -3404,13 +3410,24 @@ def _restore_stashed_changes(
 # Fork detection and upstream management for `talaria update`
 # =========================================================================
 
-OFFICIAL_REPO_URLS = {
-    "https://github.com/Jeonhui/Talaria-Agent.git",
-    "git@github.com:Jeonhui/Talaria-Agent.git",
-    "https://github.com/Jeonhui/Talaria-Agent",
-    "git@github.com:Jeonhui/Talaria-Agent",
-}
-OFFICIAL_REPO_URL = "https://github.com/Jeonhui/Talaria-Agent.git"
+from talaria_cli.branding import DEFAULT_REPO_URL as OFFICIAL_REPO_URL
+
+
+def _derive_repo_url_variants(https_dot_git: str) -> set:
+    """Return https/ssh + .git/no-suffix variants of a GitHub URL."""
+    base = https_dot_git.removesuffix(".git")  # https://github.com/<owner>/<repo>
+    if not base.startswith("https://github.com/"):
+        return {https_dot_git}
+    path = base[len("https://github.com/"):]  # <owner>/<repo>
+    return {
+        f"https://github.com/{path}.git",
+        f"git@github.com:{path}.git",
+        f"https://github.com/{path}",
+        f"git@github.com:{path}",
+    }
+
+
+OFFICIAL_REPO_URLS = _derive_repo_url_variants(OFFICIAL_REPO_URL)
 SKIP_UPSTREAM_PROMPT_FILE = ".skip_upstream_prompt"
 
 
@@ -3558,7 +3575,7 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path) -> None:
             print("→ Adding upstream remote...")
             if _add_upstream_remote(git_cmd, cwd):
                 print(
-                    "  ✓ Added upstream: https://github.com/Jeonhui/Talaria-Agent.git"
+                    f"  ✓ Added upstream: {OFFICIAL_REPO_URL}"
                 )
                 has_upstream = True
             else:
@@ -3566,7 +3583,7 @@ def _sync_with_upstream_if_needed(git_cmd: list[str], cwd: Path) -> None:
                 return
         else:
             print(
-                "  Skipped. Run 'git remote add upstream https://github.com/Jeonhui/Talaria-Agent.git' to add later."
+                f"  Skipped. Run 'git remote add upstream {OFFICIAL_REPO_URL}' to add later."
             )
             _mark_skip_upstream_prompt()
             return
@@ -4001,7 +4018,7 @@ def _cmd_update_check():
         print("✓ Already up to date.")
     else:
         commits_word = "commit" if behind == 1 else "commits"
-        print(f"⚕ Update available: {behind} {commits_word} behind origin/main.")
+        print(f"{BRAND_EMOJI} Update available: {behind} {commits_word} behind origin/main.")
         from talaria_cli.config import recommended_update_command
         print(f"  Run '{recommended_update_command()}' to install.")
 
@@ -4188,7 +4205,7 @@ def cmd_update(args):
     from talaria_cli.config import is_managed, managed_error
 
     if is_managed():
-        managed_error("update Talaria Agent")
+        managed_error(f"update {default_branding('agent_name', 'Talaria Agent')}")
         return
 
     if getattr(args, "check", False):
@@ -4217,7 +4234,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
         else None
     )
 
-    print("⚕ Updating Talaria Agent...")
+    print(f"{BRAND_EMOJI} Updating {default_branding('agent_name', 'Talaria Agent')}...")
     print()
 
     # Pre-update backup — runs before any git/file mutation so users can
@@ -4235,7 +4252,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
         else:
             print("✗ Not a git repository. Please reinstall:")
             print(
-                "  curl -fsSL https://raw.githubusercontent.com/Jeonhui/Talaria-Agent/main/scripts/install.sh | bash"
+                f"  curl -fsSL {DEFAULT_INSTALL_SCRIPT_URL} | bash"
             )
             sys.exit(1)
 
@@ -5002,7 +5019,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
 
             if supports_systemd_services() and has_legacy_talaria_units():
                 print()
-                print("⚠ Legacy Talaria gateway unit(s) detected:")
+                print(f"⚠ Legacy {default_branding('agent_short_name', 'Talaria')} gateway unit(s) detected:")
                 for name, path, is_sys in _find_legacy_talaria_units():
                     scope = "system" if is_sys else "user"
                     print(f"    {path}  ({scope} scope)")
@@ -5494,8 +5511,7 @@ def main():
         description=(
             "Manage the fallback provider chain.  Fallback providers are tried "
             "in order when the primary model fails with rate-limit, overload, or "
-            "connection errors.  See: "
-            "https://github.com/Jeonhui/Talaria-Agent"
+            f"connection errors.  See: {DEFAULT_REPO_HTTPS_URL}"
         ),
     )
     fallback_subparsers = fallback_parser.add_subparsers(dest="fallback_command")
@@ -5671,7 +5687,7 @@ def main():
     setup_parser = subparsers.add_parser(
         "setup",
         help="Interactive setup wizard",
-        description="Configure Talaria Agent with an interactive wizard. "
+        description=f"Configure {default_branding('agent_name', 'Talaria Agent')} with an interactive wizard. "
         "Run a specific section: talaria setup model|terminal|gateway|tools|agent",
     )
     setup_parser.add_argument(
@@ -5823,7 +5839,7 @@ def main():
     auth_status.add_argument("provider", help="Provider id")
     auth_logout = auth_subparsers.add_parser("logout", help="Log out a provider and clear stored auth state")
     auth_logout.add_argument("provider", help="Provider id")
-    auth_spotify = auth_subparsers.add_parser("spotify", help="Authenticate Talaria with Spotify via PKCE")
+    auth_spotify = auth_subparsers.add_parser("spotify", help=f"Authenticate {default_branding('agent_short_name', 'Talaria')} with Spotify via PKCE")
     auth_spotify.add_argument("spotify_action", nargs="?", choices=["login", "status", "logout"], default="login")
     auth_spotify.add_argument("--client-id", help="Spotify app client_id (or set TALARIA_SPOTIFY_CLIENT_ID)")
     auth_spotify.add_argument("--redirect-uri", help="Allow-listed localhost redirect URI for your Spotify app")
@@ -5838,7 +5854,7 @@ def main():
     status_parser = subparsers.add_parser(
         "status",
         help="Show status of all components",
-        description="Display status of Talaria Agent components",
+        description=f"Display status of {default_branding('agent_name', 'Talaria Agent')} components",
     )
     status_parser.add_argument(
         "--all", action="store_true", help="Show all details (redacted for sharing)"
@@ -6091,7 +6107,7 @@ def main():
     doctor_parser = subparsers.add_parser(
         "doctor",
         help="Check configuration and dependencies",
-        description="Diagnose issues with Talaria Agent setup",
+        description=f"Diagnose issues with {default_branding('agent_name', 'Talaria Agent')} setup",
     )
     doctor_parser.add_argument(
         "--fix", action="store_true", help="Attempt to fix issues automatically"
@@ -6104,7 +6120,7 @@ def main():
     dump_parser = subparsers.add_parser(
         "dump",
         help="Dump setup summary for support/debugging",
-        description="Output a compact, plain-text summary of your Talaria setup "
+        description=f"Output a compact, plain-text summary of your {default_branding('agent_short_name', 'Talaria')} setup "
         "that can be copy-pasted into Discord/GitHub for support context",
     )
     dump_parser.add_argument(

@@ -35,6 +35,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from tools.registry import registry
 
+
+def _discord_user_agent() -> str:
+    """Build the Discord REST User-Agent from theme branding."""
+    from talaria_cli.branding import DEFAULT_REPO_HTTPS_URL, default_branding
+    name = default_branding("agent_name", "Talaria Agent").replace(" ", "-")
+    return f"{name} ({DEFAULT_REPO_HTTPS_URL})"
+
 logger = logging.getLogger(__name__)
 
 DISCORD_API_BASE = "https://discord.com/api/v10"
@@ -79,7 +86,7 @@ def _discord_request(
         headers={
             "Authorization": f"Bot {token}",
             "Content-Type": "application/json",
-            "User-Agent": "Talaria-Agent (https://github.com/Jeonhui/Talaria-Agent)",
+            "User-Agent": _discord_user_agent(),
         },
     )
 

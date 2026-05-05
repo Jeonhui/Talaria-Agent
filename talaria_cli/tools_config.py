@@ -22,6 +22,7 @@ from talaria_cli.config import (
     load_config, save_config, get_env_value, save_env_value,
 )
 from talaria_cli.colors import Colors, color
+from talaria_cli.branding import BRAND_EMOJI, DEFAULT_REPO_HTTPS_URL
 from tools.tool_backend_helpers import fal_key_is_configured
 from utils import base_url_hostname
 
@@ -1603,7 +1604,7 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
     # Non-interactive summary mode for CLI usage
     if getattr(args, "summary", False):
         total = len(_get_effective_configurable_toolsets())
-        print(color("⚕ Tool Summary", Colors.CYAN, Colors.BOLD))
+        print(color(f"{BRAND_EMOJI} Tool Summary", Colors.CYAN, Colors.BOLD))
         print()
         summary = _platform_toolset_summary(config, enabled_platforms)
         for pkey in enabled_platforms:
@@ -1619,10 +1620,10 @@ def tools_command(args=None, first_install: bool = False, config: dict = None):
                 print(color("    (none enabled)", Colors.DIM))
         print()
         return
-    print(color("⚕ Talaria Tool Configuration", Colors.CYAN, Colors.BOLD))
+    print(color(f"{BRAND_EMOJI} Talaria Tool Configuration", Colors.CYAN, Colors.BOLD))
     print(color("  Enable or disable tools per platform.", Colors.DIM))
     print(color("  Tools that need API keys will be configured when enabled.", Colors.DIM))
-    print(color("  Guide: https://github.com/Jeonhui/Talaria-Agent", Colors.DIM))
+    print(color(f"  Guide: {DEFAULT_REPO_HTTPS_URL}", Colors.DIM))
     print()
 
     # ── First-time install: linear flow, no platform menu ──

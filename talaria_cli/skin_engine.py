@@ -65,8 +65,8 @@ All fields are optional. Missing values inherit from the ``default`` skin.
     branding:
       agent_name: "Talaria Agent"          # Banner title, status display
       welcome: "Welcome message"          # Shown at CLI startup
-      goodbye: "Goodbye! ⚕"              # Shown on exit
-      response_label: " ⚕ Talaria "       # Response box header label
+      goodbye: "Goodbye! 🪽"              # Shown on exit
+      response_label: " 🪽 Talaria "       # Response box header label
       prompt_symbol: "❯"                 # Input prompt symbol (bare token; renderers add trailing space)
       help_header: "(^_^)? Commands"      # /help header text
 
@@ -134,8 +134,10 @@ class SkinConfig:
     branding: Dict[str, str] = field(default_factory=dict)
     tool_prefix: str = "┊"
     tool_emojis: Dict[str, str] = field(default_factory=dict)  # per-tool emoji overrides
-    banner_logo: str = ""    # Rich-markup ASCII art logo (replaces TALARIA_AGENT_LOGO)
-    banner_hero: str = ""    # Rich-markup hero art (replaces TALARIA_CADUCEUS)
+    banner_logo: str = ""    # Rich-markup ASCII art logo (overrides theme.BANNER_LOGO)
+    banner_hero: str = ""    # Rich-markup hero art (overrides theme.BANNER_HERO_ART)
+    banner_layout: Dict[str, bool] = field(default_factory=dict)  # which banner sections to show
+    banner_custom_lines: List[str] = field(default_factory=list)  # custom Rich-markup lines at top of right column
 
     def get_color(self, key: str, fallback: str = "") -> str:
         """Get a color value with fallback."""
@@ -159,80 +161,11 @@ class SkinConfig:
 # Built-in skin definitions
 # =============================================================================
 
+from talaria_cli.branding import DEFAULT_SKIN, ALTERNATE_SKINS
+
 _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
-    "default": {
-        "name": "default",
-        "description": "Classic Talaria — gold and kawaii",
-        "colors": {
-            "banner_border": "#CD7F32",
-            "banner_title": "#FFD700",
-            "banner_accent": "#FFBF00",
-            "banner_dim": "#B8860B",
-            "banner_text": "#FFF8DC",
-            "ui_accent": "#FFBF00",
-            "ui_label": "#DAA520",
-            "ui_ok": "#4caf50",
-            "ui_error": "#ef5350",
-            "ui_warn": "#ffa726",
-            "prompt": "#FFF8DC",
-            "input_rule": "#CD7F32",
-            "response_border": "#FFD700",
-            "status_bar_bg": "#1a1a2e",
-            "session_label": "#DAA520",
-            "session_border": "#8B8682",
-        },
-        "spinner": {
-            # Empty = use hardcoded defaults in display.py
-        },
-        "branding": {
-            "agent_name": "Talaria Agent",
-            "welcome": "Welcome to Talaria Agent! Type your message or /help for commands.",
-            "goodbye": "Goodbye! ⚕",
-            "response_label": " ⚕ Talaria ",
-            "prompt_symbol": "❯",
-            "help_header": "(^_^)? Available Commands",
-        },
-        "tool_prefix": "┊",
-    },
-    "mono": {
-        "name": "mono",
-        "description": "Monochrome — clean grayscale",
-        "colors": {
-            "banner_border": "#555555",
-            "banner_title": "#e6edf3",
-            "banner_accent": "#aaaaaa",
-            "banner_dim": "#444444",
-            "banner_text": "#c9d1d9",
-            "ui_accent": "#aaaaaa",
-            "ui_label": "#888888",
-            "ui_ok": "#888888",
-            "ui_error": "#cccccc",
-            "ui_warn": "#999999",
-            "prompt": "#c9d1d9",
-            "input_rule": "#444444",
-            "response_border": "#aaaaaa",
-            "status_bar_bg": "#1F1F1F",
-            "status_bar_text": "#C9D1D9",
-            "status_bar_strong": "#E6EDF3",
-            "status_bar_dim": "#777777",
-            "status_bar_good": "#B5B5B5",
-            "status_bar_warn": "#AAAAAA",
-            "status_bar_bad": "#D0D0D0",
-            "status_bar_critical": "#F0F0F0",
-            "session_label": "#888888",
-            "session_border": "#555555",
-        },
-        "spinner": {},
-        "branding": {
-            "agent_name": "Talaria Agent",
-            "welcome": "Welcome to Talaria Agent! Type your message or /help for commands.",
-            "goodbye": "Goodbye! ⚕",
-            "response_label": " ⚕ Talaria ",
-            "prompt_symbol": "❯",
-            "help_header": "[?] Available Commands",
-        },
-        "tool_prefix": "┊",
-    },
+    "default": DEFAULT_SKIN,
+    **ALTERNATE_SKINS,
 }
 
 
@@ -272,6 +205,12 @@ def _build_skin_config(data: Dict[str, Any]) -> SkinConfig:
     spinner.update(data.get("spinner", {}))
     branding = dict(default.get("branding", {}))
     branding.update(data.get("branding", {}))
+    banner_layout = dict(default.get("banner_layout", {}))
+    banner_layout.update(data.get("banner_layout", {}))
+    custom_lines = data.get("banner_custom_lines",
+                            default.get("banner_custom_lines", []))
+    if not isinstance(custom_lines, list):
+        custom_lines = []
 
     return SkinConfig(
         name=data.get("name", "unknown"),
@@ -283,6 +222,8 @@ def _build_skin_config(data: Dict[str, Any]) -> SkinConfig:
         tool_emojis=data.get("tool_emojis", {}),
         banner_logo=data.get("banner_logo", ""),
         banner_hero=data.get("banner_hero", ""),
+        banner_layout=banner_layout,
+        banner_custom_lines=list(custom_lines),
     )
 
 
@@ -404,12 +345,55 @@ def get_active_help_header(fallback: str = "(^_^)? Available Commands") -> str:
 
 
 
-def get_active_goodbye(fallback: str = "Goodbye! ⚕") -> str:
+def get_active_goodbye(fallback: str = "Goodbye! 🪽") -> str:
     """Get the goodbye line from the active skin."""
     try:
         return get_active_skin().get_branding("goodbye", fallback)
     except Exception:
         return fallback
+
+
+def get_active_brand_emoji(fallback: str = "🪽") -> str:
+    """Get the brand emoji from the active skin (theme-driven default)."""
+    from talaria_cli.branding import default_branding
+    resolved = fallback or default_branding("brand_emoji", "🪽")
+    try:
+        return get_active_skin().get_branding("brand_emoji", resolved)
+    except Exception:
+        return resolved
+
+
+def get_active_agent_name(fallback: str = "Talaria Agent") -> str:
+    """Full agent name from the active skin (theme-driven default)."""
+    from talaria_cli.branding import default_branding
+    resolved = default_branding("agent_name", fallback)
+    try:
+        return get_active_skin().get_branding("agent_name", resolved)
+    except Exception:
+        return resolved
+
+
+def banner_layout_enabled(key: str, fallback: bool = True) -> bool:
+    """Whether the given banner section should render (theme/skin driven)."""
+    from talaria_cli.branding import banner_layout as _theme_layout
+    resolved = _theme_layout(key, fallback)
+    try:
+        skin_layout = get_active_skin().banner_layout or {}
+        if key in skin_layout:
+            return bool(skin_layout[key])
+    except Exception:
+        pass
+    return resolved
+
+
+def get_active_agent_short_name(fallback: str = "Talaria") -> str:
+    """Short agent name (first word) from the active skin."""
+    from talaria_cli.branding import default_branding
+    resolved = default_branding("agent_short_name", fallback)
+    try:
+        return get_active_skin().get_branding("agent_short_name", resolved)
+    except Exception:
+        return resolved
 
 
 

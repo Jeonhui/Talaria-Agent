@@ -56,6 +56,7 @@ import yaml
 
 from talaria_cli.colors import Colors, color
 from talaria_cli.default_soul import DEFAULT_SOUL_MD
+from talaria_cli.branding import BRAND_EMOJI
 
 
 # =============================================================================
@@ -213,6 +214,35 @@ def get_project_root() -> Path:
     """Get the project installation directory."""
     return Path(__file__).parent.parent.resolve()
 
+
+def get_display_name(default: Optional[str] = None) -> str:
+    """Return the user's display name from ``config.yaml``.
+
+    Reads ``user.display_name`` from ``~/.talaria/config.yaml``. Falls back
+    to ``default`` when provided, otherwise to the OS username. Pure
+    convenience helper — code that wants the user's preferred display name
+    (banner greeting, response prefix, etc.) calls this once.
+
+    Examples in ``config.yaml``::
+
+        user:
+          display_name: "Johnny"
+    """
+    try:
+        cfg = load_config() or {}
+        name = cfg_get(cfg, "user", "display_name", default="")
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    except Exception:
+        pass
+    if default:
+        return default
+    try:
+        import getpass
+        return getpass.getuser()
+    except Exception:
+        return "user"
+
 def _secure_dir(path):
     """Set directory to owner-only access (0700 by default). No-op on Windows.
 
@@ -283,11 +313,35 @@ def _secure_file(path):
 
 
 def _ensure_default_soul_md(home: Path) -> None:
-    """Seed a default SOUL.md into TALARIA_HOME if the user doesn't have one yet."""
+    """Seed a default SOUL.md into TALARIA_HOME if the user doesn't have one yet.
+
+    Injects the configured ``user.display_name`` (if any) so the seeded SOUL
+    addresses the user by name on first run. Users are free to edit
+    afterwards — this seed never overwrites an existing file.
+    """
     soul_path = home / "SOUL.md"
     if soul_path.exists():
         return
-    soul_path.write_text(DEFAULT_SOUL_MD, encoding="utf-8")
+    from talaria_cli.default_soul import render_default_soul
+    user_name = ""
+    try:
+        # Best-effort: read display_name from a partial config if it
+        # already exists (e.g. seeded by an installer). Avoid recursion
+        # via load_config() since this runs during home setup.
+        cfg_path = home / "config.yaml"
+        if cfg_path.is_file():
+            import yaml
+            with open(cfg_path, "r", encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+            if isinstance(raw, dict):
+                user_block = raw.get("user")
+                if isinstance(user_block, dict):
+                    name = user_block.get("display_name")
+                    if isinstance(name, str) and name.strip():
+                        user_name = name.strip()
+    except Exception:
+        user_name = ""
+    soul_path.write_text(render_default_soul(user_name), encoding="utf-8")
     _secure_file(soul_path)
 
 
@@ -861,7 +915,7 @@ DEFAULT_CONFIG = {
     # WhatsApp platform settings (gateway mode)
     "whatsapp": {
         # Reply prefix prepended to every outgoing WhatsApp message.
-        # Default (None) uses the built-in "⚕ *Talaria Agent*" header.
+        # Default (None) uses the built-in "🪽 *Talaria Agent*" header.
         # Set to "" (empty string) to disable the header entirely.
         # Supports \n for newlines, e.g. "🤖 *My Bot*\n──────\n"
     },
@@ -3255,7 +3309,7 @@ def show_config():
     
     print()
     print(color("┌─────────────────────────────────────────────────────────┐", Colors.CYAN))
-    print(color("│              ⚕ Talaria Configuration                    │", Colors.CYAN))
+    print(color(f"│              {BRAND_EMOJI} Talaria Configuration                    │", Colors.CYAN))
     print(color("└─────────────────────────────────────────────────────────┘", Colors.CYAN))
     
     # Paths

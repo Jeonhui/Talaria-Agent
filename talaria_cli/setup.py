@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
-_DOCS_BASE = "https://github.com/Jeonhui/Talaria-Agent"
+from talaria_cli.branding import DEFAULT_REPO_HTTPS_URL as _DOCS_BASE  # noqa: E402
 
 
 def _model_config_dict(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -144,6 +144,7 @@ from talaria_cli.config import (
 # display_talaria_home imported lazily at call sites (stale-module safety during talaria update)
 
 from talaria_cli.colors import Colors, color
+from talaria_cli.branding import BRAND_EMOJI, default_branding
 
 
 def print_header(title: str):
@@ -174,13 +175,13 @@ def is_interactive_stdin() -> bool:
 def print_noninteractive_setup_guidance(reason: str | None = None) -> None:
     """Print guidance for headless/non-interactive setup flows."""
     print()
-    print(color("⚕ Talaria Setup — Non-interactive mode", Colors.CYAN, Colors.BOLD))
+    print(color(f"{BRAND_EMOJI} Talaria Setup — Non-interactive mode", Colors.CYAN, Colors.BOLD))
     print()
     if reason:
         print_info(reason)
     print_info("The interactive wizard cannot be used here.")
     print()
-    print_info("Configure Talaria using environment variables or config commands:")
+    print_info(f"Configure {default_branding('agent_short_name', 'Talaria')} using environment variables or config commands:")
     print_info("  talaria config set model.provider custom")
     print_info("  talaria config set model.base_url http://localhost:8080/v1")
     print_info("  talaria config set model.default your-model-name")
@@ -645,7 +646,7 @@ def setup_model_provider(config: dict, *, quick: bool = False):
             print()
             print_header("Same-Provider Fallback & Rotation")
             print_info(
-                "Talaria can keep multiple credentials for one provider and rotate between"
+                f"{default_branding('agent_short_name', 'Talaria')} can keep multiple credentials for one provider and rotate between"
             )
             print_info(
                 "them when a credential is exhausted or rate-limited. This preserves"
@@ -1770,7 +1771,7 @@ def run_setup_wizard(args):
                         Colors.MAGENTA,
                     )
                 )
-                print(color(f"│     ⚕ Talaria Setup — {label:<34s} │", Colors.MAGENTA))
+                print(color(f"│     {BRAND_EMOJI} Talaria Setup — {label:<34s} │", Colors.MAGENTA))
                 print(
                     color(
                         "└─────────────────────────────────────────────────────────┘",

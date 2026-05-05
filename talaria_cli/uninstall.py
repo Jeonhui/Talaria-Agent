@@ -14,6 +14,7 @@ from pathlib import Path
 from talaria_constants import get_talaria_home
 
 from talaria_cli.colors import Colors, color
+from talaria_cli.branding import BRAND_EMOJI, DEFAULT_INSTALL_SCRIPT_URL
 
 def log_info(msg: str):
     print(f"{color('→', Colors.CYAN)} {msg}")
@@ -297,7 +298,7 @@ def run_uninstall(args):
 
     print()
     print(color("┌─────────────────────────────────────────────────────────┐", Colors.MAGENTA, Colors.BOLD))
-    print(color("│            ⚕ Talaria Agent Uninstaller                  │", Colors.MAGENTA, Colors.BOLD))
+    print(color(f"│            {BRAND_EMOJI} Talaria Agent Uninstaller                  │", Colors.MAGENTA, Colors.BOLD))
     print(color("└─────────────────────────────────────────────────────────┘", Colors.MAGENTA, Colors.BOLD))
     print()
     
@@ -471,11 +472,11 @@ def run_uninstall(args):
         print(f"  {talaria_home}/")
         print()
         print("To reinstall later with your existing settings:")
-        print(color("  curl -fsSL https://raw.githubusercontent.com/Jeonhui/Talaria-Agent/main/scripts/install.sh | bash", Colors.DIM))
+        print(color(f"  curl -fsSL {DEFAULT_INSTALL_SCRIPT_URL} | bash", Colors.DIM))
         print()
     
     print(color("Reload your shell to complete the process:", Colors.YELLOW))
     print("  source ~/.bashrc  # or ~/.zshrc")
     print()
-    print("Thank you for using Talaria Agent! ⚕")
+    print(f"Thank you for using Talaria Agent! {BRAND_EMOJI}")
     print()

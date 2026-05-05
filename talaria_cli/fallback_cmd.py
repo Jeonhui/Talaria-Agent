@@ -135,7 +135,8 @@ def cmd_fallback_list(args) -> None:  # noqa: ARG001
         print(f"    {i}. {_format_entry(entry)}")
     print()
     print("  Tried in order when the primary fails (rate-limit, 5xx, connection errors).")
-    print("  Docs: https://github.com/Jeonhui/Talaria-Agent")
+    from talaria_cli.branding import DEFAULT_REPO_HTTPS_URL
+    print(f"  Docs: {DEFAULT_REPO_HTTPS_URL}")
     print()
 
 

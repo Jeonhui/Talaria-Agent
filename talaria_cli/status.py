@@ -14,6 +14,7 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 from talaria_cli.auth import AuthError, resolve_provider
 from talaria_cli.colors import Colors, color
+from talaria_cli.branding import BRAND_EMOJI
 from talaria_cli.config import get_env_path, get_env_value, get_talaria_home, load_config
 from talaria_cli.models import provider_label
 from talaria_cli.runtime_provider import resolve_requested_provider
@@ -91,7 +92,7 @@ def show_status(args):
 
     print()
     print(color("┌─────────────────────────────────────────────────────────┐", Colors.CYAN))
-    print(color("│                 ⚕ Talaria Agent Status                  │", Colors.CYAN))
+    print(color(f"│                 {BRAND_EMOJI} Talaria Agent Status                  │", Colors.CYAN))
     print(color("└─────────────────────────────────────────────────────────┘", Colors.CYAN))
 
     # =========================================================================

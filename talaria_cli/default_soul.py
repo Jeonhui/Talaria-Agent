@@ -1,11 +1,17 @@
-"""Default SOUL.md template seeded into TALARIA_HOME on first run."""
+"""Default SOUL.md template seeded into TALARIA_HOME on first run.
 
-DEFAULT_SOUL_MD = (
-    "You are Talaria Agent, an intelligent AI assistant. "
-    "You are helpful, knowledgeable, and direct. You assist users with a wide "
-    "range of tasks including answering questions, writing and editing code, "
-    "analyzing information, creative work, and executing actions via your tools. "
-    "You communicate clearly, admit uncertainty when appropriate, and prioritize "
-    "being genuinely useful over being verbose unless otherwise directed below. "
-    "Be targeted and efficient in your exploration and investigations."
-)
+The body is sourced from ``branding.build_agent_identity`` so a fork only
+edits ``branding.py`` to retheme the seeded identity.
+"""
+
+from talaria_cli.branding import DEFAULT_AGENT_IDENTITY, build_agent_identity
+
+
+def render_default_soul(user_name: str = "") -> str:
+    """Render the SOUL.md text, optionally addressing a known user."""
+    return build_agent_identity(user_name)
+
+
+# Backwards-compatible constant — used by callers that don't need the
+# user-name variant.
+DEFAULT_SOUL_MD = DEFAULT_AGENT_IDENTITY

@@ -43,13 +43,15 @@ def cprint(text: str):
 # Skin-aware color helpers
 # =========================================================================
 
-def _skin_color(key: str, fallback: str) -> str:
-    """Get a color from the active skin, or return fallback."""
+def _skin_color(key: str, fallback: str = "") -> str:
+    """Get a color from the active skin, or fall back to theme default."""
+    from talaria_cli.branding import default_color
+    resolved_fallback = fallback or default_color(key, "")
     try:
         from talaria_cli.skin_engine import get_active_skin
-        return get_active_skin().get_color(key, fallback)
+        return get_active_skin().get_color(key, resolved_fallback)
     except Exception:
-        return fallback
+        return resolved_fallback
 
 
 def _skin_branding(key: str, fallback: str) -> str:
@@ -66,27 +68,7 @@ def _skin_branding(key: str, fallback: str) -> str:
 # =========================================================================
 
 from talaria_cli import __version__ as VERSION, __release_date__ as RELEASE_DATE
-
-TALARIA_AGENT_LOGO = """[bold #FFD700]
-████████╗ █████╗ ██╗      █████╗ ██████╗ ██╗ █████╗ 
-╚══██╔══╝██╔══██╗██║     ██╔══██╗██╔══██╗██║██╔══██╗
-   ██║   ███████║██║     ███████║██████╔╝██║███████║
-   ██║   ██╔══██║██║     ██╔══██║██╔══██╗██║██╔══██║
-   ██║   ██║  ██║███████╗██║  ██║██║  ██║██║██║  ██║
-   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝
-[/]"""
-
-TALARIA_CADUCEUS = """[bold #FFD700]⠀⠀⠀⠀⢀⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[bold #FFD700]⠀⠀⠈⢿⣷⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠉⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⢀⣠⣤⣄⡀⠀⠀⠀⠀⠀⠈⠙⠿⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⢠⣾⠟⠉⠉⠻⣷⡀⠀⠀⠀⠀⠀⠀⠈⠹⢿⣿⣷⡀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⢸⣿⣄⣀⣀⣠⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠿⠿⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⢀⣀⣤⣤⣤⣤⣤⣤⣤⣬⣷⣶⣟⣁⣤⣤⣤⣤⣤⣤⣄⣀⡀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠈⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁⠀⠀⠀⠀[/]"""
+from talaria_cli.branding import BANNER_LOGO, BANNER_HERO_ART
 
 
 
@@ -125,7 +107,7 @@ _UPDATE_CHECK_CACHE_SECONDS = 6 * 3600
 # (e.g. nix-built talaria — no local git history to count against).
 UPDATE_AVAILABLE_NO_COUNT = -1
 
-_UPSTREAM_REPO_URL = "https://github.com/Jeonhui/Talaria-Agent.git"
+from talaria_cli.branding import DEFAULT_REPO_URL as _UPSTREAM_REPO_URL
 
 
 def _check_via_rev(local_rev: str) -> Optional[int]:
@@ -274,7 +256,7 @@ def get_git_banner_state(repo_dir: Optional[Path] = None) -> Optional[dict]:
     return {"upstream": upstream, "local": local, "ahead": max(ahead, 0)}
 
 
-_RELEASE_URL_BASE = "https://github.com/Jeonhui/Talaria-Agent/releases/tag"
+from talaria_cli.branding import DEFAULT_RELEASE_URL_BASE as _RELEASE_URL_BASE
 _latest_release_cache: Optional[tuple] = None  # (tag, url) once resolved
 
 
@@ -435,37 +417,74 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
             disabled_tools.update(tools_in_ts)
 
     layout_table = Table.grid(padding=(0, 2))
-    layout_table.add_column("left", justify="center")
-    layout_table.add_column("right", justify="left")
 
     # Resolve skin colors once for the entire banner
-    accent = _skin_color("banner_accent", "#FFBF00")
-    dim = _skin_color("banner_dim", "#B8860B")
-    text = _skin_color("banner_text", "#FFF8DC")
-    session_color = _skin_color("session_border", "#8B8682")
+    accent = _skin_color("banner_accent")
+    dim = _skin_color("banner_dim")
+    text = _skin_color("banner_text")
+    session_color = _skin_color("session_border")
+    error_color = _skin_color("ui_error")
+    warn_color = _skin_color("ui_warn")
+
+    # Layout toggles — let the active theme/skin hide whole sections
+    from talaria_cli.skin_engine import banner_layout_enabled
+    show_logo = banner_layout_enabled("show_logo")
+    show_hero = banner_layout_enabled("show_hero_art")
+    show_model = banner_layout_enabled("show_model")
+    show_cwd = banner_layout_enabled("show_cwd")
+    show_session = banner_layout_enabled("show_session_id")
+    show_custom = banner_layout_enabled("show_custom")
+    show_tools = banner_layout_enabled("show_tools")
+    show_mcp = banner_layout_enabled("show_mcp_servers")
+    show_skills = banner_layout_enabled("show_skills")
+    show_profile = banner_layout_enabled("show_profile")
+    show_summary = banner_layout_enabled("show_summary")
+    show_update = banner_layout_enabled("show_update_warning")
 
     # Use skin's custom caduceus art if provided
     try:
         from talaria_cli.skin_engine import get_active_skin
         _bskin = get_active_skin()
-        _hero = _bskin.banner_hero if hasattr(_bskin, 'banner_hero') and _bskin.banner_hero else TALARIA_CADUCEUS
+        _hero = _bskin.banner_hero if hasattr(_bskin, 'banner_hero') and _bskin.banner_hero else BANNER_HERO_ART
     except Exception:
         _bskin = None
-        _hero = TALARIA_CADUCEUS
-    left_lines = ["", _hero, ""]
+        _hero = BANNER_HERO_ART
+    left_lines: List[str] = []
+    if show_hero:
+        left_lines.extend(["", _hero, ""])
     model_short = model.split("/")[-1] if "/" in model else model
     if model_short.endswith(".gguf"):
         model_short = model_short[:-5]
     if len(model_short) > 28:
         model_short = model_short[:25] + "..."
     ctx_str = f" [dim {dim}]·[/] [dim {dim}]{_format_context_length(context_length)} context[/]" if context_length else ""
-    left_lines.append(f"[{accent}]{model_short}[/]{ctx_str}")
-    left_lines.append(f"[dim {dim}]{cwd}[/]")
-    if session_id:
+    if show_model:
+        left_lines.append(f"[{accent}]{model_short}[/]{ctx_str}")
+    if show_cwd:
+        left_lines.append(f"[dim {dim}]{cwd}[/]")
+    if show_session and session_id:
         left_lines.append(f"[dim {session_color}]Session: {session_id}[/]")
     left_content = "\n".join(left_lines)
 
-    right_lines = [f"[bold {accent}]Available Tools[/]"]
+    right_lines: List[str] = []
+
+    # Custom user lines at the very top of the right column. Each entry is
+    # one line; Rich markup is preserved. Falls back to the theme default
+    # when the active skin doesn't override.
+    if show_custom:
+        custom_lines: List[str] = []
+        try:
+            if _bskin is not None and getattr(_bskin, "banner_custom_lines", None):
+                custom_lines = list(_bskin.banner_custom_lines)
+        except Exception:
+            custom_lines = []
+        if not custom_lines:
+            from talaria_cli.branding import DEFAULT_BANNER_CUSTOM_LINES
+            custom_lines = list(DEFAULT_BANNER_CUSTOM_LINES)
+        if custom_lines:
+            right_lines.extend(custom_lines)
+            right_lines.append("")  # blank separator before next section
+
     toolsets_dict: Dict[str, list] = {}
 
     for tool in tools:
@@ -482,56 +501,58 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
             if tool_name not in toolsets_dict[display_name]:
                 toolsets_dict[display_name].append(tool_name)
 
-    sorted_toolsets = sorted(toolsets_dict.keys())
-    display_toolsets = sorted_toolsets[:8]
-    remaining_toolsets = len(sorted_toolsets) - 8
+    if show_tools:
+        right_lines.append(f"[bold {accent}]Available Tools[/]")
+        sorted_toolsets = sorted(toolsets_dict.keys())
+        display_toolsets = sorted_toolsets[:8]
+        remaining_toolsets = len(sorted_toolsets) - 8
 
-    for toolset in display_toolsets:
-        tool_names = toolsets_dict[toolset]
-        colored_names = []
-        for name in sorted(tool_names):
-            if name in disabled_tools:
-                colored_names.append(f"[red]{name}[/]")
-            elif name in lazy_tools:
-                colored_names.append(f"[yellow]{name}[/]")
-            else:
-                colored_names.append(f"[{text}]{name}[/]")
-
-        tools_str = ", ".join(colored_names)
-        if len(", ".join(sorted(tool_names))) > 45:
-            short_names = []
-            length = 0
-            for name in sorted(tool_names):
-                if length + len(name) + 2 > 42:
-                    short_names.append("...")
-                    break
-                short_names.append(name)
-                length += len(name) + 2
+        for toolset in display_toolsets:
+            tool_names = toolsets_dict[toolset]
             colored_names = []
-            for name in short_names:
-                if name == "...":
-                    colored_names.append("[dim]...[/]")
-                elif name in disabled_tools:
-                    colored_names.append(f"[red]{name}[/]")
+            for name in sorted(tool_names):
+                if name in disabled_tools:
+                    colored_names.append(f"[{error_color}]{name}[/]")
                 elif name in lazy_tools:
-                    colored_names.append(f"[yellow]{name}[/]")
+                    colored_names.append(f"[{warn_color}]{name}[/]")
                 else:
                     colored_names.append(f"[{text}]{name}[/]")
+
             tools_str = ", ".join(colored_names)
+            if len(", ".join(sorted(tool_names))) > 45:
+                short_names = []
+                length = 0
+                for name in sorted(tool_names):
+                    if length + len(name) + 2 > 42:
+                        short_names.append("...")
+                        break
+                    short_names.append(name)
+                    length += len(name) + 2
+                colored_names = []
+                for name in short_names:
+                    if name == "...":
+                        colored_names.append(f"[dim {dim}]...[/]")
+                    elif name in disabled_tools:
+                        colored_names.append(f"[{error_color}]{name}[/]")
+                    elif name in lazy_tools:
+                        colored_names.append(f"[{warn_color}]{name}[/]")
+                    else:
+                        colored_names.append(f"[{text}]{name}[/]")
+                tools_str = ", ".join(colored_names)
 
-        right_lines.append(f"[dim {dim}]{toolset}:[/] {tools_str}")
+            right_lines.append(f"[dim {dim}]{toolset}:[/] {tools_str}")
 
-    if remaining_toolsets > 0:
-        right_lines.append(f"[dim {dim}](and {remaining_toolsets} more toolsets...)[/]")
+        if remaining_toolsets > 0:
+            right_lines.append(f"[dim {dim}](and {remaining_toolsets} more toolsets...)[/]")
 
-    # MCP Servers section (only if configured)
+    # MCP Servers section (only if configured + section enabled)
     try:
         from tools.mcp_tool import get_mcp_status
         mcp_status = get_mcp_status()
     except Exception:
         mcp_status = []
 
-    if mcp_status:
+    if show_mcp and mcp_status:
         right_lines.append("")
         right_lines.append(f"[bold {accent}]MCP Servers[/]")
         for srv in mcp_status:
@@ -542,74 +563,96 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
                 )
             else:
                 right_lines.append(
-                    f"[red]{srv['name']}[/] [dim]({srv['transport']})[/] "
-                    f"[red]— failed[/]"
+                    f"[{error_color}]{srv['name']}[/] [dim {dim}]({srv['transport']})[/] "
+                    f"[{error_color}]— failed[/]"
                 )
 
-    right_lines.append("")
-    right_lines.append(f"[bold {accent}]Available Skills[/]")
     skills_by_category = get_available_skills()
     total_skills = sum(len(s) for s in skills_by_category.values())
 
-    if skills_by_category:
-        for category in sorted(skills_by_category.keys()):
-            skill_names = sorted(skills_by_category[category])
-            if len(skill_names) > 8:
-                display_names = skill_names[:8]
-                skills_str = ", ".join(display_names) + f" +{len(skill_names) - 8} more"
-            else:
-                skills_str = ", ".join(skill_names)
-            if len(skills_str) > 50:
-                skills_str = skills_str[:47] + "..."
-            right_lines.append(f"[dim {dim}]{category}:[/] [{text}]{skills_str}[/]")
-    else:
-        right_lines.append(f"[dim {dim}]No skills installed[/]")
+    if show_skills:
+        right_lines.append("")
+        right_lines.append(f"[bold {accent}]Available Skills[/]")
+        if skills_by_category:
+            for category in sorted(skills_by_category.keys()):
+                skill_names = sorted(skills_by_category[category])
+                if len(skill_names) > 8:
+                    display_names = skill_names[:8]
+                    skills_str = ", ".join(display_names) + f" +{len(skill_names) - 8} more"
+                else:
+                    skills_str = ", ".join(skill_names)
+                if len(skills_str) > 50:
+                    skills_str = skills_str[:47] + "..."
+                right_lines.append(f"[dim {dim}]{category}:[/] [{text}]{skills_str}[/]")
+        else:
+            right_lines.append(f"[dim {dim}]No skills installed[/]")
 
-    right_lines.append("")
     mcp_connected = sum(1 for s in mcp_status if s["connected"]) if mcp_status else 0
-    summary_parts = [f"{len(tools)} tools", f"{total_skills} skills"]
-    if mcp_connected:
-        summary_parts.append(f"{mcp_connected} MCP servers")
-    summary_parts.append("/help for commands")
-    # Show active profile name when not 'default'
-    try:
-        from talaria_cli.profiles import get_active_profile_name
-        _profile_name = get_active_profile_name()
-        if _profile_name and _profile_name != "default":
-            right_lines.append(f"[bold {accent}]Profile:[/] [{text}]{_profile_name}[/]")
-    except Exception:
-        pass  # Never break the banner over a profiles.py bug
 
-    right_lines.append(f"[dim {dim}]{' · '.join(summary_parts)}[/]")
+    # Show active profile name when not 'default'
+    if show_profile:
+        try:
+            from talaria_cli.profiles import get_active_profile_name
+            _profile_name = get_active_profile_name()
+            if _profile_name and _profile_name != "default":
+                right_lines.append("")
+                right_lines.append(f"[bold {accent}]Profile:[/] [{text}]{_profile_name}[/]")
+        except Exception:
+            pass  # Never break the banner over a profiles.py bug
+
+    if show_summary:
+        summary_parts = [f"{len(tools)} tools", f"{total_skills} skills"]
+        if mcp_connected:
+            summary_parts.append(f"{mcp_connected} MCP servers")
+        summary_parts.append("/help for commands")
+        right_lines.append("")
+        right_lines.append(f"[dim {dim}]{' · '.join(summary_parts)}[/]")
 
     # Update check — use prefetched result if available
-    try:
-        behind = get_update_result(timeout=0.5)
-        if behind is not None and behind != 0:
-            from talaria_cli.config import get_managed_update_command, recommended_update_command
-            if behind > 0:
-                commits_word = "commit" if behind == 1 else "commits"
-                right_lines.append(
-                    f"[bold yellow]⚠ {behind} {commits_word} behind[/]"
-                    f"[dim yellow] — run [bold]{recommended_update_command()}[/bold] to update[/]"
-                )
-            else:
-                # UPDATE_AVAILABLE_NO_COUNT: nix-built talaria; we know an update
-                # exists but not by how much, and we don't know how the user
-                # installed it (nix run, profile, system flake, home-manager).
-                managed_cmd = get_managed_update_command()
-                line = "[bold yellow]⚠ update available[/]"
-                if managed_cmd:
-                    line += f"[dim yellow] — run [bold]{managed_cmd}[/bold][/]"
-                right_lines.append(line)
-    except Exception:
-        pass  # Never break the banner over an update check
+    if show_update:
+        try:
+            behind = get_update_result(timeout=0.5)
+            if behind is not None and behind != 0:
+                from talaria_cli.config import get_managed_update_command, recommended_update_command
+                if behind > 0:
+                    commits_word = "commit" if behind == 1 else "commits"
+                    right_lines.append(
+                        f"[bold {warn_color}]⚠ {behind} {commits_word} behind[/]"
+                        f"[dim {warn_color}] — run [bold]{recommended_update_command()}[/bold] to update[/]"
+                    )
+                else:
+                    # UPDATE_AVAILABLE_NO_COUNT: nix-built talaria; we know an update
+                    # exists but not by how much, and we don't know how the user
+                    # installed it (nix run, profile, system flake, home-manager).
+                    managed_cmd = get_managed_update_command()
+                    line = f"[bold {warn_color}]⚠ update available[/]"
+                    if managed_cmd:
+                        line += f"[dim {warn_color}] — run [bold]{managed_cmd}[/bold][/]"
+                    right_lines.append(line)
+        except Exception:
+            pass  # Never break the banner over an update check
 
     right_content = "\n".join(right_lines)
-    layout_table.add_row(left_content, right_content)
+    # Collapse to a single centered column whenever one side is empty —
+    # otherwise the populated side would hug the edge after empty-column
+    # padding.
+    if not right_lines and left_lines:
+        layout_table.add_column("center", justify="center")
+        layout_table.add_row(left_content)
+    elif right_lines and not left_lines:
+        layout_table.add_column("center", justify="center")
+        layout_table.add_row(right_content)
+    elif not right_lines and not left_lines:
+        # Both sides empty — render nothing (panel will just show title/border).
+        layout_table.add_column("center", justify="center")
+        layout_table.add_row("")
+    else:
+        layout_table.add_column("left", justify="left")
+        layout_table.add_column("right", justify="left")
+        layout_table.add_row(left_content, right_content)
 
-    title_color = _skin_color("banner_title", "#FFD700")
-    border_color = _skin_color("banner_border", "#CD7F32")
+    title_color = _skin_color("banner_title")
+    border_color = _skin_color("banner_border")
     version_label = format_banner_version_label()
     release_info = get_latest_release_tag()
     if release_info:
@@ -626,8 +669,8 @@ def build_welcome_banner(console: Console, model: str, cwd: str,
 
     console.print()
     term_width = shutil.get_terminal_size().columns
-    if term_width >= 95:
-        _logo = _bskin.banner_logo if _bskin and hasattr(_bskin, 'banner_logo') and _bskin.banner_logo else TALARIA_AGENT_LOGO
+    if show_logo and term_width >= 95:
+        _logo = _bskin.banner_logo if _bskin and hasattr(_bskin, 'banner_logo') and _bskin.banner_logo else BANNER_LOGO
         console.print(_logo)
         console.print()
     console.print(outer_panel)

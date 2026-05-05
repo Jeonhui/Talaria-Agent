@@ -7,7 +7,7 @@ license: MIT
 metadata:
   talaria:
     tags: [debugging, python, pdb, debugpy, breakpoints, dap, post-mortem]
-    related_skills: [systematic-debugging, node-inspect-debugger, debugging-talaria-tui-commands]
+    related_skills: [systematic-debugging, node-inspect-debugger]
 ---
 
 # Python Debugger (pdb + debugpy)

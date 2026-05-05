@@ -1600,6 +1600,11 @@ class ChatConsole:
     so colors and markup render correctly inside the interactive chat loop.
     Drop-in replacement for Rich Console — just pass this to any function
     that expects a console.print() interface.
+
+    A single ``_cprint`` is issued per ``print()`` call (rather than one per
+    rendered line) so prompt_toolkit's renderer doesn't fire a CPR query
+    (``ESC[6n``) for every line of multi-line output. CPR responses can leak
+    back as visible ``^[[<row>;<col>R`` text in slow PTYs / SSH sessions.
     """
 
     def __init__(self):
@@ -1618,9 +1623,23 @@ class ChatConsole:
         # Read terminal width at render time so panels adapt to current size
         self._inner.width = shutil.get_terminal_size((80, 24)).columns
         self._inner.print(*args, **kwargs)
-        output = self._buffer.getvalue()
-        for line in output.rstrip("\n").split("\n"):
-            _cprint(line)
+        output = self._buffer.getvalue().rstrip("\n")
+        if output:
+            _cprint(output)
+
+
+# Module-level singleton — reused across show_help, status prints, slash
+# command output, etc.  Avoids reinitializing the Rich Console + StringIO
+# for every print, which adds up under high-output paths like /help.
+_shared_chat_console: Optional["ChatConsole"] = None
+
+
+def _get_chat_console() -> "ChatConsole":
+    """Return the shared ChatConsole singleton, lazily created."""
+    global _shared_chat_console
+    if _shared_chat_console is None:
+        _shared_chat_console = ChatConsole()
+    return _shared_chat_console
 
     @contextmanager
     def status(self, *_args, **_kwargs):
@@ -1635,30 +1654,6 @@ class ChatConsole:
         """
         yield self
 
-# ASCII Art - TALARIA-AGENT logo (full width, single line - requires ~95 char terminal)
-TALARIA_AGENT_LOGO = """[bold #FFD700]
-████████╗ █████╗ ██╗      █████╗ ██████╗ ██╗ █████╗ 
-╚══██╔══╝██╔══██╗██║     ██╔══██╗██╔══██╗██║██╔══██╗
-   ██║   ███████║██║     ███████║██████╔╝██║███████║
-   ██║   ██╔══██║██║     ██╔══██║██╔══██╗██║██╔══██║
-   ██║   ██║  ██║███████╗██║  ██║██║  ██║██║██║  ██║
-   ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝╚═╝  ╚═╝
-[/]"""
-
-# ASCII Art - Talaria winged sandal (Greek sandal w/ ankle loop + thin sole)
-TALARIA_CADUCEUS = """[bold #FFD700]⠀⠀⠀⠀⢀⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[bold #FFD700]⠀⠀⠈⢿⣷⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠉⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFD700]⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀[/]
-[#FFBF00]⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢿⣿⣷⣦⣄⡀⠀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⠀⠀⢀⣠⣤⣄⡀⠀⠀⠀⠀⠀⠈⠙⠿⣿⣿⣦⡀⠀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⢠⣾⠟⠉⠉⠻⣷⡀⠀⠀⠀⠀⠀⠀⠈⠹⢿⣿⣷⡀⠀⠀⠀⠀⠀[/]
-[#CD7F32]⠀⠀⠀⠀⠀⢸⣿⣄⣀⣀⣠⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠘⠿⠿⠀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⢀⣀⣤⣤⣤⣤⣤⣤⣤⣬⣷⣶⣟⣁⣤⣤⣤⣤⣤⣤⣄⣀⡀⠀⠀⠀⠀[/]
-[#B8860B]⠀⠀⠀⠀⠈⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠁⠀⠀⠀⠀[/]"""
-
-
 def _build_compact_banner() -> str:
     """Build a compact banner that fits the current terminal width."""
     try:
@@ -1672,11 +1667,15 @@ def _build_compact_banner() -> str:
     title_color = _skin.get_color("banner_title", "#FFBF00") if _skin else "#FFBF00"
     dim_color = _skin.get_color("banner_dim", "#B8860B") if _skin else "#B8860B"
 
+    from talaria_cli.skin_engine import get_active_brand_emoji
+    from talaria_cli.branding import default_branding
+    _emoji = get_active_brand_emoji()
+    _default_name = default_branding("agent_name", "Talaria Agent")
+    agent_name = _skin.get_branding("agent_name", _default_name) if _skin else _default_name
     if skin_name == "default":
-        line1 = "⚕ TALARIA AGENT - AI Agent Framework"
-        tiny_line = "⚕ TALARIA AGENT"
+        line1 = f"{_emoji} {agent_name.upper()} - AI Agent Framework"
+        tiny_line = f"{_emoji} {agent_name.upper()}"
     else:
-        agent_name = _skin.get_branding("agent_name", "Talaria Agent") if _skin else "Talaria Agent"
         line1 = f"{agent_name} - AI Agent Framework"
         tiny_line = agent_name
 
@@ -2416,6 +2415,8 @@ class TalariaCLI:
 
     def _build_status_bar_text(self, width: Optional[int] = None) -> str:
         """Return a compact one-line session status string for the TUI footer."""
+        from talaria_cli.skin_engine import get_active_brand_emoji
+        emoji = get_active_brand_emoji()
         try:
             snapshot = self._get_status_bar_snapshot()
             if width is None:
@@ -2425,10 +2426,10 @@ class TalariaCLI:
             duration_label = snapshot["duration"]
 
             if width < 52:
-                text = f"⚕ {snapshot['model_short']} · {duration_label}"
+                text = f"{emoji} {snapshot['model_short']} · {duration_label}"
                 return self._trim_status_bar_text(text, width)
             if width < 76:
-                parts = [f"⚕ {snapshot['model_short']}", percent_label]
+                parts = [f"{emoji} {snapshot['model_short']}", percent_label]
                 parts.append(duration_label)
                 return self._trim_status_bar_text(" · ".join(parts), width)
 
@@ -2439,19 +2440,22 @@ class TalariaCLI:
             else:
                 context_label = "ctx --"
 
-            parts = [f"⚕ {snapshot['model_short']}", context_label, percent_label]
+            parts = [f"{emoji} {snapshot['model_short']}", context_label, percent_label]
             parts.append(duration_label)
             prompt_elapsed = snapshot.get("prompt_elapsed")
             if prompt_elapsed:
                 parts.append(prompt_elapsed)
             return self._trim_status_bar_text(" │ ".join(parts), width)
         except Exception:
-            return f"⚕ {self.model if getattr(self, 'model', None) else 'Talaria'}"
+            from talaria_cli.skin_engine import get_active_agent_short_name
+            return f"{emoji} {self.model if getattr(self, 'model', None) else get_active_agent_short_name()}"
 
     def _get_status_bar_fragments(self):
         if not self._status_bar_visible or getattr(self, '_model_picker_state', None):
             return []
         try:
+            from talaria_cli.skin_engine import get_active_brand_emoji
+            emoji_pad = f" {get_active_brand_emoji()} "
             snapshot = self._get_status_bar_snapshot()
             # Use prompt_toolkit's own terminal width when running inside the
             # TUI — shutil.get_terminal_size() can return stale or fallback
@@ -2463,7 +2467,7 @@ class TalariaCLI:
 
             if width < 52:
                 frags = [
-                    ("class:status-bar", " ⚕ "),
+                    ("class:status-bar", emoji_pad),
                     ("class:status-bar-strong", snapshot["model_short"]),
                     ("class:status-bar-dim", " · "),
                     ("class:status-bar-dim", duration_label),
@@ -2474,7 +2478,7 @@ class TalariaCLI:
                 percent_label = f"{percent}%" if percent is not None else "--"
                 if width < 76:
                     frags = [
-                        ("class:status-bar", " ⚕ "),
+                        ("class:status-bar", emoji_pad),
                         ("class:status-bar-strong", snapshot["model_short"]),
                         ("class:status-bar-dim", " · "),
                         (self._status_bar_context_style(percent), percent_label),
@@ -2492,7 +2496,7 @@ class TalariaCLI:
 
                     bar_style = self._status_bar_context_style(percent)
                     frags = [
-                        ("class:status-bar", " ⚕ "),
+                        ("class:status-bar", emoji_pad),
                         ("class:status-bar-strong", snapshot["model_short"]),
                         ("class:status-bar-dim", " │ "),
                         ("class:status-bar-dim", context_label),
@@ -2996,12 +3000,15 @@ class TalariaCLI:
             self._stream_box_opened = True
             try:
                 from talaria_cli.skin_engine import get_active_skin
+                from talaria_cli.branding import default_branding, default_color
+                _default_label = default_branding("response_label", " 🪽 Talaria ").strip()
                 _skin = get_active_skin()
-                label = _skin.get_branding("response_label", "⚕ Talaria")
-                _text_hex = _skin.get_color("banner_text", "#FFF8DC")
+                label = _skin.get_branding("response_label", _default_label)
+                _text_hex = _skin.get_color("banner_text", default_color("banner_text", "#FFF8DC"))
             except Exception:
-                label = "⚕ Talaria"
-                _text_hex = "#FFF8DC"
+                from talaria_cli.branding import default_branding, default_color
+                label = default_branding("response_label", " 🪽 Talaria ").strip()
+                _text_hex = default_color("banner_text", "#FFF8DC")
             # Build a true-color ANSI escape for the response text color
             # so streamed content matches the Rich Panel appearance.
             try:
@@ -3529,8 +3536,9 @@ class TalariaCLI:
                 f"[yellow]⚠️  Context length is only {ctx_len:,} tokens — "
                 f"this is likely too low for agent use with tools.[/]"
             )
+            from talaria_cli.skin_engine import get_active_agent_short_name
             self._console_print(
-                "[dim]   Talaria needs 16k–32k minimum. Tool schemas + system prompt alone use ~4k–8k.[/]"
+                f"[dim]   {get_active_agent_short_name()} needs 16k–32k minimum. Tool schemas + system prompt alone use ~4k–8k.[/]"
             )
             base_url = getattr(self, "base_url", "") or ""
             if "11434" in base_url or "ollama" in base_url.lower():
@@ -3633,6 +3641,8 @@ class TalariaCLI:
         last ``MAX_DISPLAY_EXCHANGES`` user/assistant exchanges and shows
         an indicator for earlier hidden messages.
         """
+        from talaria_cli.skin_engine import get_active_agent_short_name
+        _short_name = get_active_agent_short_name()
         if not self.conversation_history:
             return
 
@@ -3760,13 +3770,13 @@ class TalariaCLI:
                     lines.append(f"         {ml}\n", style="dim")
             elif role == "assistant_last":
                 # Last assistant response shown in full, non-dim
-                lines.append("  ◆ Talaria: ", style=f"bold {_assistant_label_c}")
+                lines.append(f"  ◆ {_short_name}: ", style=f"bold {_assistant_label_c}")
                 msg_lines = text.splitlines()
                 lines.append(msg_lines[0] + "\n", style="")
                 for ml in msg_lines[1:]:
                     lines.append(f"            {ml}\n", style="")
             else:
-                lines.append("  ◆ Talaria: ", style=f"dim bold {_assistant_label_c}")
+                lines.append(f"  ◆ {_short_name}: ", style=f"dim bold {_assistant_label_c}")
                 msg_lines = text.splitlines()
                 lines.append(msg_lines[0] + "\n", style="dim")
                 for ml in msg_lines[1:]:
@@ -4305,8 +4315,9 @@ class TalariaCLI:
         model = getattr(self, "model", None) or "(unknown)"
         is_running = bool(getattr(self, "_agent_running", False))
 
+        from talaria_cli.skin_engine import get_active_agent_short_name
         lines = [
-            "Talaria CLI Status",
+            f"{get_active_agent_short_name()} CLI Status",
             "",
             f"Session ID: {self.session_id}",
             f"Path: {display_talaria_home()}",
@@ -4337,7 +4348,15 @@ class TalariaCLI:
         return True
 
     def show_help(self):
-        """Display help information with categorized commands."""
+        """Display help information with categorized commands.
+
+        Builds a single Rich-markup string and renders it with one
+        ``_cprint`` call.  Per-line printing fires a prompt_toolkit
+        cursor-position query (``ESC[6n``) every time, and on slow PTYs the
+        terminal's ``ESC[<row>;<col>R`` reply leaks back into stdout as
+        visible ``^[[<row>;<col>R`` text.  Batching the output to one render
+        keeps CPR queries to a single round-trip for the whole help screen.
+        """
         from talaria_cli.commands import COMMANDS_BY_CATEGORY
 
         try:
@@ -4349,32 +4368,45 @@ class TalariaCLI:
         inner_width = 55
         if len(header) > inner_width:
             header = header[:inner_width]
-        _cprint(f"\n{_BOLD}+{'-' * inner_width}+{_RST}")
-        _cprint(f"{_BOLD}|{header:^{inner_width}}|{_RST}")
-        _cprint(f"{_BOLD}+{'-' * inner_width}+{_RST}")
+
+        accent = _accent_hex()
+        chunks: list[str] = []
+        chunks.append(f"\n[bold]+{'-' * inner_width}+[/]")
+        chunks.append(f"[bold]|{header:^{inner_width}}|[/]")
+        chunks.append(f"[bold]+{'-' * inner_width}+[/]")
 
         for category, commands in COMMANDS_BY_CATEGORY.items():
-            _cprint(f"\n  {_BOLD}── {category} ──{_RST}")
+            chunks.append(f"\n  [bold]── {category} ──[/]")
             for cmd, desc in commands.items():
                 if not self._command_available(cmd):
                     continue
-                ChatConsole().print(f"    [bold {_accent_hex()}]{cmd:<15}[/] [dim]-[/] {_escape(desc)}")
-
-        if _skill_commands:
-            _cprint(f"\n  ⚡ {_BOLD}Skill Commands{_RST} ({len(_skill_commands)} installed):")
-            for cmd, info in sorted(_skill_commands.items()):
-                ChatConsole().print(
-                    f"    [bold {_accent_hex()}]{cmd:<22}[/] [dim]-[/] {_escape(info['description'])}"
+                chunks.append(
+                    f"    [bold {accent}]{cmd:<15}[/] [dim]-[/] {_escape(desc)}"
                 )
 
-        _cprint(f"\n  {_DIM}Tip: Just type your message to chat with Talaria!{_RST}")
-        _cprint(f"  {_DIM}Multi-line: Alt+Enter for a new line{_RST}")
-        _cprint(f"  {_DIM}Draft editor: Ctrl+G (Alt+G in VSCode/Cursor){_RST}")
+        if _skill_commands:
+            chunks.append(
+                f"\n  ⚡ [bold]Skill Commands[/] ({len(_skill_commands)} installed):"
+            )
+            for cmd, info in sorted(_skill_commands.items()):
+                chunks.append(
+                    f"    [bold {accent}]{cmd:<22}[/] [dim]-[/] {_escape(info['description'])}"
+                )
+
+        from talaria_cli.skin_engine import get_active_agent_short_name as _gsn
+        chunks.append(
+            f"\n  [dim]Tip: Just type your message to chat with {_gsn()}![/]"
+        )
+        chunks.append("  [dim]Multi-line: Alt+Enter for a new line[/]")
+        chunks.append("  [dim]Draft editor: Ctrl+G (Alt+G in VSCode/Cursor)[/]")
         if _is_termux_environment():
-            _cprint(
-                f"  {_DIM}Attach image: /image {_termux_example_image_path()} or start your prompt with a local image path{_RST}\n")
+            chunks.append(
+                f"  [dim]Attach image: /image {_termux_example_image_path()} or start your prompt with a local image path[/]\n"
+            )
         else:
-            _cprint(f"  {_DIM}Paste image: Alt+V (or /paste){_RST}\n")
+            chunks.append("  [dim]Paste image: Alt+V (or /paste)[/]\n")
+
+        _get_chat_console().print("\n".join(chunks))
 
     def show_tools(self):
         """Display available tools with kawaii ASCII art."""
@@ -4683,7 +4715,8 @@ class TalariaCLI:
                 )
                 continue
 
-            print(f"\n  [Talaria #{visible_index}]")
+            from talaria_cli.skin_engine import get_active_agent_short_name as _gsn
+            print(f"\n  [{_gsn()} #{visible_index}]")
             tool_calls = msg.get("tool_calls") or []
             if content_text:
                 preview = content_text[:preview_limit]
@@ -6487,14 +6520,17 @@ class TalariaCLI:
                 if response:
                     try:
                         from talaria_cli.skin_engine import get_active_skin
+                        from talaria_cli.branding import default_branding, default_color
+                        _default_label = default_branding("response_label", " 🪽 Talaria ").strip()
                         _skin = get_active_skin()
-                        label = _skin.get_branding("response_label", "⚕ Talaria")
-                        _resp_color = _skin.get_color("response_border", "#CD7F32")
-                        _resp_text = _skin.get_color("banner_text", "#FFF8DC")
+                        label = _skin.get_branding("response_label", _default_label)
+                        _resp_color = _skin.get_color("response_border", default_color("response_border", "#CD7F32"))
+                        _resp_text = _skin.get_color("banner_text", default_color("banner_text", "#FFF8DC"))
                     except Exception:
-                        label = "⚕ Talaria"
-                        _resp_color = "#CD7F32"
-                        _resp_text = "#FFF8DC"
+                        from talaria_cli.branding import default_branding, default_color
+                        label = default_branding("response_label", " 🪽 Talaria ").strip()
+                        _resp_color = default_color("response_border", "#CD7F32")
+                        _resp_text = default_color("banner_text", "#FFF8DC")
 
                     _chat_console = ChatConsole()
                     _chat_console.print(Panel(
@@ -6984,12 +7020,14 @@ class TalariaCLI:
 
         self.busy_input_mode = arg
         if save_config_value("display.busy_input_mode", arg):
+            from talaria_cli.skin_engine import get_active_agent_short_name as _gsn
+            _name = _gsn()
             if arg == "queue":
-                behavior = "Enter will queue follow-up input while Talaria is busy."
+                behavior = f"Enter will queue follow-up input while {_name} is busy."
             elif arg == "steer":
                 behavior = "Enter will steer your message into the current run (after the next tool call)."
             else:
-                behavior = "Enter will interrupt the current run while Talaria is busy."
+                behavior = f"Enter will interrupt the current run while {_name} is busy."
             _cprint(f"  {_ACCENT}✓ Busy input mode set to '{arg}' (saved to config){_RST}")
             _cprint(f"  {_DIM}{behavior}{_RST}")
         else:
@@ -8474,14 +8512,17 @@ class TalariaCLI:
                 # Use skin engine for label/color with fallback
                 try:
                     from talaria_cli.skin_engine import get_active_skin
+                    from talaria_cli.branding import default_branding, default_color
+                    _default_label = default_branding("response_label", " 🪽 Talaria ").strip()
                     _skin = get_active_skin()
-                    label = _skin.get_branding("response_label", "⚕ Talaria")
-                    _resp_color = _skin.get_color("response_border", "#CD7F32")
-                    _resp_text = _skin.get_color("banner_text", "#FFF8DC")
+                    label = _skin.get_branding("response_label", _default_label)
+                    _resp_color = _skin.get_color("response_border", default_color("response_border", "#CD7F32"))
+                    _resp_text = _skin.get_color("banner_text", default_color("banner_text", "#FFF8DC"))
                 except Exception:
-                    label = "⚕ Talaria"
-                    _resp_color = "#CD7F32"
-                    _resp_text = "#FFF8DC"
+                    from talaria_cli.branding import default_branding, default_color
+                    label = default_branding("response_label", " 🪽 Talaria ").strip()
+                    _resp_color = default_color("response_border", "#CD7F32")
+                    _resp_text = default_color("banner_text", "#FFF8DC")
 
                 is_error_response = result and (result.get("failed") or result.get("partial"))
                 already_streamed = self._stream_started and self._stream_box_opened and not is_error_response
@@ -8593,9 +8634,11 @@ class TalariaCLI:
         else:
             try:
                 from talaria_cli.skin_engine import get_active_goodbye
-                goodbye = get_active_goodbye("Goodbye! ⚕")
+                from talaria_cli.branding import default_branding
+                goodbye = get_active_goodbye(default_branding("goodbye", "Goodbye! 🪽"))
             except Exception:
-                goodbye = "Goodbye! ⚕"
+                from talaria_cli.branding import default_branding
+                goodbye = default_branding("goodbye", "Goodbye! 🪽")
             print(goodbye)
 
     def _get_tui_prompt_symbols(self) -> tuple[str, str]:
@@ -8665,7 +8708,8 @@ class TalariaCLI:
         if self._command_running:
             return _state_fragment("class:prompt-working", self._command_spinner_frame())
         if self._agent_running:
-            return _state_fragment("class:prompt-working", "⚕")
+            from talaria_cli.skin_engine import get_active_brand_emoji
+            return _state_fragment("class:prompt-working", get_active_brand_emoji())
         return [("class:prompt", symbol)]
 
     def _get_tui_prompt_text(self) -> str:
@@ -8782,13 +8826,15 @@ class TalariaCLI:
 
         try:
             from talaria_cli.skin_engine import get_active_skin
+            from talaria_cli.branding import default_branding, default_color
+            _default_welcome = default_branding("welcome", "Welcome! Type your message or /help for commands.")
             _welcome_skin = get_active_skin()
-            _welcome_text = _welcome_skin.get_branding("welcome",
-                                                       "Welcome to Talaria Agent! Type your message or /help for commands.")
-            _welcome_color = _welcome_skin.get_color("banner_text", "#FFF8DC")
+            _welcome_text = _welcome_skin.get_branding("welcome", _default_welcome)
+            _welcome_color = _welcome_skin.get_color("banner_text", default_color("banner_text", "#FFF8DC"))
         except Exception:
-            _welcome_text = "Welcome to Talaria Agent! Type your message or /help for commands."
-            _welcome_color = "#FFF8DC"
+            from talaria_cli.branding import default_branding, default_color
+            _welcome_text = default_branding("welcome", "Welcome! Type your message or /help for commands.")
+            _welcome_color = default_color("banner_text", "#FFF8DC")
         self._console_print(f"[{_welcome_color}]{_welcome_text}[/]")
         # Show a random tip to help users discover features
         try:
@@ -9356,7 +9402,8 @@ class TalariaCLI:
             import signal as _sig
             from prompt_toolkit.application import run_in_terminal
             from talaria_cli.skin_engine import get_active_skin
-            agent_name = get_active_skin().get_branding("agent_name", "Talaria Agent")
+            from talaria_cli.branding import default_branding
+            agent_name = get_active_skin().get_branding("agent_name", default_branding("agent_name", "Talaria Agent"))
             msg = f"\n{agent_name} has been suspended. Run `fg` to bring {agent_name} back."
 
             def _suspend():
@@ -9767,7 +9814,9 @@ class TalariaCLI:
                 else f"  {other_num_prefix}. Other (type your answer)"
             )
             preview_lines.extend(_wrap_panel_text(other_label, 60, subsequent_indent="    "))
-            box_width = _panel_box_width("Talaria needs your input", preview_lines)
+            from talaria_cli.skin_engine import get_active_agent_short_name as _gsn
+            _input_title = f"{_gsn()} needs your input"
+            box_width = _panel_box_width(_input_title, preview_lines)
             inner_text_width = max(8, box_width - 2)
 
             # Pre-wrap choices + Other option — these are mandatory.
@@ -9842,9 +9891,9 @@ class TalariaCLI:
             lines = []
             # Box top border
             lines.append(('class:clarify-border', '╭─ '))
-            lines.append(('class:clarify-title', 'Talaria needs your input'))
+            lines.append(('class:clarify-title', _input_title))
             lines.append(
-                ('class:clarify-border', ' ' + ('─' * max(0, box_width - len("Talaria needs your input") - 3)) + '╮\n'))
+                ('class:clarify-border', ' ' + ('─' * max(0, box_width - len(_input_title) - 3)) + '╮\n'))
             if not use_compact_chrome:
                 _append_blank_panel_line(lines, 'class:clarify-border', box_width)
 
@@ -10572,7 +10621,8 @@ def main(
     if gateway:
         import asyncio
         from gateway.run import start_gateway
-        print("Starting Talaria Gateway (messaging platforms)...")
+        from talaria_cli.skin_engine import get_active_agent_short_name as _gsn
+        print(f"Starting {_gsn()} Gateway (messaging platforms)...")
         asyncio.run(start_gateway())
         return
 

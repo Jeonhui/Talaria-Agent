@@ -256,10 +256,15 @@ _PROVIDERS_WITHOUT_VISION: frozenset = frozenset({
     "kimi-coding-cn",
 })
 
-# OpenRouter app attribution headers
+# OpenRouter app attribution headers — sourced from theme so a fork rebrands.
+from talaria_cli.branding import (
+    DEFAULT_REPO_HTTPS_URL as _OR_HTTP_REFERER,
+    default_branding as _or_default_branding,
+)
+
 _OR_HEADERS = {
-    "HTTP-Referer": "https://github.com/Jeonhui/Talaria-Agent",
-    "X-OpenRouter-Title": "Talaria Agent",
+    "HTTP-Referer": _OR_HTTP_REFERER,
+    "X-OpenRouter-Title": _or_default_branding("agent_name", "Talaria Agent"),
     "X-OpenRouter-Categories": "productivity,cli-agent",
 }
 

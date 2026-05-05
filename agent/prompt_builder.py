@@ -131,20 +131,23 @@ def _strip_yaml_frontmatter(content: str) -> str:
 # Constants
 # =========================================================================
 
-DEFAULT_AGENT_IDENTITY = (
-    "You are Talaria Agent, an intelligent AI assistant. "
-    "You are helpful, knowledgeable, and direct. You assist users with a wide "
-    "range of tasks including answering questions, writing and editing code, "
-    "analyzing information, creative work, and executing actions via your tools. "
-    "You communicate clearly, admit uncertainty when appropriate, and prioritize "
-    "being genuinely useful over being verbose unless otherwise directed below. "
-    "Be targeted and efficient in your exploration and investigations."
+from talaria_cli.branding import (
+    DEFAULT_AGENT_IDENTITY,
+    DEFAULT_REPO_HTTPS_URL as _AGENT_DOCS_URL,
+    build_agent_identity,
+    default_branding as _default_branding,
 )
 
+
+def agent_identity_for(user_name: str = "") -> str:
+    """Identity prompt addressed to ``user_name`` when provided."""
+    return build_agent_identity(user_name)
+
 TALARIA_AGENT_HELP_GUIDANCE = (
-    "If the user asks about configuring, setting up, or using Talaria Agent "
+    f"If the user asks about configuring, setting up, or using "
+    f"{_default_branding('agent_name', 'Talaria Agent')} "
     "itself, load the `talaria-agent` skill with skill_view(name='talaria-agent') "
-    "before answering. Docs: https://github.com/Jeonhui/Talaria-Agent"
+    f"before answering. Docs: {_AGENT_DOCS_URL}"
 )
 
 MEMORY_GUIDANCE = (
