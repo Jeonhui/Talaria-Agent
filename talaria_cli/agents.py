@@ -7,6 +7,8 @@ ergonomic to run several of them concurrently as independent agents.
 
 Subcommands:
 
+    talaria agents create A [--clone-from B] [--no-setup]
+                                      # profile create + setup wizard in one go
     talaria agents list                # all profiles + running state
     talaria agents start A [B C ...]   # spawn detached gateway per profile
     talaria agents stop A              # stop one profile's gateway
@@ -68,6 +70,54 @@ def _resolve_profile(name: str):
         if info.name == name:
             return info, True
     return None, False
+
+
+# ─── create ───────────────────────────────────────────────────────────────────
+
+
+def cmd_create(args: argparse.Namespace) -> int:
+    """Create a new profile and (by default) run setup against it."""
+    from talaria_cli.profiles import create_profile
+
+    name: str = args.name
+    clone_from: Optional[str] = args.clone_from
+    skip_setup: bool = bool(args.no_setup)
+
+    # Step 1: create the profile dir with config scaffolded from clone_from
+    # (defaults to currently active profile when --clone-from omitted).
+    try:
+        profile_dir = create_profile(
+            name,
+            clone_from=clone_from,
+            clone_config=True,
+        )
+    except FileExistsError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except (ValueError, FileNotFoundError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"[{name}] created at {profile_dir}")
+
+    if skip_setup:
+        print(f"Next: talaria --profile {name} setup")
+        return 0
+
+    # Step 2: hand off to `talaria --profile <name> setup`. Inherits the
+    # current TTY so the interactive wizard works.
+    section: Optional[str] = args.section
+    cmd = _talaria_launcher_cmd() + ["--profile", name, "setup"]
+    if section:
+        cmd.append(section)
+    print(f"[{name}] launching setup wizard…")
+    try:
+        return subprocess.call(cmd)
+    except KeyboardInterrupt:
+        print()
+        print(f"[{name}] setup interrupted — profile remains. Resume with:")
+        print(f"    talaria --profile {name} setup")
+        return 130
 
 
 # ─── list ─────────────────────────────────────────────────────────────────────
@@ -276,6 +326,25 @@ def register_cli(parser: argparse.ArgumentParser) -> None:
     """Wire `talaria agents` subcommands."""
     parser.set_defaults(func=cmd_list)
     subs = parser.add_subparsers(dest="agents_command", metavar="COMMAND")
+
+    p_create = subs.add_parser(
+        "create",
+        help="Create a new profile and run setup wizard against it",
+        description=(
+            "Two-step wrapper: `talaria profile create <name> --clone-config` "
+            "followed by `talaria --profile <name> setup`.  The wizard "
+            "inherits the current TTY so it's fully interactive."
+        ),
+    )
+    p_create.add_argument("name", help="New profile name (lowercase / hyphens / underscores)")
+    p_create.add_argument("--clone-from", default=None, metavar="PROFILE",
+                          help="Source profile to clone config from (default: current active profile)")
+    p_create.add_argument("--section", default=None,
+                          choices=["model", "terminal", "gateway", "tools", "agent"],
+                          help="Run only one setup section instead of the full wizard")
+    p_create.add_argument("--no-setup", action="store_true",
+                          help="Just create the profile; skip the setup wizard")
+    p_create.set_defaults(func=cmd_create)
 
     p_list = subs.add_parser("list", help="Show all profiles + running state")
     p_list.set_defaults(func=cmd_list)
