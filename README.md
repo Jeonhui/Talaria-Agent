@@ -18,6 +18,31 @@ Talaria is a slim, opinionated fork of [Hermes Agent](https://github.com/NousRes
     ███████░                     
 ```
 
+## Why slim
+
+Talaria exists because Hermes ships everything-and-the-kitchen-sink and that
+broad surface gets in the way of personal use. The lean fork is shaped around
+three goals:
+
+- **Fit to purpose** — only the surfaces I actually use (Discord / Slack /
+  Telegram + Claude / GPT / Codex / Xiaomi / OpenRouter / local). No voice,
+  no web dashboard, no aggregator middlemen, no third-party memory plugins.
+  Less code = less to misconfigure and less to break on upgrade.
+- **Easier to customize** — fewer abstractions, shorter call paths, no
+  optional-skill registry or plugin marketplace layers to thread through.
+  Adding a tool, swapping a prompt, or changing the agent loop is a small
+  diff against ~186k LOC, not a hunt across ~649k.
+- **Resource efficiency** — smaller install footprint, faster cold start,
+  lower memory baseline, fewer background services. Runs comfortably on a
+  Termux phone or a tiny VPS, not just a workstation. No optional extras
+  pulled in "just in case."
+
+If you need the full Hermes feature matrix (voice, web UI, every messenger,
+RL/eval harnesses, plugin registries), use upstream Hermes. Talaria is the
+opinionated subset for one developer's daily driver.
+
+> 한국어 README: [README.ko.md](README.ko.md)
+
 ## What ships
 
 | Surface | Talaria |
@@ -176,8 +201,17 @@ talaria skills install <repo>      # install from GitHub
 talaria cron list                  # scheduled jobs
 talaria cron create "0 9 * * *" "Daily standup reminder"
 
+talaria agents list                # show every profile + running state
+talaria agents start A B           # spawn detached gateways for multiple profiles
+talaria agents stop A | --all      # stop one or every running agent
+talaria agents logs A -f           # tail a specific profile's log
+
+talaria checkpoints                # disk usage + per-project breakdown
+talaria checkpoints prune          # delete orphan/stale shadow repos
+talaria security audit             # OSV.dev scan of venv + plugins + pinned MCP servers
+
 talaria insights --days 7          # session usage report
-talaria status                     # health summary
+talaria status                     # health summary (now includes session recap)
 talaria doctor                     # detailed diagnostics
 talaria uninstall [--full]         # remove (--full also wipes ~/.talaria)
 ```
@@ -214,6 +248,47 @@ TERMINAL_ENV=local
 ```
 
 Provider/model live in `~/.talaria/config.yaml` so multi-bot setups don't fight over env vars.
+
+---
+
+## Running multiple agents
+
+Talaria supports running several independent agents concurrently — each with
+its own SOUL.md, skills, API keys, and even messaging platform. This is built
+on top of the profile system: every profile is a fully isolated
+`TALARIA_HOME` directory.
+
+```bash
+# Create two independent profiles
+talaria profile create work --clone-config       # copies config.yaml + .env scaffolding
+talaria profile create personal --clone-config
+
+# Customize each separately
+talaria --profile work config set model.default claude-sonnet-4.6
+talaria --profile personal config set model.default gpt-5
+
+# Each profile has its own SOUL.md, skills, and .env
+$EDITOR ~/.talaria/profiles/work/SOUL.md
+$EDITOR ~/.talaria/profiles/personal/.env        # different Discord bot token!
+
+# Run both concurrently as detached background processes
+talaria agents start work personal
+
+talaria agents list
+# NAME       STATE     PID  SKILLS  MODEL
+# default    stopped    —        0  —
+# work       running  41023      3  anthropic/claude-sonnet-4.6
+# personal   running  41045      5  openai/gpt-5
+
+talaria agents logs work -f                       # tail one
+talaria agents stop personal                      # stop one
+talaria agents stop --all                         # stop everything
+```
+
+Per-profile isolation includes: `config.yaml`, `.env`, `SOUL.md`, `skills/`,
+`state.db` (sessions), `checkpoints/`, MCP server processes, and the
+systemd/launchd service name (`talaria-gateway-work` vs
+`talaria-gateway-personal`).
 
 ---
 

@@ -852,3 +852,104 @@ def maybe_auto_prune_checkpoints(
 
     return out
 
+
+# ---------------------------------------------------------------------------
+# Inventory / clear (used by `talaria checkpoints` CLI)
+# ---------------------------------------------------------------------------
+
+
+def _dir_size_bytes(path: Path) -> int:
+    total = 0
+    try:
+        for p in path.rglob("*"):
+            try:
+                if p.is_file():
+                    total += p.stat().st_size
+            except OSError:
+                continue
+    except OSError:
+        pass
+    return total
+
+
+def _project_commit_count(shadow_repo: Path) -> int:
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD"],
+            env={**os.environ, **_git_env(shadow_repo, str(shadow_repo))},
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0:
+            return int(result.stdout.strip() or "0")
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+    return 0
+
+
+def store_status(checkpoint_base: Optional[Path] = None) -> Dict:
+    """Inventory the checkpoint base for `talaria checkpoints status`.
+
+    Talaria's layout has no central ``store/`` dir or ``legacy-*`` archives
+    (those are hermes v2 concepts) — so ``store_size_bytes`` mirrors
+    ``total_size_bytes`` and ``legacy_*`` fields are always empty.
+    """
+    base = checkpoint_base or CHECKPOINT_BASE
+    info: Dict = {
+        "base": str(base),
+        "total_size_bytes": 0,
+        "store_size_bytes": 0,
+        "legacy_size_bytes": 0,
+        "project_count": 0,
+        "projects": [],
+        "legacy_archives": [],
+    }
+    if not base.exists():
+        return info
+
+    projects: List[Dict] = []
+    for child in base.iterdir():
+        if not child.is_dir() or not (child / "HEAD").exists():
+            continue
+        workdir = _read_workdir_marker(child) or ""
+        exists = bool(workdir) and Path(workdir).exists()
+        last_touch = _shadow_repo_newest_mtime(child)
+        commits = _project_commit_count(child)
+        size = _dir_size_bytes(child)
+        info["total_size_bytes"] += size
+        projects.append({
+            "workdir": workdir,
+            "exists": exists,
+            "commits": commits,
+            "last_touch": last_touch,
+            "size_bytes": size,
+        })
+
+    info["store_size_bytes"] = info["total_size_bytes"]
+    info["projects"] = projects
+    info["project_count"] = len(projects)
+    return info
+
+
+def clear_all(checkpoint_base: Optional[Path] = None) -> Dict[str, int]:
+    """Delete the entire checkpoint base. Returns ``{deleted, bytes_freed}``."""
+    base = checkpoint_base or CHECKPOINT_BASE
+    if not base.exists():
+        return {"deleted": 0, "bytes_freed": 0}
+    bytes_freed = _dir_size_bytes(base)
+    try:
+        shutil.rmtree(base)
+        return {"deleted": 1, "bytes_freed": bytes_freed}
+    except OSError as exc:
+        logger.warning("clear_all failed: %s", exc)
+        return {"deleted": 0, "bytes_freed": 0}
+
+
+def clear_legacy(checkpoint_base: Optional[Path] = None) -> Dict[str, int]:
+    """No-op for Talaria — no legacy archive layout exists.
+
+    Kept for CLI compatibility with the hermes-style ``clear-legacy``
+    subcommand. Always reports zero deletions.
+    """
+    _ = checkpoint_base  # unused
+    return {"deleted": 0, "bytes_freed": 0}
+

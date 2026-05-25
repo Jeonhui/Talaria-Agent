@@ -7396,6 +7396,79 @@ Examples:
     logs_parser.set_defaults(func=cmd_logs)
 
     # =========================================================================
+    # checkpoints command
+    # =========================================================================
+    # =========================================================================
+    # agents command — multi-profile fleet control
+    # =========================================================================
+    agents_parser = subparsers.add_parser(
+        "agents",
+        help="Run multiple profiles concurrently as independent agents",
+        description=(
+            "Fleet wrapper over `--profile <name> gateway run`.  Each "
+            "profile is already a fully isolated TALARIA_HOME — these "
+            "subcommands make it ergonomic to start/stop several at once."
+        ),
+    )
+    from talaria_cli.agents import register_cli as _register_agents_cli
+    _register_agents_cli(agents_parser)
+
+    # =========================================================================
+    # checkpoints command
+    # =========================================================================
+    checkpoints_parser = subparsers.add_parser(
+        "checkpoints",
+        help="Inspect / prune / clear ~/.talaria/checkpoints/",
+        description=(
+            "Direct visibility and control over the filesystem checkpoint "
+            "store.  Show per-project breakdown, see how much disk "
+            "space checkpoints occupy, force a prune, or wipe the base."
+        ),
+    )
+    from talaria_cli.checkpoints import register_cli as _register_checkpoints_cli
+    _register_checkpoints_cli(checkpoints_parser)
+
+    # =========================================================================
+    # security command
+    # =========================================================================
+    security_parser = subparsers.add_parser(
+        "security",
+        help="Supply-chain audit against OSV.dev",
+        description=(
+            "On-demand audit of venv packages, plugin requirements, and "
+            "pinned MCP servers against the OSV.dev advisory database."
+        ),
+    )
+    security_subparsers = security_parser.add_subparsers(dest="security_command")
+    audit_parser = security_subparsers.add_parser(
+        "audit",
+        help="Scan installed components for known vulnerabilities",
+    )
+    for p in (security_parser, audit_parser):
+        p.add_argument("--skip-venv", action="store_true",
+                       help="Skip scanning the Python venv")
+        p.add_argument("--skip-plugins", action="store_true",
+                       help="Skip scanning ~/.talaria/plugins requirements")
+        p.add_argument("--skip-mcp", action="store_true",
+                       help="Skip scanning pinned MCP servers in config.yaml")
+        p.add_argument("--json", action="store_true",
+                       help="Emit machine-readable JSON output")
+        p.add_argument("--fail-on", default="critical",
+                       choices=["low", "moderate", "high", "critical"],
+                       help="Exit non-zero if any finding meets this severity (default: critical)")
+
+    def _cmd_security(args):
+        sub = getattr(args, "security_command", None)
+        from talaria_cli.security_audit import cmd_security_audit
+        if sub in (None, "audit"):
+            return cmd_security_audit(args)
+        security_parser.print_help()
+        return 2
+
+    audit_parser.set_defaults(func=_cmd_security)
+    security_parser.set_defaults(func=_cmd_security)
+
+    # =========================================================================
     # Parse and execute
     # =========================================================================
     # Pre-process argv so unquoted multi-word session names after -c / -r
