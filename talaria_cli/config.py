@@ -2811,8 +2811,14 @@ def load_config() -> Dict[str, Any]:
                 user_config.pop("max_turns", None)
 
             config = _deep_merge(config, user_config)
-        except Exception as e:
-            print(f"Warning: Failed to load config: {e}")
+        except (yaml.YAMLError, OSError, ValueError, TypeError) as e:
+            # Malformed/unreadable config — fall back to defaults but make the
+            # failure loud. Goes to stderr (not stdout) so machine-readable CLI
+            # output isn't corrupted, and to the log with a traceback for
+            # debugging. Truly unexpected exceptions propagate instead of being
+            # silently swallowed.
+            print(f"Warning: Failed to load config ({config_path}): {e}", file=sys.stderr)
+            logger.warning("Failed to load config %s: %s", config_path, e, exc_info=True)
 
     normalized = _normalize_root_model_keys(_normalize_max_turns_config(config))
     expanded = _expand_env_vars(normalized)
