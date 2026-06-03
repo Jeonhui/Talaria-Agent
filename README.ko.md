@@ -56,7 +56,8 @@ Hermes는 모든 기능을 담은 풀스택 프레임워크라, 개인 용도에
 집중도를 높이기 위해 통째로 들어낸 서브시스템들:
 
 - **음성 & TTS** — speech-to-text, text-to-speech, push-to-talk, Discord 보이스 채널, ElevenLabs/Edge/MiniMax/NeuTTS 프로바이더
-- **웹 대시보드 & ink/React TUI 프론트엔드** — 인터랙티브 표면은 `talaria chat` (prompt_toolkit REPL)뿐
+- **웹 대시보드 & ink/React TUI 프론트엔드** — 그래픽 표면 없음
+- **인터랙티브 터미널 채팅** — `talaria chat` REPL 제거됨. 이제 헤드리스로 동작 — 메시징 게이트웨이(Discord/Slack/Telegram), 일회성 `talaria -q "..."`, 또는 ACP 에디터 연동 사용
 - **애그리게이터 경로** — Vercel AI Gateway 및 Nous Portal 구독 시스템 (OpenRouter는 이제 자체 키를 갖는 1급 프로바이더)
 - **인증 플로우** — Nous Portal 디바이스 코드 로그인, OpenClaw 마이그레이션, `talaria login` 서브커맨드
 - **백엔드** — Modal, Daytona, Singularity 샌드박스 실행기 (local / Docker / SSH만 잔존)
@@ -133,10 +134,11 @@ docker compose logs -f
 `talaria setup` 후:
 
 ```bash
-talaria chat                  # 에이전트와 인터랙티브 REPL
+talaria -q "what is 2+2"      # 일회성 질의 (stdout 으로 답 출력 후 종료)
 talaria gateway run           # 메시징 게이트웨이 포그라운드 실행
 talaria gateway start         # 백그라운드 서비스로 설치 + 시작
 talaria status                # 프로바이더 / API 키 / 플랫폼 / 게이트웨이 상태
+talaria sessions status       # 활성 세션 + MCP 연결 상태
 talaria doctor                # 상세 진단
 ```
 
@@ -177,8 +179,9 @@ talaria setup agent           # 최대 반복, 압축, 디스플레이
 ## 자주 쓰는 커맨드
 
 ```bash
-talaria chat                       # 인터랙티브 채팅
-talaria chat -q "what is 2+2"      # 일회성 질의
+talaria -q "what is 2+2"           # 일회성 질의 (또는 --oneshot / -z)
+talaria gateway run                # Discord / Slack / Telegram 으로 대화
+talaria sessions status            # 활성 세션 + MCP 연결 상태
 
 talaria model                      # 프로바이더/모델 전환
 talaria config show                # 현재 설정 표시
@@ -254,7 +257,7 @@ docker/              Docker 진입점
 scripts/             설치 / 제거 / 빌드 헬퍼
 ```
 
-`run_agent.py`, `cli.py`, `talaria_cli/main.py`가 세 개의 큰 진입 표면이고 나머지는 거기서 갈라진다.
+`run_agent.py`(에이전트 코어), `talaria_cli/main.py`(CLI 커맨드), `gateway/run.py`(메시징 게이트웨이)가 큰 진입 표면이고 나머지는 거기서 갈라진다.
 
 ---
 

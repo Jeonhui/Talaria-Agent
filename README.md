@@ -58,7 +58,8 @@ opinionated subset for one developer's daily driver.
 Whole subsystems dropped to keep the assistant focused:
 
 - **Voice & TTS** — speech-to-text, text-to-speech, push-to-talk, Discord voice channels, ElevenLabs/Edge/MiniMax/NeuTTS providers
-- **Web dashboard & ink/React TUI frontend** — `talaria chat` (prompt_toolkit REPL) is the only interactive surface
+- **Web dashboard & ink/React TUI frontend** — no graphical surface ships
+- **Interactive terminal chat** — the `talaria chat` REPL was removed; Talaria now runs headless. Use the messaging gateway (Discord/Slack/Telegram), one-shot `talaria -q "..."`, or the ACP editor integration
 - **Aggregator paths** — Vercel AI Gateway and Nous Portal subscription system (OpenRouter is now a first-class provider with its own key)
 - **Auth flows** — Nous Portal device-code login, OpenClaw migration, the `talaria login` subcommand
 - **Backends** — Modal, Daytona, Singularity sandbox executors (only local / Docker / SSH remain)
@@ -135,10 +136,11 @@ The image runs `gateway run` by default. Use `docker exec -it talaria /opt/talar
 After `talaria setup`:
 
 ```bash
-talaria chat                  # interactive REPL with the agent
+talaria -q "what is 2+2"      # one-shot query (answer to stdout, then exit)
 talaria gateway run           # run the messaging gateway in the foreground
 talaria gateway start         # install + start as a background service
 talaria status                # show provider / API keys / platforms / gateway state
+talaria sessions status       # active sessions + live MCP connection status
 talaria doctor                # detailed diagnostics
 ```
 
@@ -179,8 +181,9 @@ Or run a single section directly: `talaria setup model | terminal | gateway | to
 ## Common commands
 
 ```bash
-talaria chat                       # interactive chat
-talaria chat -q "what is 2+2"      # one-shot query
+talaria -q "what is 2+2"           # one-shot query (also: --oneshot / -z)
+talaria gateway run                # chat via Discord / Slack / Telegram
+talaria sessions status            # active sessions + MCP connection status
 
 talaria model                      # switch provider/model
 talaria config show                # show current config
@@ -306,7 +309,7 @@ docker/              Docker entrypoint
 scripts/             install / uninstall / build helpers
 ```
 
-`run_agent.py`, `cli.py`, and `talaria_cli/main.py` are the three big entry surfaces; everything else fans out from there.
+`run_agent.py` (agent core), `talaria_cli/main.py` (CLI commands), and `gateway/run.py` (messaging gateway) are the big entry surfaces; everything else fans out from there.
 
 ---
 
