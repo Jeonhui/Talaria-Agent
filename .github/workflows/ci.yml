@@ -35,11 +35,24 @@ jobs:
         continue-on-error: true
         run: ty check
 
-      - name: Pytest
+      - name: Pytest (with coverage)
         env:
           # Belt-and-suspenders: conftest blanks these too.
           ANTHROPIC_API_KEY: ""
           OPENAI_API_KEY: ""
           TZ: UTC
           PYTHONHASHSEED: "0"
-        run: pytest -m "not integration"
+        # Coverage is reported (term-missing) for visibility. No --cov-fail-under
+        # yet — the fork's tree is still thinly covered; flip on a floor once the
+        # core modules (credential_pool, transports, gateway) climb.
+        run: >-
+          pytest -m "not integration"
+          --cov=agent --cov=gateway --cov=talaria_cli --cov=tools
+          --cov=acp_adapter --cov=cron --cov-report=term-missing
+
+      - name: Dependency audit (pip-audit)
+        # Informational for now — surfaces known-vuln dependencies in the log
+        # without blocking PRs. Drop continue-on-error once advisories are
+        # triaged (pin/upgrade or add a documented --ignore-vuln).
+        continue-on-error: true
+        run: pip-audit --progress-spinner off
