@@ -1134,7 +1134,7 @@ def _dump_subagent_timeout_diagnostic(
         def _w(line: str = "") -> None:
             lines.append(line)
 
-        _w(f"# Subagent timeout diagnostic")
+        _w("# Subagent timeout diagnostic")
         _w(f"# Generated: {_dt.datetime.now().isoformat()}")
         _w("")
         _w("## Timeout")
@@ -2295,13 +2295,13 @@ def _resolve_delegation_credentials(cfg: dict, parent_agent) -> dict:
 def _load_config() -> dict:
     """Load delegation config from CLI_CONFIG or persistent config.
 
-    Checks the runtime config (cli.py CLI_CONFIG) first, then falls back
+    Checks the runtime config (cli_config.CLI_CONFIG) first, then falls back
     to the persistent config (talaria_cli/config.py load_config()) so that
     ``delegation.model`` / ``delegation.provider`` are picked up regardless
     of the entry point (CLI, gateway, cron).
     """
     try:
-        from cli import CLI_CONFIG
+        from cli_config import CLI_CONFIG
 
         cfg = CLI_CONFIG.get("delegation", {})
         if cfg:

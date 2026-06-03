@@ -232,7 +232,7 @@ def run_backup(args) -> None:
     print(f"  Time:        {elapsed:.1f}s")
 
     if skipped_dirs:
-        print(f"\n  Excluded directories:")
+        print("\n  Excluded directories:")
         for d in sorted(skipped_dirs):
             print(f"    {d}/")
 
@@ -440,8 +440,8 @@ def run_import(args) -> None:
             except ImportError:
                 # talaria_cli.profiles might not be available (fresh install)
                 if any(profiles_dir.iterdir()):
-                    print(f"\n  Profiles detected but aliases could not be created.")
-                    print(f"  Run: talaria profile list  (after installing talaria)")
+                    print("\n  Profiles detected but aliases could not be created.")
+                    print("  Run: talaria profile list  (after installing talaria)")
 
         # Guidance
         print()

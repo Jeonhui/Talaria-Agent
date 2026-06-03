@@ -1764,6 +1764,13 @@ class TelegramAdapter(BasePlatformAdapter):
 
         # --- Model picker callbacks ---
         if data.startswith(("mp:", "mm:", "mb", "mx", "mg:")):
+            # Only authorized users may change model settings — otherwise any
+            # member who can see the picker (e.g. in a group) could click the
+            # buttons and reconfigure the session's model.
+            caller_id = str(getattr(query.from_user, "id", ""))
+            if not self._is_callback_user_authorized(caller_id):
+                await query.answer(text="⛔ You are not authorized to change model settings.")
+                return
             chat_id = str(query.message.chat_id) if query.message else None
             if chat_id:
                 await self._handle_model_picker_callback(query, data, chat_id)

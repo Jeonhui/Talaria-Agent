@@ -1057,6 +1057,56 @@ class DiscordAdapter(BasePlatformAdapter):
             logger.error("[%s] Failed to send local image, falling back to base adapter: %s", self.name, e, exc_info=True)
             return await super().send_image_file(chat_id, image_path, caption, reply_to, metadata=metadata)
 
+    async def _fetch_url_ssrf_safe(
+        self,
+        url: str,
+        sess_kw: dict,
+        req_kw: dict,
+        *,
+        what: str = "file",
+        max_redirects: int = 5,
+    ):
+        """Download *url* re-validating is_safe_url on every redirect hop.
+
+        aiohttp has no per-redirect event hook (unlike httpx, which the Slack
+        adapter and base.cache_image_from_url use via event_hooks), so we
+        disable auto-redirects and follow them manually, checking is_safe_url
+        on each Location.  Without this, an attacker URL that passes the
+        initial is_safe_url() check can 302-redirect to 169.254.169.254 or an
+        internal host and have its body uploaded as a Discord attachment.
+
+        Returns (data: bytes, content_type: str).
+        """
+        import aiohttp
+        from urllib.parse import urljoin
+
+        async with aiohttp.ClientSession(**sess_kw) as session:
+            current = url
+            for _ in range(max_redirects + 1):
+                async with session.get(
+                    current,
+                    timeout=aiohttp.ClientTimeout(total=30),
+                    allow_redirects=False,
+                    **req_kw,
+                ) as resp:
+                    if resp.status in (301, 302, 303, 307, 308):
+                        location = resp.headers.get("Location", "")
+                        if not location:
+                            raise Exception(f"Redirect with no Location while fetching {what}")
+                        nxt = urljoin(current, location)
+                        if not is_safe_url(nxt):
+                            raise Exception(
+                                f"Blocked redirect to private/internal address while fetching {what}"
+                            )
+                        current = nxt
+                        continue
+                    if resp.status != 200:
+                        raise Exception(f"Failed to download {what}: HTTP {resp.status}")
+                    data = await resp.read()
+                    content_type = resp.headers.get("content-type", "")
+                    return data, content_type
+            raise Exception(f"Too many redirects while fetching {what}")
+
     async def send_image(
         self,
         chat_id: str,
@@ -1074,8 +1124,6 @@ class DiscordAdapter(BasePlatformAdapter):
             return await super().send_image(chat_id, image_url, caption, reply_to, metadata=metadata)
 
         try:
-            import aiohttp
-
             channel = self._client.get_channel(int(chat_id))
             if not channel:
                 channel = await self._client.fetch_channel(int(chat_id))
@@ -1087,38 +1135,36 @@ class DiscordAdapter(BasePlatformAdapter):
             from gateway.platforms.base import resolve_proxy_url, proxy_kwargs_for_aiohttp
             _proxy = resolve_proxy_url(platform_env_var="DISCORD_PROXY")
             _sess_kw, _req_kw = proxy_kwargs_for_aiohttp(_proxy)
-            async with aiohttp.ClientSession(**_sess_kw) as session:
-                async with session.get(image_url, timeout=aiohttp.ClientTimeout(total=30), **_req_kw) as resp:
-                    if resp.status != 200:
-                        raise Exception(f"Failed to download image: HTTP {resp.status}")
+            image_data, content_type = await self._fetch_url_ssrf_safe(
+                image_url, _sess_kw, _req_kw, what="image"
+            )
 
-                    image_data = await resp.read()
+            # Determine filename from content type
+            if not content_type:
+                content_type = "image/png"
+            ext = "png"
+            if "jpeg" in content_type or "jpg" in content_type:
+                ext = "jpg"
+            elif "gif" in content_type:
+                ext = "gif"
+            elif "webp" in content_type:
+                ext = "webp"
 
-                    # Determine filename from URL or content type
-                    content_type = resp.headers.get("content-type", "image/png")
-                    ext = "png"
-                    if "jpeg" in content_type or "jpg" in content_type:
-                        ext = "jpg"
-                    elif "gif" in content_type:
-                        ext = "gif"
-                    elif "webp" in content_type:
-                        ext = "webp"
+            import io
+            file = discord.File(io.BytesIO(image_data), filename=f"image.{ext}")
 
-                    import io
-                    file = discord.File(io.BytesIO(image_data), filename=f"image.{ext}")
+            if self._is_forum_parent(channel):
+                return await self._forum_post_file(
+                    channel,
+                    content=(caption or "").strip(),
+                    file=file,
+                )
 
-                    if self._is_forum_parent(channel):
-                        return await self._forum_post_file(
-                            channel,
-                            content=(caption or "").strip(),
-                            file=file,
-                        )
-
-                    msg = await channel.send(
-                        content=caption if caption else None,
-                        file=file,
-                    )
-                    return SendResult(success=True, message_id=str(msg.id))
+            msg = await channel.send(
+                content=caption if caption else None,
+                file=file,
+            )
+            return SendResult(success=True, message_id=str(msg.id))
 
         except ImportError:
             logger.warning(
@@ -1153,8 +1199,6 @@ class DiscordAdapter(BasePlatformAdapter):
             return await super().send_animation(chat_id, animation_url, caption, reply_to, metadata=metadata)
 
         try:
-            import aiohttp
-
             channel = self._client.get_channel(int(chat_id))
             if not channel:
                 channel = await self._client.fetch_channel(int(chat_id))
@@ -1166,28 +1210,25 @@ class DiscordAdapter(BasePlatformAdapter):
             from gateway.platforms.base import resolve_proxy_url, proxy_kwargs_for_aiohttp
             _proxy = resolve_proxy_url(platform_env_var="DISCORD_PROXY")
             _sess_kw, _req_kw = proxy_kwargs_for_aiohttp(_proxy)
-            async with aiohttp.ClientSession(**_sess_kw) as session:
-                async with session.get(animation_url, timeout=aiohttp.ClientTimeout(total=30), **_req_kw) as resp:
-                    if resp.status != 200:
-                        raise Exception(f"Failed to download animation: HTTP {resp.status}")
+            animation_data, _ = await self._fetch_url_ssrf_safe(
+                animation_url, _sess_kw, _req_kw, what="animation"
+            )
 
-                    animation_data = await resp.read()
+            import io
+            file = discord.File(io.BytesIO(animation_data), filename="animation.gif")
 
-                    import io
-                    file = discord.File(io.BytesIO(animation_data), filename="animation.gif")
+            if self._is_forum_parent(channel):
+                return await self._forum_post_file(
+                    channel,
+                    content=(caption or "").strip(),
+                    file=file,
+                )
 
-                    if self._is_forum_parent(channel):
-                        return await self._forum_post_file(
-                            channel,
-                            content=(caption or "").strip(),
-                            file=file,
-                        )
-
-                    msg = await channel.send(
-                        content=caption if caption else None,
-                        file=file,
-                    )
-                    return SendResult(success=True, message_id=str(msg.id))
+            msg = await channel.send(
+                content=caption if caption else None,
+                file=file,
+            )
+            return SendResult(success=True, message_id=str(msg.id))
 
         except ImportError:
             logger.warning(

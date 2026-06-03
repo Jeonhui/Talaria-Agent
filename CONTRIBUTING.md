@@ -95,7 +95,7 @@ ln -sf "$(pwd)/venv/bin/talaria" ~/.local/bin/talaria
 
 # Verify
 talaria doctor
-talaria chat -q "Hello"
+talaria -q "Hello"
 ```
 
 ### Run tests
@@ -111,7 +111,7 @@ pytest tests/ -v
 ```
 talaria-agent/
 ├── run_agent.py              # AIAgent class — core conversation loop, tool dispatch, session persistence
-├── cli.py                    # TalariaCLI class — interactive TUI, prompt_toolkit integration
+├── cli_config.py             # Shared config loader (load_cli_config / CLI_CONFIG / save_config_value)
 ├── model_tools.py            # Tool orchestration (thin layer over tools/registry.py)
 ├── toolsets.py               # Tool groupings and presets (talaria-cli, talaria-telegram, etc.)
 ├── talaria_state.py           # SQLite session database with FTS5 full-text search, session titles
@@ -619,7 +619,7 @@ Scopes: `cli`, `gateway`, `tools`, `skills`, `agent`, `install`, `whatsapp`, `se
 
 Examples:
 ```
-fix(cli): prevent crash in save_config_value when model is a string
+fix(cli_config): prevent crash in save_config_value when model is a string
 feat(gateway): add WhatsApp multi-user session isolation
 fix(security): prevent shell injection in sudo password piping
 test(tools): add unit tests for file_operations

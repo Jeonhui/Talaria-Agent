@@ -224,6 +224,7 @@ class ProcessRegistry:
 
         now = time.time()
         should_disable = False
+        return_early = False
         with session._lock:
             # Case 1: still inside the cooldown from the last emission.
             # Count this as a strike for the current window (only once per window)
@@ -724,8 +725,18 @@ class ProcessRegistry:
                     self._move_to_finished(session)
                     return
 
-            except Exception:
-                # Environment might be gone (sandbox reaped, etc.)
+            except Exception as exc:
+                # Environment might be gone (sandbox reaped, etc.) — but a
+                # transient env.execute() error (network blip, timeout on the
+                # kill -0 probe) can also land here.  Log before declaring the
+                # process dead so a false "exited -1" notification is traceable
+                # rather than silent.
+                logger.warning(
+                    "Env poller for session %s: liveness probe failed (%s) — "
+                    "treating process as exited",
+                    getattr(session, "id", "?"),
+                    exc,
+                )
                 session.exited = True
                 session.exit_code = -1
                 self._move_to_finished(session)

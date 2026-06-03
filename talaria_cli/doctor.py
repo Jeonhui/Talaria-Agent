@@ -1038,7 +1038,7 @@ def run_doctor(args):
             _auth_var = resolve_aws_auth_env_var()
             _region = resolve_bedrock_region()
             _label = "AWS Bedrock".ljust(20)
-            print(f"  Checking AWS Bedrock...", end="", flush=True)
+            print("  Checking AWS Bedrock...", end="", flush=True)
             try:
                 import boto3
                 _br_client = boto3.client("bedrock", region_name=_region)

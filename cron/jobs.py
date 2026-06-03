@@ -851,7 +851,11 @@ def get_due_jobs() -> List[Dict[str, Any]]:
             due.append(job)
 
     if needs_save:
-        save_jobs(raw_jobs)
+        # Serialize with the other writers (mark_job_run / advance_next_run)
+        # so the missed-job fast-forward write isn't lost to a concurrent
+        # save under parallel ticks.
+        with _jobs_file_lock:
+            save_jobs(raw_jobs)
 
     return due
 

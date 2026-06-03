@@ -488,8 +488,8 @@ URLs, module names (`talaria_cli`), env vars (`TALARIA_*`), and install
 paths (`.talaria/`), but a manual scan is wise.
 
 Some persona-specific strings (e.g. "Captain Talaria" in the pirate persona
-in `cli.py`) are intentionally character-themed — leave them or rewrite for
-your brand persona.
+in `cli_config.py`'s `personalities` defaults) are intentionally
+character-themed — leave them or rewrite for your brand persona.
 
 ---
 

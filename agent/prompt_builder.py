@@ -132,10 +132,13 @@ def _strip_yaml_frontmatter(content: str) -> str:
 # =========================================================================
 
 from talaria_cli.branding import (
-    DEFAULT_AGENT_IDENTITY,
     DEFAULT_REPO_HTTPS_URL as _AGENT_DOCS_URL,
     build_agent_identity,
     default_branding as _default_branding,
+    # Re-exported (the `as` alias marks it intentional for ruff): run_agent.py
+    # and agent/codex_responses_adapter.py import DEFAULT_AGENT_IDENTITY from
+    # here, not from branding directly.
+    DEFAULT_AGENT_IDENTITY as DEFAULT_AGENT_IDENTITY,
 )
 
 

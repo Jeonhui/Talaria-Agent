@@ -24,7 +24,7 @@ talaria-agent/
 ├── run_agent.py          # AIAgent class — core conversation loop (~12k LOC)
 ├── model_tools.py        # Tool orchestration, discover_builtin_tools(), handle_function_call()
 ├── toolsets.py           # Toolset definitions, _TALARIA_CORE_TOOLS list
-├── cli.py                # TalariaCLI class — interactive CLI orchestrator (~11k LOC)
+├── cli_config.py         # load_cli_config() / CLI_CONFIG / save_config_value — shared config loader
 ├── talaria_state.py       # SessionDB — SQLite session store (FTS5 search)
 ├── talaria_constants.py   # get_talaria_home(), display_talaria_home() — profile-aware paths
 ├── talaria_logging.py     # setup_logging() — agent.log / errors.log / gateway.log (profile-aware)
@@ -62,7 +62,7 @@ tools/*.py  (each calls registry.register() at import time)
        ↑
 model_tools.py  (imports tools/registry + triggers tool discovery)
        ↑
-run_agent.py, cli.py, batch_runner.py, environments/
+run_agent.py, talaria_cli/main.py, gateway/run.py
 ```
 
 ---
@@ -127,26 +127,25 @@ Reasoning content is stored in `assistant_msg["reasoning"]`.
 
 ---
 
-## CLI Architecture (cli.py)
+## Slash Commands & Config
 
-- **Rich** for banner/panels, **prompt_toolkit** for input with autocomplete
-- **KawaiiSpinner** (`agent/display.py`) — animated faces during API calls, `┊` activity feed for tool results
-- `load_cli_config()` in cli.py merges hardcoded defaults + user config YAML
-- **Skin engine** (`talaria_cli/skin_engine.py`) — data-driven CLI theming; initialized from `display.skin` config key at startup; skins customize banner colors, spinner faces/verbs/wings, tool prefix, response box, branding text
-- `process_command()` is a method on `TalariaCLI` — dispatches on canonical command name resolved via `resolve_command()` from the central registry
+The terminal-chat REPL (`cli.py`) was removed — Talaria runs headless: the
+messaging gateway, one-shot `talaria -q "..."`, and the ACP adapter. Slash
+commands now run through the gateway, but the central registry still drives
+all of them.
+
+- `load_cli_config()` / `CLI_CONFIG` / `save_config_value()` live in **`cli_config.py`** (root) — the shared config loader. Importing it bridges config → env vars (TERMINAL_*, AUXILIARY_*, etc.) as a side effect, which the gateway relies on.
+- **Skin engine** (`talaria_cli/skin_engine.py`) — data-driven theming from the `display.skin` config key
 - Skill slash commands: `agent/skill_commands.py` scans `~/.talaria/skills/`, injects as **user message** (not system prompt) to preserve prompt caching
 
 ### Slash Command Registry (`talaria_cli/commands.py`)
 
 All slash commands are defined in a central `COMMAND_REGISTRY` list of `CommandDef` objects. Every downstream consumer derives from this registry automatically:
 
-- **CLI** — `process_command()` resolves aliases via `resolve_command()`, dispatches on canonical name
 - **Gateway** — `GATEWAY_KNOWN_COMMANDS` frozenset for hook emission, `resolve_command()` for dispatch
 - **Gateway help** — `gateway_help_lines()` generates `/help` output
 - **Telegram** — `telegram_bot_commands()` generates the BotCommand menu
 - **Slack** — `slack_subcommand_map()` generates `/talaria` subcommand routing
-- **Autocomplete** — `COMMANDS` flat dict feeds `SlashCommandCompleter`
-- **CLI help** — `COMMANDS_BY_CATEGORY` dict feeds `show_help()`
 
 ### Adding a Slash Command
 
@@ -155,17 +154,12 @@ All slash commands are defined in a central `COMMAND_REGISTRY` list of `CommandD
 CommandDef("mycommand", "Description of what it does", "Session",
            aliases=("mc",), args_hint="[arg]"),
 ```
-2. Add handler in `TalariaCLI.process_command()` in `cli.py`:
-```python
-elif canonical == "mycommand":
-    self._handle_mycommand(cmd_original)
-```
-3. If the command is available in the gateway, add a handler in `gateway/run.py`:
+2. Add a handler in `gateway/run.py` (the gateway dispatches slash commands):
 ```python
 if canonical == "mycommand":
     return await self._handle_mycommand(event)
 ```
-4. For persistent settings, use `save_config_value()` in `cli.py`
+3. For persistent settings, use `save_config_value()` from `cli_config.py`
 
 **CommandDef fields:**
 - `name` — canonical name without slash (e.g. `"background"`)
@@ -173,7 +167,7 @@ if canonical == "mycommand":
 - `category` — one of `"Session"`, `"Configuration"`, `"Tools & Skills"`, `"Info"`, `"Exit"`
 - `aliases` — tuple of alternative names (e.g. `("bg",)`)
 - `args_hint` — argument placeholder shown in help (e.g. `"<prompt>"`, `"[name]"`)
-- `cli_only` — only available in the interactive CLI
+- `cli_only` — legacy flag from the removed terminal REPL; such commands are now reachable in the gateway only when paired with a `gateway_config_gate` (below)
 - `gateway_only` — only available in messaging platforms
 - `gateway_config_gate` — config dotpath (e.g. `"display.tool_progress_command"`); when set on a `cli_only` command, the command becomes available in the gateway if the config value is truthy. `GATEWAY_KNOWN_COMMANDS` always includes config-gated commands so the gateway can dispatch them; help/menus only show them when the gate is open.
 
@@ -251,7 +245,7 @@ the env var in code (see `gateway_timeout`, `terminal.cwd` → `TERMINAL_CWD`).
 
 | Loader | Used by | Location |
 |--------|---------|----------|
-| `load_cli_config()` | CLI mode | `cli.py` — merges CLI-specific defaults + user YAML |
+| `load_cli_config()` | gateway, delegation, one-shot | `cli_config.py` — merges CLI-specific defaults + user YAML, bridges to env vars |
 | `load_config()` | `talaria tools`, `talaria setup`, most CLI subcommands | `talaria_cli/config.py` — merges `DEFAULT_CONFIG` + user YAML |
 | Direct YAML load | Gateway runtime | `gateway/run.py` + `gateway/config.py` — reads user YAML raw |
 
@@ -294,17 +288,13 @@ talaria_cli/skin_engine.py    # SkinConfig dataclass, built-in skins, YAML loade
 | Banner section headers | `colors.banner_accent` | `banner.py` |
 | Banner dim text | `colors.banner_dim` | `banner.py` |
 | Banner body text | `colors.banner_text` | `banner.py` |
-| Response box border | `colors.response_border` | `cli.py` |
 | Spinner faces (waiting) | `spinner.waiting_faces` | `display.py` |
 | Spinner faces (thinking) | `spinner.thinking_faces` | `display.py` |
 | Spinner verbs | `spinner.thinking_verbs` | `display.py` |
 | Spinner wings (optional) | `spinner.wings` | `display.py` |
 | Tool output prefix | `tool_prefix` | `display.py` |
 | Per-tool emojis | `tool_emojis` | `display.py` → `get_tool_emoji()` |
-| Agent name | `branding.agent_name` | `banner.py`, `cli.py` |
-| Welcome message | `branding.welcome` | `cli.py` |
-| Response box label | `branding.response_label` | `cli.py` |
-| Prompt symbol | `branding.prompt_symbol` | `cli.py` |
+| Agent name | `branding.agent_name` | `banner.py` |
 
 ### Built-in skins
 
@@ -401,7 +391,7 @@ framework only exposes CLI commands for the **currently active** memory
 provider (read from `memory.provider` in config.yaml), so disabled
 providers don't clutter `talaria --help`.
 
-**Rule:** plugins MUST NOT modify core files (`run_agent.py`, `cli.py`,
+**Rule:** plugins MUST NOT modify core files (`run_agent.py`,
 `gateway/run.py`, `talaria_cli/main.py`, etc.). If a plugin needs a
 capability the framework doesn't expose, expand the generic plugin
 surface (new hook, new ctx method) — never hardcode plugin-specific

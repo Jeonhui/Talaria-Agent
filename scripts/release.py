@@ -158,7 +158,6 @@ AUTHOR_MAP = {
     "241404605+MestreY0d4-Uninter@users.noreply.github.com": "MestreY0d4-Uninter",
     "268667990+Roy-oss1@users.noreply.github.com": "Roy-oss1",
     "27917469+nosleepcassette@users.noreply.github.com": "nosleepcassette",
-    "241404605+MestreY0d4-Uninter@users.noreply.github.com": "MestreY0d4-Uninter",
     "109555139+davetist@users.noreply.github.com": "davetist",
     "39405770+yyq4193@users.noreply.github.com": "yyq4193",
     "Asunfly@users.noreply.github.com": "Asunfly",
@@ -183,7 +182,6 @@ AUTHOR_MAP = {
     "nocoo@users.noreply.github.com": "nocoo",
     "30841158+n-WN@users.noreply.github.com": "n-WN",
     "tsuijinglei@gmail.com": "hiddenpuppy",
-    "buraysandro9@gmail.com": "ygd58",
     "jerome@clawwork.ai": "HiddenPuppy",
     "jerome.benoit@sap.com": "jerome-benoit",
     "wysie@users.noreply.github.com": "Wysie",
@@ -269,7 +267,6 @@ AUTHOR_MAP = {
     "michael@make.software": "mssteuer",
     "der@konsi.org": "konsisumer",
     "abogale2@gmail.com": "amanuel2",
-    "alexazzjjtt@163.com": "alexzhu0",
     "pub_forgreatagent@antgroup.com": "AntAISecurityLab",
     "252620095+briandevans@users.noreply.github.com": "briandevans",
     "danielrpike9@gmail.com": "Bartok9",
@@ -357,7 +354,6 @@ AUTHOR_MAP = {
     "chlqhdtn98@gmail.com": "BongSuCHOI",
     "coffeemjj@gmail.com": "Cafexss",
     "dalianmao0107@gmail.com": "dalianmao000",
-    "der@konsi.org": "konsisumer",
     "dgrieco@redhat.com": "DomGrieco",
     "dhicham.pro@gmail.com": "spideystreet",
     "dipp.who@gmail.com": "dippwho",
@@ -413,7 +409,6 @@ AUTHOR_MAP = {
     "ziliangpeng@users.noreply.github.com": "ziliangpeng",
     "centripetal-star@users.noreply.github.com": "centripetal-star",
     "LeonSGP43@users.noreply.github.com": "LeonSGP43",
-    "154585401+LeonSGP43@users.noreply.github.com": "LeonSGP43",
     "Lubrsy706@users.noreply.github.com": "Lubrsy706",
     "niyant@spicefi.xyz": "spniyant",
     "olafthiele@gmail.com": "olafthiele",
@@ -430,8 +425,6 @@ AUTHOR_MAP = {
     "taosiyuan163@153.com": "taosiyuan163",
     "tesseracttars@gmail.com": "tesseracttars-creator",
     "tianliangjay@gmail.com": "xingkongliang",
-    "tranquil_flow@protonmail.com": "Tranquil-Flow",
-    "LyleLengyel@gmail.com": "mcndjxlefnd",
     "unayung@gmail.com": "Unayung",
     "vorvul.danylo@gmail.com": "WorldInnovationsDepartment",
     "win4r@outlook.com": "win4r",
@@ -456,8 +449,6 @@ AUTHOR_MAP = {
     "danieldliu@tencent.com": "danieldliu",
     "loongzhao@tencent.com": "loongzhao",
     "Bartok9@users.noreply.github.com": "Bartok9",
-    "LeonSGP43@users.noreply.github.com": "LeonSGP43",
-    "kshitijk4poor@users.noreply.github.com": "kshitijk4poor",
     "mbelleau@Michels-MacBook-Pro.local": "malaiwah",
     "michel.belleau@malaiwah.com": "malaiwah",
     "gnanasekaran.sekareee@gmail.com": "gnanam1990",
@@ -489,10 +480,8 @@ AUTHOR_MAP = {
     "jarvischer@gmail.com": "maxchernin",
     "levantam.98.2324@gmail.com": "LVT382009",
     "zhurongcheng@rcrai.com": "heykb",
-    "withapurpose37@gmail.com": "StefanIsMe",
     "261797239+lumenradley@users.noreply.github.com": "lumenradley",
     "166376523+sjz-ks@users.noreply.github.com": "sjz-ks",
-    "haileymarshall005@gmail.com": "haileymarshall",
     "aniruddhaadak80@users.noreply.github.com": "aniruddhaadak80",
     "zheng.jerilyn@gmail.com": "jerilynzheng",
     "asslaenn5@gmail.com": "Aslaaen",
@@ -1054,7 +1043,7 @@ def main():
             return
 
     print(f"{'='*60}")
-    print(f"  Talaria Agent Release Preview")
+    print("  Talaria Agent Release Preview")
     print(f"{'='*60}")
     print(f"  CalVer tag:      {tag_name}")
     print(f"  SemVer:          v{current_version} → v{new_version}")
@@ -1100,7 +1089,7 @@ def main():
             if commit_result.returncode != 0:
                 print(f"  ✗ Failed to commit version bump: {commit_result.stderr.strip()}")
                 return
-            print(f"  ✓ Committed version bump")
+            print("  ✓ Committed version bump")
 
         # Create annotated tag
         tag_result = git_result(
@@ -1115,7 +1104,7 @@ def main():
         # Push
         push_result = git_result("push", "origin", "HEAD", "--tags")
         if push_result.returncode == 0:
-            print(f"  ✓ Pushed to origin")
+            print("  ✓ Pushed to origin")
         else:
             print(f"  ✗ Failed to push to origin: {push_result.stderr.strip()}")
             print("    Continue manually after fixing access:")
@@ -1160,7 +1149,7 @@ def main():
             else:
                 print(f"  ✗ GitHub release failed: {result.stderr.strip()}")
             print(f"    Release notes kept at: {changelog_file}")
-            print(f"    Tag was created locally. Create the release manually:")
+            print("    Tag was created locally. Create the release manually:")
             print(
                 f"    gh release create {tag_name} --title 'Talaria Agent v{new_version} ({calver_date})' "
                 f"--notes-file .release_notes.md {' '.join(str(path) for path in artifacts)}"
@@ -1168,8 +1157,8 @@ def main():
             print(f"\n  ✓ Release artifacts prepared for manual publish: v{new_version} ({tag_name})")
     else:
         print(f"\n{'='*60}")
-        print(f"  Dry run complete. To publish, add --publish")
-        print(f"  Example: python scripts/release.py --bump minor --publish")
+        print("  Dry run complete. To publish, add --publish")
+        print("  Example: python scripts/release.py --bump minor --publish")
         print(f"{'='*60}")
 
 

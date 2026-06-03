@@ -5,6 +5,7 @@ Handles: talaria gateway [run|start|stop|restart|status|install|uninstall|setup]
 """
 
 import asyncio
+import logging
 import os
 import shutil
 import signal
@@ -12,6 +13,8 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 

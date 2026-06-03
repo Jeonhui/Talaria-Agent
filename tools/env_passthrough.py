@@ -114,7 +114,23 @@ def _load_config_passthrough() -> frozenset[str]:
         if isinstance(passthrough, list):
             for item in passthrough:
                 if isinstance(item, str) and item.strip():
-                    result.add(item.strip())
+                    name = item.strip()
+                    # Same guard as register_env_passthrough: config must not
+                    # be able to override the execute_code sandbox's
+                    # credential-scrubbing for Talaria-managed provider keys
+                    # (GHSA-rhgp-j443-p4rf).  Without this, adding
+                    # ANTHROPIC_API_KEY to terminal.env_passthrough would leak
+                    # the real key into sandboxed child processes.
+                    if _is_talaria_provider_credential(name):
+                        logger.warning(
+                            "env passthrough config: refusing Talaria provider "
+                            "credential %r (blocked by "
+                            "_TALARIA_PROVIDER_ENV_BLOCKLIST); see "
+                            "GHSA-rhgp-j443-p4rf.",
+                            name,
+                        )
+                        continue
+                    result.add(name)
     except Exception as e:
         logger.debug("Could not read tools.env_passthrough from config: %s", e)
 
