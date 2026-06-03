@@ -17,15 +17,19 @@ import os
 import subprocess
 import sys
 
-# fcntl is Unix-only; on Windows use msvcrt for file locking
+# fcntl is Unix-only; on Windows use msvcrt for file locking.
+# Both names are bound unconditionally so the unlock path in tick()'s
+# `finally:` can reference `msvcrt` without risking NameError on Unix
+# (where fcntl imports fine and the msvcrt import is skipped).
+fcntl = None
+msvcrt = None
 try:
     import fcntl
 except ImportError:
-    fcntl = None
     try:
         import msvcrt
     except ImportError:
-        msvcrt = None
+        pass
 from pathlib import Path
 from typing import List, Optional
 
@@ -1375,7 +1379,13 @@ def tick(verbose: bool = True, adapters=None, loop=None) -> int:
                 for job in parallel_jobs:
                     _ctx = contextvars.copy_context()
                     _futures.append(_tick_pool.submit(_ctx.run, _process_job, job))
-                _results.extend(f.result() for f in _futures)
+                # Consume each future independently — a single worker raising
+                # must not discard the results (and exceptions) of the rest.
+                for _f in _futures:
+                    try:
+                        _results.append(_f.result())
+                    except Exception as _je:
+                        logger.error("Cron parallel job crashed: %s", _je, exc_info=True)
 
         # Best-effort sweep of MCP stdio subprocesses that survived their
         # session teardown during this tick.  Runs AFTER every job has

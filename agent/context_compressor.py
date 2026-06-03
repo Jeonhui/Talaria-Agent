@@ -337,6 +337,11 @@ class ContextCompressor(ContextEngine):
         self._last_summary_error = None
         self._last_summary_dropped_count = 0
         self._last_summary_fallback_used = False
+        # Reset so each new session gets a fresh aux-model fallback chance.
+        # (Termination of _generate_summary's retry is already guaranteed by
+        # summary_model being cleared to "" before it recurses; this flag is
+        # belt-and-suspenders and must not carry a stale True across sessions.)
+        self._summary_model_fallen_back = False
         self._last_aux_model_failure_error = None
         self._last_aux_model_failure_model = None
         self._last_compression_savings_pct = 100.0

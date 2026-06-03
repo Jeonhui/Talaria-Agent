@@ -500,7 +500,10 @@ class GatewayStreamConsumer:
             if _best_effort_ok and not self._final_response_sent:
                 self._final_response_sent = True
         except Exception as e:
-            logger.error("Stream consumer error: %s", e)
+            # Leave _final_response_sent as-is (False unless a complete send was
+            # already confirmed) so the gateway's fallback path re-delivers the
+            # real answer rather than silently dropping it. exc_info aids triage.
+            logger.error("Stream consumer error: %s", e, exc_info=True)
 
     # Pattern to strip MEDIA:<path> tags (including optional surrounding quotes).
     # Matches the simple cleanup regex used by the non-streaming path in
