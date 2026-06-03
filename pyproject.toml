@@ -23,7 +23,7 @@ dependencies = [
   "requests>=2.33.0,<3",  # CVE-2026-25645
   "jinja2>=3.1.5,<4",
   "pydantic>=2.12.5,<3",
-  # Interactive CLI (prompt_toolkit is used directly by cli.py)
+  # Terminal UI building blocks (prompt_toolkit: pickers, key bindings, ANSI)
   "prompt_toolkit>=3.0.52,<4",
   # Tools
   # Cron scheduler (built-in feature — scheduled cron/interval jobs use croniter).
@@ -70,7 +70,7 @@ talaria-agent = "run_agent:main"
 talaria-acp = "acp_adapter.entry:main"
 
 [tool.setuptools]
-py-modules = ["run_agent", "model_tools", "toolsets", "cli", "talaria_constants", "talaria_state", "talaria_time", "talaria_logging", "utils"]
+py-modules = ["run_agent", "model_tools", "toolsets", "cli_config", "talaria_constants", "talaria_state", "talaria_time", "talaria_logging", "utils"]
 
 [tool.setuptools.packages.find]
 include = ["agent", "agent.*", "tools", "tools.*", "talaria_cli", "gateway", "gateway.*", "cron", "acp_adapter"]
@@ -102,7 +102,21 @@ invalid-assignment = "ignore"
 not-iterable = "ignore"
 
 [tool.ruff]
-exclude = ["*"]
+target-version = "py311"
+line-length = 120
+# Generated / vendored / data dirs that shouldn't be linted.
+extend-exclude = ["skills", "models-dev-upstream", "ref", "examples"]
+
+[tool.ruff.lint]
+# Pyflakes (F) catches real bugs — undefined names, unused imports, bad
+# f-strings, duplicate dict keys — and E9 catches syntax errors. We do NOT
+# enable the full default set: the codebase intentionally uses non-top-level
+# imports (E402) and other patterns that would be noise.
+select = ["F", "E9"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests redefine fixtures and import for side effects.
+"tests/*" = ["F811", "F401", "F403", "F405"]
 
 [tool.uv]
 exclude-newer = "7 days"

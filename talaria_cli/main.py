@@ -760,136 +760,38 @@ def _resolve_session_by_name_or_id(name_or_id: str) -> Optional[str]:
 
 
 def cmd_chat(args):
-    """Run interactive chat CLI."""
-    # Resolve --continue into --resume with the latest session or by name
-    continue_val = getattr(args, "continue_last", None)
-    if continue_val and not getattr(args, "resume", None):
-        if isinstance(continue_val, str):
-            # -c "session name" — resolve by title or ID
-            resolved = _resolve_session_by_name_or_id(continue_val)
-            if resolved:
-                args.resume = resolved
-            else:
-                print(f"No session found matching '{continue_val}'.")
-                print("Use 'talaria sessions list' to see available sessions.")
-                sys.exit(1)
-        else:
-            # -c with no argument — continue the most recent session
-            last_id = _resolve_last_session(source="cli")
-            if last_id:
-                args.resume = last_id
-            else:
-                print("No previous CLI session found to continue.")
-                sys.exit(1)
+    """Interactive terminal chat was removed; this is now a thin shim.
 
-    # Resolve --resume by title if it's not a direct session ID
-    resume_val = getattr(args, "resume", None)
-    if resume_val:
-        resolved = _resolve_session_by_name_or_id(resume_val)
-        if resolved:
-            args.resume = resolved
-        # If resolution fails, keep the original value — _init_agent will
-        # report "Session not found" with the original input
+    The old REPL (cli.py) is gone. Talaria runs headless / gateway only.
+    ``-q/--query`` is preserved as an alias for one-shot mode so existing
+    ``talaria -q "..."`` usage keeps working; everything else prints guidance.
+    """
+    # Preserve `talaria -q "..."` as a headless single-shot query, routed to
+    # the standalone one-shot path (run_oneshot bypasses the removed REPL).
+    query = getattr(args, "query", None)
+    if query:
+        # --source still tags the session for filtering, even one-shot.
+        if getattr(args, "source", None):
+            os.environ["TALARIA_SESSION_SOURCE"] = args.source
+        from talaria_cli.oneshot import run_oneshot
 
-    # First-run guard: check if any provider is configured before launching
-    if not _has_any_provider_configured():
-        print()
-        print(
-            f"It looks like {default_branding('agent_short_name', 'Talaria')} isn't configured yet -- no API keys or providers found."
-        )
-        print()
-        print("  Run:  talaria setup")
-        print()
+        sys.exit(run_oneshot(
+            query,
+            model=getattr(args, "model", None),
+            provider=getattr(args, "provider", None),
+            toolsets=getattr(args, "toolsets", None),
+        ))
 
-        from talaria_cli.setup import (
-            is_interactive_stdin,
-            print_noninteractive_setup_guidance,
-        )
-
-        if not is_interactive_stdin():
-            print_noninteractive_setup_guidance(
-                "No interactive TTY detected for the first-run setup prompt."
-            )
-            sys.exit(1)
-
-        try:
-            reply = input("Run setup now? [Y/n] ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            reply = "n"
-        if reply in ("", "y", "yes"):
-            cmd_setup(args)
-            return
-        print()
-        print("You can run 'talaria setup' at any time to configure.")
-        sys.exit(1)
-
-    # Start update check in background (runs while other init happens)
-    try:
-        from talaria_cli.banner import prefetch_update_check
-
-        prefetch_update_check()
-    except Exception:
-        pass
-
-    # Sync bundled skills on every CLI launch (fast -- skips unchanged skills)
-    try:
-        from tools.skills_sync import sync_skills
-
-        sync_skills(quiet=True)
-    except Exception:
-        pass
-
-    # --yolo: bypass all dangerous command approvals
-    if getattr(args, "yolo", False):
-        os.environ["TALARIA_YOLO_MODE"] = "1"
-
-    # --ignore-user-config: make load_cli_config() / load_config() skip the
-    # user's ~/.talaria/config.yaml and return built-in defaults. Set BEFORE
-    # importing cli (which runs `CLI_CONFIG = load_cli_config()` at module
-    # import time). Credentials in .env are still loaded — this flag only
-    # ignores behavioral/config settings.
-    if getattr(args, "ignore_user_config", False):
-        os.environ["TALARIA_IGNORE_USER_CONFIG"] = "1"
-
-    # --ignore-rules: skip auto-injection of AGENTS.md/SOUL.md/.cursorrules
-    # (rules), memory entries, and any preloaded skills coming from user config.
-    # Maps to AIAgent(skip_context_files=True, skip_memory=True).
-    if getattr(args, "ignore_rules", False):
-        os.environ["TALARIA_IGNORE_RULES"] = "1"
-
-    # --source: tag session source for filtering (e.g. 'tool' for third-party integrations)
-    if getattr(args, "source", None):
-        os.environ["TALARIA_SESSION_SOURCE"] = args.source
-
-    # Import and run the CLI
-    from cli import main as cli_main
-
-    # Build kwargs from args
-    kwargs = {
-        "model": args.model,
-        "provider": getattr(args, "provider", None),
-        "toolsets": args.toolsets,
-        "skills": getattr(args, "skills", None),
-        "verbose": args.verbose,
-        "quiet": getattr(args, "quiet", False),
-        "query": args.query,
-        "image": getattr(args, "image", None),
-        "resume": getattr(args, "resume", None),
-        "worktree": getattr(args, "worktree", False),
-        "checkpoints": getattr(args, "checkpoints", False),
-        "pass_session_id": getattr(args, "pass_session_id", False),
-        "max_turns": getattr(args, "max_turns", None),
-        "ignore_rules": getattr(args, "ignore_rules", False),
-        "ignore_user_config": getattr(args, "ignore_user_config", False),
-    }
-    # Filter out None values
-    kwargs = {k: v for k, v in kwargs.items() if v is not None}
-
-    try:
-        cli_main(**kwargs)
-    except ValueError as e:
-        print(f"Error: {e}")
-        sys.exit(1)
+    print()
+    print("Interactive terminal chat has been removed from this build.")
+    print()
+    print("Use one of:")
+    print('  talaria -q "your question"     One-shot answer (also: --oneshot / -z)')
+    print("  talaria gateway run            Chat via Discord / Slack / Telegram")
+    print("  talaria-acp                    Agent Client Protocol (editor integration)")
+    print()
+    print("Run 'talaria --help' for all commands.")
+    sys.exit(0)
 
 
 def cmd_gateway(args):
@@ -1735,8 +1637,8 @@ def _model_flow_custom(config):
     )
     if _looks_local and not _url_lower.endswith("/v1"):
         print()
-        print(f"  Hint: Did you mean to add /v1 at the end?")
-        print(f"  Most local model servers (Ollama, vLLM, llama.cpp) require it.")
+        print("  Hint: Did you mean to add /v1 at the end?")
+        print("  Most local model servers (Ollama, vLLM, llama.cpp) require it.")
         print(f"  e.g. {effective_url.rstrip('/')}/v1")
         try:
             _add_v1 = input("  Add /v1? [Y/n]: ").strip().lower()
@@ -4219,8 +4121,8 @@ def _run_pre_update_backup(args) -> None:
 
     print(f"  Saved:    {display_path} ({size_str}, {elapsed:.1f}s)")
     print(f"  Restore:  talaria import {out_path}")
-    print(f"  Disable:  omit --backup (backups are off by default)")
-    print(f"            set updates.pre_update_backup: false in config.yaml")
+    print("  Disable:  omit --backup (backups are off by default)")
+    print("            set updates.pre_update_backup: false in config.yaml")
     print()
 
 
@@ -4343,7 +4245,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
                     "✗ Authentication failed — check your git credentials or SSH key."
                 )
             else:
-                print(f"✗ Failed to fetch updates from origin.")
+                print("✗ Failed to fetch updates from origin.")
                 if stderr:
                     print(f"  {stderr.splitlines()[0]}")
             sys.exit(1)
@@ -4474,7 +4376,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
                     print(
                         f"  ℹ️  Local changes preserved in stash (ref: {auto_stash_ref})"
                     )
-                    print(f"  Restore manually with: git stash apply")
+                    print("  Restore manually with: git stash apply")
                 else:
                     _restore_stashed_changes(
                         git_cmd,
@@ -5231,7 +5133,7 @@ def cmd_profile(args):
         try:
             set_active_profile(name)
             if name == "default":
-                print(f"Switched to: default (~/.talaria)")
+                print("Switched to: default (~/.talaria)")
             else:
                 print(f"Switched to: {name}")
         except (ValueError, FileNotFoundError) as e:
@@ -5294,9 +5196,9 @@ def cmd_profile(args):
                         if not _is_wrapper_dir_in_path():
                             print(f"\n⚠ {_get_wrapper_dir()} is not in your PATH.")
                             print(
-                                f"  Add to your shell config (~/.bashrc or ~/.zshrc):"
+                                "  Add to your shell config (~/.bashrc or ~/.zshrc):"
                             )
-                            print(f'    export PATH="$HOME/.local/bin:$PATH"')
+                            print('    export PATH="$HOME/.local/bin:$PATH"')
 
             # Profile dir for display
             try:
@@ -5305,7 +5207,7 @@ def cmd_profile(args):
                 profile_dir_display = str(profile_dir)
 
             # Next steps
-            print(f"\nNext steps:")
+            print("\nNext steps:")
             print(f"  {name} setup              Configure API keys and model")
             print(f"  {name} chat               Start chatting")
             print(f"  {name} gateway start      Start the messaging gateway")
@@ -5316,7 +5218,7 @@ def cmd_profile(args):
                 print(
                     f"\n  ⚠ This profile has no API keys yet. Run '{name} setup' first,"
                 )
-                print(f"    or it will inherit keys from your shell environment.")
+                print("    or it will inherit keys from your shell environment.")
                 print(f"  Edit {profile_dir_display}/SOUL.md to customize personality")
             print()
 
@@ -6698,7 +6600,7 @@ Examples:
                 )
                 return
 
-            print(f"\n  This will permanently erase the following memory files:")
+            print("\n  This will permanently erase the following memory files:")
             for f, desc in existing:
                 path = mem_dir / f
                 size = path.stat().st_size
@@ -6719,7 +6621,7 @@ Examples:
                 print(f"  ✓ Deleted {f} ({desc})")
 
             print(
-                f"\n  Memory reset complete. New sessions will start with a blank slate."
+                "\n  Memory reset complete. New sessions will start with a blank slate."
             )
             print(f"  Files were in: {display_talaria_home()}/memories/\n")
         else:
@@ -6928,6 +6830,31 @@ Examples:
 
     sessions_subparsers.add_parser("stats", help="Show session store statistics")
 
+    sessions_status = sessions_subparsers.add_parser(
+        "status",
+        help="Show active sessions and live MCP connection status",
+        description=(
+            "Snapshot of currently-active (not-yet-ended) sessions plus a live "
+            "probe of each configured MCP server's connection."
+        ),
+    )
+    sessions_status.add_argument(
+        "--source", help="Filter sessions by source (cli, telegram, discord, etc.)"
+    )
+    sessions_status.add_argument(
+        "--limit", type=int, default=20, help="Max sessions to show (default: 20)"
+    )
+    sessions_status.add_argument(
+        "--all",
+        action="store_true",
+        help="Include ended sessions, not just active ones",
+    )
+    sessions_status.add_argument(
+        "--no-mcp",
+        action="store_true",
+        help="Skip probing MCP servers (faster)",
+    )
+
     sessions_rename = sessions_subparsers.add_parser(
         "rename", help="Set or change a session's title"
     )
@@ -6997,6 +6924,68 @@ Examples:
                 else:
                     sid = s["id"]
                     print(f"{preview:<50} {last_active:<13} {s['source']:<6} {sid}")
+
+        elif action == "status":
+            include_ended = getattr(args, "all", False)
+            sessions = db.list_sessions_rich(
+                source=args.source, exclude_sources=_exclude, limit=args.limit
+            )
+            db.close()
+            # "Active" = sessions with no recorded end (still open). The DB is
+            # the only cross-process signal here — a running gateway records
+            # open sessions there, so this works even from a separate process.
+            if include_ended:
+                shown = sessions
+            else:
+                shown = [s for s in sessions if not s.get("ended_at")]
+
+            print()
+            print("◆ Sessions" + ("" if include_ended else " (active)"))
+            if not shown:
+                print("  none")
+            else:
+                print(f"  {'Source':<9} {'Model':<24} {'Msgs':>5}  {'Last Active':<13} ID")
+                print("  " + "─" * 74)
+                for s in shown:
+                    src = (s.get("source") or "?")[:8]
+                    model = (s.get("model") or "—")[:23]
+                    msgs = s.get("message_count", 0) or 0
+                    la = _relative_time(s.get("last_active"))
+                    sid = s.get("id", "?")
+                    print(f"  {src:<9} {model:<24} {msgs:>5}  {la:<13} {sid}")
+                    title = s.get("title")
+                    if title:
+                        print(f"  {'':<9} ↳ {title[:60]}")
+
+            # MCP connection status — probe each configured server live unless
+            # skipped.  The in-process _servers registry is empty from a
+            # standalone CLI, so we connect+list+disconnect to report health.
+            if not getattr(args, "no_mcp", False):
+                print()
+                print("◆ MCP servers")
+                try:
+                    from talaria_cli.mcp_config import (
+                        _get_mcp_servers,
+                        _probe_single_server,
+                    )
+                    servers = _get_mcp_servers()
+                except Exception as e:
+                    servers = {}
+                    print(f"  (could not read MCP config: {e})")
+                if not servers:
+                    print("  none configured")
+                else:
+                    for name, cfg in servers.items():
+                        try:
+                            tools = _probe_single_server(name, cfg, connect_timeout=10)
+                            n = len(tools)
+                            print(f"  ✓ {name}: connected ({n} tool{'s' if n != 1 else ''})")
+                        except Exception as e:
+                            msg = str(e).strip() or e.__class__.__name__
+                            if len(msg) > 70:
+                                msg = msg[:67] + "..."
+                            print(f"  ✗ {name}: {msg}")
+            print()
 
         elif action == "export":
             if args.session_id:

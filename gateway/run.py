@@ -8,9 +8,9 @@ This module provides:
 Usage:
     # Start the gateway
     python -m gateway.run
-    
-    # Or from CLI
-    python cli.py --gateway
+
+    # Or via the CLI
+    talaria gateway run
 """
 
 import asyncio
@@ -2278,7 +2278,23 @@ class GatewayRunner:
                 "Set GATEWAY_ALLOW_ALL_USERS=true in ~/.talaria/.env to allow open access, "
                 "or configure platform allowlists (e.g., TELEGRAM_ALLOWED_USERS=your_id)."
             )
-        
+        # Loudly flag open-access mode — this agent can execute code and
+        # read/write files, so allowing ALL users is dangerous outside a
+        # trusted environment.  Covers both the *_ALLOW_ALL_USERS booleans
+        # and a literal "*" wildcard in any allowlist.
+        _wildcard_allowlist = any(
+            "*" in (os.getenv(v, "") or "").split(",")
+            for v in _builtin_allowed_vars + _plugin_allowed_vars
+        )
+        if _allow_all or _wildcard_allowlist:
+            logger.warning(
+                "SECURITY: open-access mode is ON — ANY user on the configured "
+                "platform(s) can interact with this agent, which can execute "
+                "code and read/write files on this host. Restrict access via "
+                "platform allowlists (e.g. TELEGRAM_ALLOWED_USERS=your_id) "
+                "unless this is a fully trusted environment."
+            )
+
         # Discover Python plugins before shell hooks so plugin block
         # decisions take precedence in tie cases.  The CLI startup path
         # does this via an explicit call in talaria_cli/main.py; the
@@ -7713,7 +7729,7 @@ class GatewayRunner:
             if choice == "always":
                 # Persist the opt-out and run the reload.
                 try:
-                    from cli import save_config_value
+                    from cli_config import save_config_value
                     save_config_value("approvals.mcp_reload_confirm", False)
                     logger.info(
                         "User opted out of /reload-mcp confirmation (session=%s)",
