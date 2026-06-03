@@ -31,17 +31,18 @@ sys.path.insert(0, REPO_ROOT)
 # Ensure TALARIA_HOME is set (needed by tools/skills_hub.py imports)
 os.environ.setdefault("TALARIA_HOME", os.path.join(os.path.expanduser("~"), ".talaria"))
 
+import httpx
+
 from tools.skills_hub import (
+    ClaudeMarketplaceSource,
+    ClawHubSource,
     GitHubAuth,
     GitHubSource,
-    SkillsShSource,
-    WellKnownSkillSource,
-    ClawHubSource,
-    ClaudeMarketplaceSource,
     LobeHubSource,
     SkillMeta,
+    SkillsShSource,
+    WellKnownSkillSource,
 )
-import httpx
 
 OUTPUT_PATH = os.path.join(REPO_ROOT, "website", "static", "api", "skills-index.json")
 INDEX_VERSION = 1

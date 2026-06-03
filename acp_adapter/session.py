@@ -8,8 +8,6 @@ history.
 """
 from __future__ import annotations
 
-from talaria_constants import get_talaria_home
-
 import copy
 import json
 import logging
@@ -18,10 +16,12 @@ import re
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from threading import Lock
 from typing import Any, Dict, List, Optional
+
+from talaria_constants import get_talaria_home
 
 logger = logging.getLogger(__name__)
 

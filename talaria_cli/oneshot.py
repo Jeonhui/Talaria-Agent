@@ -210,11 +210,11 @@ def _run_agent(
     run a single conversation.  Returns the final response string."""
     # Imports are local so they don't run when talaria is invoked for
     # other commands (keeps top-level CLI startup cheap).
+    from run_agent import AIAgent
     from talaria_cli.config import load_config
     from talaria_cli.models import detect_provider_for_model
     from talaria_cli.runtime_provider import resolve_runtime_provider
     from talaria_cli.tools_config import _get_platform_tools
-    from run_agent import AIAgent
 
     cfg = load_config()
 

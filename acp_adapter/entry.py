@@ -17,8 +17,8 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
-from talaria_constants import get_talaria_home
 
+from talaria_constants import get_talaria_home
 
 # Methods clients send as periodic liveness probes. They are not part of the
 # ACP schema, so the acp router correctly returns JSON-RPC -32601 to the
@@ -110,6 +110,7 @@ def main() -> None:
         sys.path.insert(0, project_root)
 
     import acp
+
     from .server import TalariaACPAgent
 
     # MCP tool discovery from config.yaml — run before asyncio.run() so

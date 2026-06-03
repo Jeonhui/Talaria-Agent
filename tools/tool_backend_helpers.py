@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 
-
 _DEFAULT_BROWSER_PROVIDER = "local"
 
 

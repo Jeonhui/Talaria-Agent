@@ -16,17 +16,17 @@ Architecture:
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import json
 import logging
 import os
-import shutil
 import shlex
+import shutil
 import ssl
 import stat
-import sys
-import base64
-import hashlib
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -42,7 +42,7 @@ from urllib.parse import parse_qs, urlencode, urlparse
 import httpx
 import yaml
 
-from talaria_cli.config import get_talaria_home, get_config_path, read_raw_config
+from talaria_cli.config import get_config_path, get_talaria_home, read_raw_config
 from talaria_constants import OPENROUTER_BASE_URL
 from utils import atomic_replace
 
@@ -89,6 +89,7 @@ DEFAULT_SPOTIFY_ACCOUNTS_BASE_URL = "https://accounts.spotify.com"
 DEFAULT_SPOTIFY_API_BASE_URL = "https://api.spotify.com/v1"
 DEFAULT_SPOTIFY_REDIRECT_URI = "http://127.0.0.1:43827/spotify/callback"
 from talaria_cli.branding import DEFAULT_REPO_HTTPS_URL as SPOTIFY_DOCS_URL  # noqa: E402
+
 SPOTIFY_DASHBOARD_URL = "https://developer.spotify.com/dashboard"
 SPOTIFY_ACCESS_TOKEN_REFRESH_SKEW_SECONDS = 120
 DEFAULT_SPOTIFY_SCOPE = " ".join((
@@ -483,7 +484,7 @@ def _resolve_api_key_provider_secret(
     if provider_id == "copilot":
         # Use the dedicated copilot auth module for proper token validation
         try:
-            from talaria_cli.copilot_auth import resolve_copilot_token, get_copilot_api_token
+            from talaria_cli.copilot_auth import get_copilot_api_token, resolve_copilot_token
             token, source = resolve_copilot_token()
             if token:
                 return get_copilot_api_token(token), source
@@ -2971,7 +2972,7 @@ def _save_model_choice(model_id: str) -> None:
     The model is stored in config.yaml only — NOT in .env.  This avoids
     conflicts in multi-agent setups where env vars would stomp each other.
     """
-    from talaria_cli.config import save_config, load_config
+    from talaria_cli.config import load_config, save_config
 
     config = load_config()
     # Always use dict format so provider/base_url can be stored alongside

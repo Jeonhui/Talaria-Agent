@@ -24,18 +24,18 @@ Usage:
     result = terminal_tool("python server.py", background=True)
 """
 
+import atexit
 import json
 import logging
 import os
 import platform
 import re
-import time
-import threading
-import atexit
 import shutil
 import subprocess
+import threading
+import time
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,8 @@ logger = logging.getLogger(__name__)
 # The terminal tool polls this during command execution so it can kill
 # long-running subprocesses immediately instead of blocking until timeout.
 # ---------------------------------------------------------------------------
-from tools.interrupt import is_interrupted, _interrupt_event  # noqa: F401 — re-exported
+from tools.interrupt import _interrupt_event, is_interrupted  # noqa: F401 — re-exported
+
 # display_talaria_home imported lazily at call site (stale-module safety during talaria update)
 
 
@@ -124,6 +125,7 @@ _sudo_password_cache_lock = threading.Lock()
 # the per-session queue in tools.approval, not through these callbacks,
 # so it's unaffected.
 import threading
+
 _callback_tls = threading.local()
 
 
@@ -733,10 +735,9 @@ def _transform_sudo_command(command: str | None) -> tuple[str | None, str | None
 
 
 # Environment classes now live in tools/environments/
+from tools.environments.docker import DockerEnvironment as _DockerEnvironment
 from tools.environments.local import LocalEnvironment as _LocalEnvironment
 from tools.environments.ssh import SSHEnvironment as _SSHEnvironment
-from tools.environments.docker import DockerEnvironment as _DockerEnvironment
-
 
 # Tool description for LLM
 TERMINAL_TOOL_DESCRIPTION = """Execute shell commands on a Linux environment. Filesystem usually persists between calls.

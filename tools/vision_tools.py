@@ -36,7 +36,9 @@ import uuid
 from pathlib import Path
 from typing import Any, Awaitable, Dict, Optional
 from urllib.parse import urlparse
+
 import httpx
+
 from agent.auxiliary_client import async_call_llm, extract_content_or_reasoning
 from talaria_constants import get_talaria_dir
 from tools.debug_helpers import DebugSession
@@ -321,8 +323,9 @@ def _resize_image_for_vision(image_path: Path, mime_type: Optional[str] = None,
 
     # Attempt auto-resize with Pillow (soft dependency)
     try:
-        from PIL import Image
         import io as _io
+
+        from PIL import Image
     except ImportError:
         logger.info("Pillow not installed — cannot auto-resize oversized image")
         if data_url is None:

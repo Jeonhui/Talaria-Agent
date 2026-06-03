@@ -30,9 +30,9 @@ import re
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from talaria_constants import get_talaria_home
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
+from talaria_constants import get_talaria_home
 from utils import atomic_replace
 
 # fcntl is Unix-only; on Windows use msvcrt for file locking

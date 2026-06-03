@@ -28,7 +28,6 @@ import yaml
 
 from talaria_cli.config import get_talaria_home
 
-
 HOOKS_DIR = get_talaria_home() / "hooks"
 
 

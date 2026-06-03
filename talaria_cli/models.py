@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import json
 import os
-import urllib.request
-import urllib.error
 import time
+import urllib.error
+import urllib.request
 from difflib import get_close_matches
 from typing import Any, NamedTuple, Optional
 
@@ -890,7 +890,7 @@ def _fetch_anthropic_models(timeout: float = 5.0) -> Optional[list[str]]:
     Claude Code auto-discovery).  Returns sorted model IDs or None.
     """
     try:
-        from agent.anthropic_adapter import resolve_anthropic_token, _is_oauth_token
+        from agent.anthropic_adapter import _is_oauth_token, resolve_anthropic_token
     except ImportError:
         return None
 
@@ -902,7 +902,7 @@ def _fetch_anthropic_models(timeout: float = 5.0) -> Optional[list[str]]:
     is_oauth = _is_oauth_token(token)
     if is_oauth:
         headers["Authorization"] = f"Bearer {token}"
-        from agent.anthropic_adapter import _COMMON_BETAS, _OAUTH_ONLY_BETAS, _CONTEXT_1M_BETA
+        from agent.anthropic_adapter import _COMMON_BETAS, _CONTEXT_1M_BETA, _OAUTH_ONLY_BETAS
         headers["anthropic-beta"] = ",".join(_COMMON_BETAS + _OAUTH_ONLY_BETAS)
     else:
         headers["x-api-key"] = token
@@ -1732,6 +1732,7 @@ _OLLAMA_CLOUD_CACHE_TTL = 3600  # 1 hour
 
 def _ollama_cloud_cache_path():
     from pathlib import Path
+
     from talaria_constants import get_talaria_home
     return Path(get_talaria_home()) / "ollama_cloud_models_cache.json"
 

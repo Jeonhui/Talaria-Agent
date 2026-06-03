@@ -25,6 +25,7 @@ import os
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Dict, List
+
 from talaria_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)

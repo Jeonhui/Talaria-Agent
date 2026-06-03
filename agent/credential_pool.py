@@ -4,16 +4,14 @@ from __future__ import annotations
 
 import logging
 import random
+import re
 import threading
 import time
 import uuid
-import re
 from dataclasses import dataclass, fields, replace
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from talaria_constants import OPENROUTER_BASE_URL
-from talaria_cli.config import get_env_value
 import talaria_cli.auth as auth_mod
 from talaria_cli.auth import (
     CODEX_ACCESS_TOKEN_REFRESH_SKEW_SECONDS,
@@ -30,6 +28,8 @@ from talaria_cli.auth import (
     read_credential_pool,
     write_credential_pool,
 )
+from talaria_cli.config import get_env_value
+from talaria_constants import OPENROUTER_BASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -1047,7 +1047,7 @@ def _seed_from_singletons(provider: str, entries: List[PooledCredential]) -> Tup
         # env vars (COPILOT_GITHUB_TOKEN / GH_TOKEN).  They don't live in
         # the auth store or credential pool, so we resolve them here.
         try:
-            from talaria_cli.copilot_auth import resolve_copilot_token, get_copilot_api_token
+            from talaria_cli.copilot_auth import get_copilot_api_token, resolve_copilot_token
             token, source = resolve_copilot_token()
             if token:
                 api_token = get_copilot_api_token(token)

@@ -21,7 +21,6 @@ from __future__ import annotations
 import copy
 from typing import Any, Dict, List, Optional
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -154,8 +153,8 @@ def _describe_primary(config: Dict[str, Any]) -> Optional[str]:
 
 def cmd_fallback_add(args) -> None:
     """Launch the same picker as `talaria model`, then append the selection to the chain."""
-    from talaria_cli.main import _require_tty, select_provider_and_model
     from talaria_cli.config import load_config, save_config
+    from talaria_cli.main import _require_tty, select_provider_and_model
 
     _require_tty("fallback add")
 

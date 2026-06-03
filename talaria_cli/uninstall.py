@@ -11,10 +11,10 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from talaria_cli.branding import BRAND_EMOJI, DEFAULT_INSTALL_SCRIPT_URL
+from talaria_cli.colors import Colors, color
 from talaria_constants import get_talaria_home
 
-from talaria_cli.colors import Colors, color
-from talaria_cli.branding import BRAND_EMOJI, DEFAULT_INSTALL_SCRIPT_URL
 
 def log_info(msg: str):
     print(f"{color('→', Colors.CYAN)} {msg}")
@@ -133,7 +133,7 @@ def uninstall_gateway_service():
 
     # 1. Kill any standalone gateway processes (all platforms, including Termux)
     try:
-        from talaria_cli.gateway import kill_gateway_processes, find_gateway_pids
+        from talaria_cli.gateway import find_gateway_pids, kill_gateway_processes
         pids = find_gateway_pids()
         if pids:
             killed = kill_gateway_processes()
@@ -155,9 +155,9 @@ def uninstall_gateway_service():
     if system == "Linux":
         try:
             from talaria_cli.gateway import (
-                get_systemd_unit_path,
-                get_service_name,
                 _systemctl_cmd,
+                get_service_name,
+                get_systemd_unit_path,
             )
             svc_name = get_service_name()
 

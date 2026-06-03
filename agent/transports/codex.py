@@ -60,7 +60,6 @@ class ResponsesApiTransport(ProviderTransport):
             _chat_messages_to_responses_input,
             _responses_tools,
         )
-
         from run_agent import DEFAULT_AGENT_IDENTITY
 
         instructions = params.get("instructions", "")

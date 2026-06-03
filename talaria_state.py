@@ -22,10 +22,10 @@ import sqlite3
 import threading
 import time
 from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 from agent.memory_manager import sanitize_context
 from talaria_constants import get_talaria_home
-from typing import Any, Callable, Dict, List, Optional, TypeVar
 
 logger = logging.getLogger(__name__)
 

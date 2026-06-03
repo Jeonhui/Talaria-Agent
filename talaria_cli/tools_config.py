@@ -16,13 +16,15 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-
+from talaria_cli.branding import BRAND_EMOJI, DEFAULT_REPO_HTTPS_URL
+from talaria_cli.colors import Colors, color
 from talaria_cli.config import (
     cfg_get,
-    load_config, save_config, get_env_value, save_env_value,
+    get_env_value,
+    load_config,
+    save_config,
+    save_env_value,
 )
-from talaria_cli.colors import Colors, color
-from talaria_cli.branding import BRAND_EMOJI, DEFAULT_REPO_HTTPS_URL
 from tools.tool_backend_helpers import fal_key_is_configured
 from utils import base_url_hostname
 
@@ -35,9 +37,17 @@ PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 from talaria_cli.cli_output import (  # noqa: E402 — late import block
     print_error as _print_error,
+)
+from talaria_cli.cli_output import (
     print_info as _print_info,
+)
+from talaria_cli.cli_output import (
     print_success as _print_success,
+)
+from talaria_cli.cli_output import (
     print_warning as _print_warning,
+)
+from talaria_cli.cli_output import (
     prompt as _prompt,
 )
 
@@ -494,7 +504,7 @@ def _get_platform_tools(
     include_default_mcp_servers: bool = True,
 ) -> Set[str]:
     """Resolve which individual toolset names are enabled for a platform."""
-    from toolsets import resolve_toolset, TOOLSETS
+    from toolsets import TOOLSETS, resolve_toolset
 
     platform_toolsets = config.get("platform_toolsets") or {}
     toolset_names = platform_toolsets.get(platform)
@@ -893,6 +903,7 @@ def _plugin_image_gen_providers() -> list[dict]:
     """
     try:
         from agent.image_gen_registry import list_providers
+
         from talaria_cli.plugins import _ensure_plugins_discovered
 
         _ensure_plugins_discovered()
@@ -957,6 +968,7 @@ def _toolset_needs_configuration_prompt(ts_key: str, config: dict) -> bool:
             return False
         try:
             from agent.image_gen_registry import list_providers
+
             from talaria_cli.plugins import _ensure_plugins_discovered
 
             _ensure_plugins_discovered()
@@ -1178,6 +1190,7 @@ def _plugin_image_gen_catalog(plugin_name: str):
     """
     try:
         from agent.image_gen_registry import get_provider
+
         from talaria_cli.plugins import _ensure_plugins_discovered
 
         _ensure_plugins_discovered()

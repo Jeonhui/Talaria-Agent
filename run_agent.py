@@ -27,6 +27,7 @@ import copy
 import hashlib
 import json
 import logging
+
 logger = logging.getLogger(__name__)
 import os
 import random
@@ -34,16 +35,19 @@ import re
 import ssl
 import sys
 import tempfile
-import time
 import threading
-from types import SimpleNamespace
+import time
 import urllib.request
 import uuid
-from typing import TYPE_CHECKING, List, Dict, Any, Optional
+from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from agent.rate_limit_tracker import RateLimitState
-from urllib.parse import urlparse, parse_qs, urlunparse
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse, urlunparse
+
 # NOTE: `from openai import OpenAI` is deliberately NOT at module top — the
 # SDK pulls ~240 ms of imports. We expose `OpenAI` as a thin proxy object
 # that imports the SDK on first call/isinstance check. This preserves:
@@ -51,11 +55,8 @@ from urllib.parse import urlparse, parse_qs, urlunparse
 #       _create_openai_client, and
 #   (b) `patch("run_agent.OpenAI", ...)` test patterns used by ~28 test files.
 import fire
-from datetime import datetime
-from pathlib import Path
 
 from talaria_constants import get_talaria_home
-
 
 _OPENAI_CLS_CACHE: Optional[type] = None
 
@@ -105,65 +106,99 @@ else:
 
 
 # Import our tool system
-from model_tools import (
-    get_tool_definitions,
-    get_toolset_for_tool,
-    handle_function_call,
-    check_toolset_requirements,
+from agent.codex_responses_adapter import (
+    _derive_responses_function_call_id as _codex_derive_responses_function_call_id,
 )
-from tools.terminal_tool import cleanup_vm, get_active_env, is_persistent_env
-from tools.terminal_tool import (
-    set_approval_callback as _set_approval_callback,
-    set_sudo_password_callback as _set_sudo_password_callback,
-    _get_approval_callback,
-    _get_sudo_password_callback,
+from agent.codex_responses_adapter import (
+    _deterministic_call_id as _codex_deterministic_call_id,
 )
-from tools.tool_result_storage import maybe_persist_tool_result, enforce_turn_budget
-from tools.interrupt import set_interrupt as _set_interrupt
-from tools.browser_tool import cleanup_browser
-
+from agent.codex_responses_adapter import (
+    _split_responses_tool_id as _codex_split_responses_tool_id,
+)
+from agent.codex_responses_adapter import (
+    _summarize_user_message_for_log,
+)
+from agent.context_compressor import ContextCompressor
+from agent.display import (
+    KawaiiSpinner,
+    _detect_tool_failure,
+)
+from agent.display import (
+    build_tool_preview as _build_tool_preview,
+)
+from agent.display import (
+    get_cute_tool_message as _get_cute_tool_message_impl,
+)
+from agent.display import (
+    get_tool_emoji as _get_tool_emoji,
+)
+from agent.error_classifier import FailoverReason, classify_api_error
 
 # Agent internals extracted to agent/ package for modularity
 from agent.memory_manager import StreamingContextScrubber, build_memory_context_block, sanitize_context
-from agent.retry_utils import jittered_backoff
-from agent.error_classifier import classify_api_error, FailoverReason
-from agent.prompt_builder import (
-    DEFAULT_AGENT_IDENTITY, PLATFORM_HINTS,
-    MEMORY_GUIDANCE, SESSION_SEARCH_GUIDANCE, SKILLS_GUIDANCE,
-    TALARIA_AGENT_HELP_GUIDANCE,
-)
 from agent.model_metadata import (
+    estimate_messages_tokens_rough,
+    estimate_request_tokens_rough,
+    estimate_tokens_rough,
     fetch_model_metadata,
-    estimate_tokens_rough, estimate_messages_tokens_rough, estimate_request_tokens_rough,
-    get_next_probe_tier, parse_context_limit_from_error,
+    get_next_probe_tier,
+    is_local_endpoint,
     parse_available_output_tokens_from_error,
-    save_context_length, is_local_endpoint,
+    parse_context_limit_from_error,
     query_ollama_num_ctx,
+    save_context_length,
 )
-from agent.context_compressor import ContextCompressor
-from agent.subdirectory_hints import SubdirectoryHintTracker
+from agent.prompt_builder import (
+    DEFAULT_AGENT_IDENTITY,
+    GOOGLE_MODEL_OPERATIONAL_GUIDANCE,
+    MEMORY_GUIDANCE,
+    OPENAI_MODEL_EXECUTION_GUIDANCE,
+    PLATFORM_HINTS,
+    SESSION_SEARCH_GUIDANCE,
+    SKILLS_GUIDANCE,
+    TALARIA_AGENT_HELP_GUIDANCE,
+    TOOL_USE_ENFORCEMENT_GUIDANCE,
+    TOOL_USE_ENFORCEMENT_MODELS,
+    build_context_files_prompt,
+    build_environment_hints,
+    build_skills_system_prompt,
+    load_soul_md,
+)
 from agent.prompt_caching import apply_anthropic_cache_control
-from agent.prompt_builder import build_skills_system_prompt, build_context_files_prompt, build_environment_hints, load_soul_md, TOOL_USE_ENFORCEMENT_GUIDANCE, TOOL_USE_ENFORCEMENT_MODELS, GOOGLE_MODEL_OPERATIONAL_GUIDANCE, OPENAI_MODEL_EXECUTION_GUIDANCE
-from agent.usage_pricing import estimate_usage_cost, normalize_usage
-from agent.codex_responses_adapter import (
-    _derive_responses_function_call_id as _codex_derive_responses_function_call_id,
-    _deterministic_call_id as _codex_deterministic_call_id,
-    _split_responses_tool_id as _codex_split_responses_tool_id,
-    _summarize_user_message_for_log,
-)
-from agent.display import (
-    KawaiiSpinner, build_tool_preview as _build_tool_preview,
-    get_cute_tool_message as _get_cute_tool_message_impl,
-    _detect_tool_failure,
-    get_tool_emoji as _get_tool_emoji,
+from agent.retry_utils import jittered_backoff
+from agent.subdirectory_hints import SubdirectoryHintTracker
+from agent.trajectory import (
+    convert_scratchpad_to_think,
+    has_incomplete_scratchpad,
 )
 from agent.trajectory import (
-    convert_scratchpad_to_think, has_incomplete_scratchpad,
     save_trajectory as _save_trajectory_to_file,
 )
-from utils import atomic_json_write, base_url_host_matches, base_url_hostname, env_var_enabled, normalize_proxy_url
+from agent.usage_pricing import estimate_usage_cost, normalize_usage
+from model_tools import (
+    check_toolset_requirements,
+    get_tool_definitions,
+    get_toolset_for_tool,
+    handle_function_call,
+)
 from talaria_cli.config import cfg_get
-
+from tools.browser_tool import cleanup_browser
+from tools.interrupt import set_interrupt as _set_interrupt
+from tools.terminal_tool import (
+    _get_approval_callback,
+    _get_sudo_password_callback,
+    cleanup_vm,
+    get_active_env,
+    is_persistent_env,
+)
+from tools.terminal_tool import (
+    set_approval_callback as _set_approval_callback,
+)
+from tools.terminal_tool import (
+    set_sudo_password_callback as _set_sudo_password_callback,
+)
+from tools.tool_result_storage import enforce_turn_budget, maybe_persist_tool_result
+from utils import atomic_json_write, base_url_host_matches, base_url_hostname, env_var_enabled, normalize_proxy_url
 
 
 class _SafeWriter:
@@ -434,14 +469,14 @@ def _paths_overlap(left: Path, right: Path) -> bool:
 
 
 from agent.message_sanitizer import (  # extracted helpers (see module)
-    _sanitize_surrogates,
-    _sanitize_structure_surrogates,
-    _sanitize_messages_surrogates,
     _repair_tool_call_arguments,
-    _strip_non_ascii,
     _sanitize_messages_non_ascii,
-    _sanitize_tools_non_ascii,
+    _sanitize_messages_surrogates,
     _sanitize_structure_non_ascii,
+    _sanitize_structure_surrogates,
+    _sanitize_surrogates,
+    _sanitize_tools_non_ascii,
+    _strip_non_ascii,
 )
 
 # =========================================================================
@@ -1870,9 +1905,9 @@ class AIAgent:
         # ── Build new client ──
         if api_mode == "anthropic_messages":
             from agent.anthropic_adapter import (
+                _is_oauth_token,
                 build_anthropic_client,
                 resolve_anthropic_token,
-                _is_oauth_token,
             )
             # Only fall back to ANTHROPIC_TOKEN when the provider is actually Anthropic.
             # Other anthropic_messages providers (MiniMax, Alibaba, etc.) must use their own
@@ -1926,7 +1961,7 @@ class AIAgent:
             # custom provider mid-session (closes #15779).
             _sm_custom_providers = None
             try:
-                from talaria_cli.config import load_config, get_compatible_custom_providers
+                from talaria_cli.config import get_compatible_custom_providers, load_config
                 _sm_cfg = load_config()
                 _sm_custom_providers = get_compatible_custom_providers(_sm_cfg)
             except Exception:
@@ -4409,8 +4444,8 @@ class AIAgent:
             # ``user.display_name`` when one is set in config.yaml. We do
             # NOT auto-inject the OS username — opt-in via config only.
             try:
-                from talaria_cli.config import cfg_get, load_config
                 from agent.prompt_builder import agent_identity_for
+                from talaria_cli.config import cfg_get, load_config
                 _user_name = cfg_get(load_config() or {}, "user", "display_name", default="")
                 if not isinstance(_user_name, str):
                     _user_name = ""
@@ -4983,8 +5018,9 @@ class AIAgent:
     @staticmethod
     def _build_keepalive_http_client(base_url: str = "") -> Any:
         try:
-            import httpx as _httpx
             import socket as _socket
+
+            import httpx as _httpx
 
             _sock_opts = [(_socket.SOL_SOCKET, _socket.SO_KEEPALIVE, 1)]
             if hasattr(_socket, "TCP_KEEPIDLE"):
@@ -5567,7 +5603,7 @@ class AIAgent:
             return False
 
         try:
-            from agent.anthropic_adapter import resolve_anthropic_token, build_anthropic_client
+            from agent.anthropic_adapter import build_anthropic_client, resolve_anthropic_token
 
             new_token = resolve_anthropic_token()
         except Exception as exc:
@@ -5632,7 +5668,7 @@ class AIAgent:
         runtime_base = getattr(entry, "runtime_base_url", None) or getattr(entry, "base_url", None) or self.base_url
 
         if self.api_mode == "anthropic_messages":
-            from agent.anthropic_adapter import build_anthropic_client, _is_oauth_token
+            from agent.anthropic_adapter import _is_oauth_token, build_anthropic_client
 
             try:
                 self._anthropic_client.close()
@@ -7018,7 +7054,7 @@ class AIAgent:
 
             if fb_api_mode == "anthropic_messages":
                 # Build native Anthropic client instead of using OpenAI client
-                from agent.anthropic_adapter import build_anthropic_client, resolve_anthropic_token, _is_oauth_token
+                from agent.anthropic_adapter import _is_oauth_token, build_anthropic_client, resolve_anthropic_token
                 effective_key = (fb_client.api_key or resolve_anthropic_token() or "") if fb_provider == "anthropic" else (fb_client.api_key or "")
                 self.api_key = effective_key
                 self._anthropic_api_key = effective_key
@@ -7795,7 +7831,7 @@ class AIAgent:
         # Temperature: _fixed_temperature_for_model may return OMIT_TEMPERATURE
         # sentinel (temperature omitted entirely), a numeric override, or None.
         try:
-            from agent.auxiliary_client import _fixed_temperature_for_model, OMIT_TEMPERATURE
+            from agent.auxiliary_client import OMIT_TEMPERATURE, _fixed_temperature_for_model
             _ft = _fixed_temperature_for_model(self.model, self.base_url)
             _omit_temp = _ft is OMIT_TEMPERATURE
             _fixed_temp = _ft if not _omit_temp else None
@@ -9490,7 +9526,8 @@ class AIAgent:
 
             summary_extra_body = {}
             try:
-                from agent.auxiliary_client import _fixed_temperature_for_model, OMIT_TEMPERATURE as _OMIT_TEMP
+                from agent.auxiliary_client import OMIT_TEMPERATURE as _OMIT_TEMP
+                from agent.auxiliary_client import _fixed_temperature_for_model
             except Exception:
                 _fixed_temperature_for_model = None
                 _OMIT_TEMP = None

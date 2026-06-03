@@ -30,7 +30,6 @@ from typing import Optional
 from talaria_constants import get_talaria_dir
 from utils import atomic_replace
 
-
 # Unambiguous alphabet -- excludes 0/O, 1/I to prevent confusion
 ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 CODE_LENGTH = 8

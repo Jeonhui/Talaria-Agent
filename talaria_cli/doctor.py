@@ -5,12 +5,12 @@ Diagnoses issues with Talaria Agent setup.
 """
 
 import os
-import sys
-import subprocess
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
-from talaria_cli.config import get_project_root, get_talaria_home, get_env_path
+from talaria_cli.config import get_env_path, get_project_root, get_talaria_home
 from talaria_constants import display_talaria_home
 
 PROJECT_ROOT = get_project_root()
@@ -19,6 +19,7 @@ _DHH = display_talaria_home()  # user-facing display path (e.g. ~/.talaria or ~/
 
 # Load environment variables from ~/.talaria/.env so API key checks work
 from dotenv import load_dotenv
+
 _env_path = get_env_path()
 if _env_path.exists():
     try:
@@ -32,7 +33,6 @@ from talaria_cli.colors import Colors, color
 from talaria_cli.models import _TALARIA_USER_AGENT
 from talaria_constants import OPENROUTER_MODELS_URL
 from utils import base_url_host_matches
-
 
 _PROVIDER_ENV_HINTS = (
     "OPENROUTER_API_KEY",
@@ -274,6 +274,8 @@ def run_doctor(args):
             try:
                 from talaria_cli.auth import (
                     PROVIDER_REGISTRY,
+                )
+                from talaria_cli.auth import (
                     resolve_provider as _resolve_auth_provider,
                 )
                 known_providers = {"anthropic", "openai", "openai-codex", "xiaomi", "lmstudio", "custom", "auto"}
@@ -284,6 +286,8 @@ def run_doctor(args):
                 from talaria_cli.config import get_compatible_custom_providers as _compatible_custom_providers
                 from talaria_cli.providers import (
                     normalize_provider as _normalize_catalog_provider,
+                )
+                from talaria_cli.providers import (
                     resolve_provider_full as _resolve_provider_full,
                 )
             except Exception:
@@ -924,11 +928,12 @@ def run_doctor(args):
         print("  Checking Anthropic API...", end="", flush=True)
         try:
             import httpx
+
             from agent.anthropic_adapter import (
-                _is_oauth_token,
                 _COMMON_BETAS,
-                _OAUTH_ONLY_BETAS,
                 _CONTEXT_1M_BETA,
+                _OAUTH_ONLY_BETAS,
+                _is_oauth_token,
             )
 
             headers = {"anthropic-version": "2023-06-01"}
@@ -1064,7 +1069,7 @@ def run_doctor(args):
     try:
         # Add project root to path for imports
         sys.path.insert(0, str(PROJECT_ROOT))
-        from model_tools import check_tool_availability, TOOLSET_REQUIREMENTS
+        from model_tools import TOOLSET_REQUIREMENTS, check_tool_availability
         
         available, unavailable = check_tool_availability()
 
@@ -1156,8 +1161,9 @@ def run_doctor(args):
     # Profiles
     # =========================================================================
     try:
-        from talaria_cli.profiles import list_profiles, _get_wrapper_dir, profile_exists
         import re as _re
+
+        from talaria_cli.profiles import _get_wrapper_dir, list_profiles, profile_exists
 
         named_profiles = [p for p in list_profiles() if not p.is_default]
         if named_profiles:

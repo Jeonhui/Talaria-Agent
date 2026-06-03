@@ -14,7 +14,6 @@ from pathlib import Path
 
 from talaria_constants import get_talaria_home
 
-
 # ---------------------------------------------------------------------------
 # Curses-based interactive picker (same pattern as talaria tools)
 # ---------------------------------------------------------------------------
@@ -58,6 +57,7 @@ def _prompt(label: str, default: str | None = None, secret: bool = False) -> str
 def _install_dependencies(provider_name: str) -> None:
     """Install pip dependencies declared in plugin.yaml."""
     import subprocess
+
     from plugins.memory import find_provider_dir
 
     plugin_dir = find_provider_dir(provider_name)

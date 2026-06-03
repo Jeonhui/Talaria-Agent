@@ -11,13 +11,13 @@ Modular wizard with independently-runnable sections:
 Config files are stored in ~/.talaria/ for easy access.
 """
 
+import copy
 import logging
 import os
 import shutil
 import sys
-import copy
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 from utils import base_url_hostname
 
@@ -125,22 +125,22 @@ def _set_reasoning_effort(config: Dict[str, Any], effort: str) -> None:
 
 
 # Import config helpers
+from talaria_cli.branding import BRAND_EMOJI, default_branding
+
+# display_talaria_home imported lazily at call sites (stale-module safety during talaria update)
+from talaria_cli.colors import Colors, color
 from talaria_cli.config import (
-    cfg_get,
     DEFAULT_CONFIG,
-    get_talaria_home,
+    cfg_get,
+    ensure_talaria_home,
     get_config_path,
     get_env_path,
+    get_env_value,
+    get_talaria_home,
     load_config,
     save_config,
     save_env_value,
-    get_env_value,
-    ensure_talaria_home,
 )
-# display_talaria_home imported lazily at call sites (stale-module safety during talaria update)
-
-from talaria_cli.colors import Colors, color
-from talaria_cli.branding import BRAND_EMOJI, default_branding
 
 
 def print_header(title: str):
@@ -402,6 +402,7 @@ def _print_setup_summary(config: dict, talaria_home):
         _img_backend = None
         try:
             from agent.image_gen_registry import list_providers
+
             from talaria_cli.plugins import _ensure_plugins_discovered
 
             _ensure_plugins_discovered()
@@ -631,6 +632,7 @@ def setup_model_provider(config: dict, *, quick: bool = False):
     if not quick and _supports_same_provider_pool_setup(selected_provider):
         try:
             from types import SimpleNamespace
+
             from agent.credential_pool import load_pool
             from talaria_cli.auth_commands import auth_add_command
 
@@ -1416,7 +1418,7 @@ def _setup_webhooks():
 
 def setup_gateway(config: dict):
     """Configure messaging platform integrations."""
-    from talaria_cli.gateway import _all_platforms, _platform_status, _configure_platform
+    from talaria_cli.gateway import _all_platforms, _configure_platform, _platform_status
 
     print_header("Messaging Platforms")
     print_info("Connect to messaging platforms to chat with Talaria from anywhere.")
@@ -1500,20 +1502,20 @@ def setup_gateway(config: dict):
         _is_macos = _platform.system() == "Darwin"
 
         from talaria_cli.gateway import (
+            UserSystemdUnavailableError,
             _is_service_installed,
             _is_service_running,
-            supports_systemd_services,
             has_conflicting_systemd_units,
             has_legacy_talaria_units,
             install_linux_gateway_from_setup,
-            print_systemd_scope_conflict_warning,
-            print_legacy_unit_warning,
-            systemd_start,
-            systemd_restart,
             launchd_install,
-            launchd_start,
             launchd_restart,
-            UserSystemdUnavailableError,
+            launchd_start,
+            print_legacy_unit_warning,
+            print_systemd_scope_conflict_warning,
+            supports_systemd_services,
+            systemd_restart,
+            systemd_start,
         )
 
         service_installed = _is_service_installed()
@@ -1956,9 +1958,9 @@ def _run_first_time_quick_setup(config: dict, talaria_home, is_existing: bool):
 def _run_quick_setup(config: dict, talaria_home):
     """Quick setup — only configure items that are missing."""
     from talaria_cli.config import (
-        get_missing_env_vars,
-        get_missing_config_fields,
         check_config_version,
+        get_missing_config_fields,
+        get_missing_env_vars,
     )
 
     print()

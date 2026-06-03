@@ -25,22 +25,25 @@ Usage:
     result = file_ops.search("TODO", path=".", file_glob="*.py")
 """
 
+import difflib
 import os
 import re
-import difflib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
 from pathlib import Path
-from tools.binary_extensions import BINARY_EXTENSIONS
+from typing import Any, Dict, List, Optional
 
 from agent.file_safety import (
     build_write_denied_paths,
     build_write_denied_prefixes,
+)
+from agent.file_safety import (
     get_safe_write_root as _shared_get_safe_write_root,
+)
+from agent.file_safety import (
     is_write_denied as _shared_is_write_denied,
 )
-
+from tools.binary_extensions import BINARY_EXTENSIONS
 
 # ---------------------------------------------------------------------------
 # Write-path deny list — blocks writes to sensitive system/credential files
@@ -840,7 +843,7 @@ class ShellFileOperations(FileOperations):
             PatchResult with changes made
         """
         # Import patch parser
-        from tools.patch_parser import parse_v4a_patch, apply_v4a_operations
+        from tools.patch_parser import apply_v4a_operations, parse_v4a_patch
         
         operations, parse_error = parse_v4a_patch(patch_content)
         if parse_error:

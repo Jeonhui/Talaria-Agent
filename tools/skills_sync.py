@@ -26,8 +26,9 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from talaria_constants import get_talaria_home
 from typing import Dict, List, Tuple
+
+from talaria_constants import get_talaria_home
 from utils import atomic_replace
 
 logger = logging.getLogger(__name__)

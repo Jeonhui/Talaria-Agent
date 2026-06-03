@@ -25,22 +25,22 @@ import re
 from dataclasses import dataclass
 from typing import List, NamedTuple, Optional
 
-from talaria_cli.providers import (
-    custom_provider_slug,
-    determine_api_mode,
-    get_label,
-    is_aggregator,
-    resolve_provider_full,
-)
-from talaria_cli.model_normalize import (
-    normalize_model_for_provider,
-)
 from agent.models_dev import (
     ModelCapabilities,
     ModelInfo,
     get_model_capabilities,
     get_model_info,
     list_provider_models,
+)
+from talaria_cli.model_normalize import (
+    normalize_model_for_provider,
+)
+from talaria_cli.providers import (
+    custom_provider_slug,
+    determine_api_mode,
+    get_label,
+    is_aggregator,
+    resolve_provider_full,
 )
 
 logger = logging.getLogger(__name__)
@@ -586,8 +586,8 @@ def switch_model(
     from talaria_cli.models import (
         copilot_model_api_mode,
         detect_provider_for_model,
-        validate_requested_model,
         opencode_model_api_mode,
+        validate_requested_model,
     )
     from talaria_cli.runtime_provider import resolve_runtime_provider
 
@@ -956,15 +956,21 @@ def list_authenticated_providers(
     Only includes providers that have API keys set or are user-defined endpoints.
     """
     import os
+
     from agent.models_dev import (
         PROVIDER_TO_MODELS_DEV,
         fetch_models_dev,
+    )
+    from agent.models_dev import (
         get_provider_info as _mdev_pinfo,
     )
     from talaria_cli.auth import PROVIDER_REGISTRY
     from talaria_cli.models import (
-        OPENROUTER_MODELS, _PROVIDER_MODELS,
-        _MODELS_DEV_PREFERRED, _merge_with_models_dev, provider_model_ids,
+        _MODELS_DEV_PREFERRED,
+        _PROVIDER_MODELS,
+        OPENROUTER_MODELS,
+        _merge_with_models_dev,
+        provider_model_ids,
     )
 
     results: List[dict] = []
@@ -1021,8 +1027,8 @@ def list_authenticated_providers(
     if "lmstudio" not in curated and (
         os.environ.get("LM_API_KEY") or os.environ.get("LM_BASE_URL") or current_provider.strip().lower() == "lmstudio"
     ):
-        from talaria_cli.models import fetch_lmstudio_models
         from talaria_cli.auth import AuthError
+        from talaria_cli.models import fetch_lmstudio_models
         is_current_lmstudio = current_provider.strip().lower() == "lmstudio"
         lm_base = (
             os.environ.get("LM_BASE_URL")
@@ -1108,8 +1114,8 @@ def list_authenticated_providers(
         _record_builtin_endpoint(slug)
 
     # --- 2. Check Talaria-only providers (openai-codex) ---
-    from talaria_cli.providers import TALARIA_OVERLAYS
     from talaria_cli.auth import PROVIDER_REGISTRY as _auth_registry
+    from talaria_cli.providers import TALARIA_OVERLAYS
 
     # Build reverse mapping: models.dev ID → Talaria provider ID.
     # TALARIA_OVERLAYS keys may be models.dev IDs (e.g. "github-copilot")

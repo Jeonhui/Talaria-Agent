@@ -17,6 +17,7 @@ import threading
 import time
 import unicodedata
 from typing import Optional
+
 from talaria_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)

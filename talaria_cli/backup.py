@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from talaria_constants import get_default_talaria_root, get_talaria_home, display_talaria_home
+from talaria_constants import display_talaria_home, get_default_talaria_root, get_talaria_home
 
 logger = logging.getLogger(__name__)
 
@@ -408,8 +408,10 @@ def run_import(args) -> None:
         if profiles_dir.is_dir():
             try:
                 from talaria_cli.profiles import (
-                    create_wrapper_script, check_alias_collision,
-                    _is_wrapper_dir_in_path, _get_wrapper_dir,
+                    _get_wrapper_dir,
+                    _is_wrapper_dir_in_path,
+                    check_alias_collision,
+                    create_wrapper_script,
                 )
                 for entry in sorted(profiles_dir.iterdir()):
                     if not entry.is_dir():

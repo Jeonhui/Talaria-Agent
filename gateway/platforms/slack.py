@@ -15,11 +15,11 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Any, Tuple, List
+from typing import Any, Dict, List, Optional, Tuple
 
 try:
-    from slack_bolt.async_app import AsyncApp
     from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
+    from slack_bolt.async_app import AsyncApp
     from slack_sdk.web.async_client import AsyncWebClient
     SLACK_AVAILABLE = True
 except ImportError:
@@ -30,23 +30,23 @@ except ImportError:
 
 import sys
 from pathlib import Path as _Path
+
 sys.path.insert(0, str(_Path(__file__).resolve().parents[2]))
 
 from gateway.config import Platform, PlatformConfig
-from gateway.platforms.helpers import MessageDeduplicator
 from gateway.platforms.base import (
+    SUPPORTED_DOCUMENT_TYPES,
     BasePlatformAdapter,
     MessageEvent,
     MessageType,
     ProcessingOutcome,
     SendResult,
-    SUPPORTED_DOCUMENT_TYPES,
+    cache_document_from_bytes,
     is_host_excluded_by_no_proxy,
     resolve_proxy_url,
     safe_url_for_log,
-    cache_document_from_bytes,
 )
-
+from gateway.platforms.helpers import MessageDeduplicator
 
 logger = logging.getLogger(__name__)
 
@@ -489,8 +489,9 @@ class SlackAdapter(BasePlatformAdapter):
             # routes the command event through the socket regardless of the
             # manifest's request URL, but it will not deliver an event for
             # a slash command the manifest doesn't declare.
-            from talaria_cli.commands import slack_native_slashes
             import re as _re
+
+            from talaria_cli.commands import slack_native_slashes
 
             _slash_names = [name for name, _d, _h in slack_native_slashes()]
             if _slash_names:

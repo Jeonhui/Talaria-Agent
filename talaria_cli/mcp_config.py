@@ -11,15 +11,15 @@ import re
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
+from talaria_cli.colors import Colors, color
 from talaria_cli.config import (
     cfg_get,
+    get_env_value,
+    get_talaria_home,  # noqa: F401 — used by test mocks
     load_config,
     save_config,
-    get_env_value,
     save_env_value,
-    get_talaria_home,  # noqa: F401 — used by test mocks
 )
-from talaria_cli.colors import Colors, color
 from talaria_constants import display_talaria_home
 
 logger = logging.getLogger(__name__)
@@ -153,9 +153,9 @@ def _probe_single_server(
     Raises on connection failure.
     """
     from tools.mcp_tool import (
+        _connect_server,
         _ensure_mcp_loop,
         _run_on_mcp_loop,
-        _connect_server,
         _stop_mcp_loop,
     )
 

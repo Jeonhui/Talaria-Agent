@@ -572,9 +572,13 @@ class KawaiiSpinner:
 
     # Spinner defaults pulled from theme so a fork only edits theme.py
     from talaria_cli.branding import (
-        DEFAULT_WAITING_FACES as KAWAII_WAITING,
         DEFAULT_THINKING_FACES as KAWAII_THINKING,
+    )
+    from talaria_cli.branding import (
         DEFAULT_THINKING_VERBS as THINKING_VERBS,
+    )
+    from talaria_cli.branding import (
+        DEFAULT_WAITING_FACES as KAWAII_WAITING,
     )
 
     @classmethod

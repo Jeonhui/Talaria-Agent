@@ -11,8 +11,6 @@ import re
 import threading
 from collections import OrderedDict
 from pathlib import Path
-
-from talaria_constants import get_talaria_home, get_skills_dir, is_wsl
 from typing import Optional
 
 from agent.skill_utils import (
@@ -24,6 +22,7 @@ from agent.skill_utils import (
     parse_frontmatter,
     skill_matches_platform,
 )
+from talaria_constants import get_skills_dir, get_talaria_home, is_wsl
 from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
@@ -132,13 +131,19 @@ def _strip_yaml_frontmatter(content: str) -> str:
 # =========================================================================
 
 from talaria_cli.branding import (
-    DEFAULT_REPO_HTTPS_URL as _AGENT_DOCS_URL,
-    build_agent_identity,
-    default_branding as _default_branding,
     # Re-exported (the `as` alias marks it intentional for ruff): run_agent.py
     # and agent/codex_responses_adapter.py import DEFAULT_AGENT_IDENTITY from
     # here, not from branding directly.
     DEFAULT_AGENT_IDENTITY as DEFAULT_AGENT_IDENTITY,
+)
+from talaria_cli.branding import (
+    DEFAULT_REPO_HTTPS_URL as _AGENT_DOCS_URL,
+)
+from talaria_cli.branding import (
+    build_agent_identity,
+)
+from talaria_cli.branding import (
+    default_branding as _default_branding,
 )
 
 

@@ -24,7 +24,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, Sequence
 
-from talaria_constants import get_talaria_home, display_talaria_home
+from talaria_constants import display_talaria_home, get_talaria_home
 
 # Known log files (name → filename)
 LOG_FILES = {
