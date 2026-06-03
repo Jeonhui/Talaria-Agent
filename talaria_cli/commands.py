@@ -60,14 +60,6 @@ COMMAND_REGISTRY: list[CommandDef] = [
     # Session
     CommandDef("new", "Start a new session (fresh session ID + history)", "Session",
                aliases=("reset",)),
-    CommandDef("clear", "Clear screen and start a new session", "Session",
-               cli_only=True),
-    CommandDef("redraw", "Force a full UI repaint (recovers from terminal drift)", "Session",
-               cli_only=True),
-    CommandDef("history", "Show conversation history", "Session",
-               cli_only=True),
-    CommandDef("save", "Save the current conversation", "Session",
-               cli_only=True),
     CommandDef("retry", "Retry the last message (resend to agent)", "Session"),
     CommandDef("undo", "Remove the last user/assistant exchange", "Session"),
     CommandDef("title", "Set a title for the current session", "Session",
@@ -78,8 +70,6 @@ COMMAND_REGISTRY: list[CommandDef] = [
                args_hint="[focus topic]"),
     CommandDef("rollback", "List or restore filesystem checkpoints", "Session",
                args_hint="[number]"),
-    CommandDef("snapshot", "Create or restore state snapshots of Talaria config/state", "Session",
-               cli_only=True, aliases=("snap",), args_hint="[create|restore <id>|prune]"),
     CommandDef("stop", "Kill all running background processes", "Session"),
     CommandDef("approve", "Approve a pending dangerous command", "Session",
                gateway_only=True, args_hint="[session|always]"),
@@ -101,17 +91,10 @@ COMMAND_REGISTRY: list[CommandDef] = [
                args_hint="[name]"),
 
     # Configuration
-    CommandDef("config", "Show current configuration", "Configuration",
-               cli_only=True),
     CommandDef("model", "Switch model for this session", "Configuration",
                aliases=("provider",), args_hint="[model] [--provider name] [--global]"),
-    CommandDef("gquota", "Show Google Gemini Code Assist quota usage", "Info",
-               cli_only=True),
-
     CommandDef("personality", "Set a predefined personality", "Configuration",
                args_hint="[name]"),
-    CommandDef("statusbar", "Toggle the context/model status bar", "Configuration",
-               cli_only=True, aliases=("sb",)),
     CommandDef("verbose", "Cycle tool progress display: off -> new -> all -> verbose",
                "Configuration", cli_only=True,
                gateway_config_gate="display.tool_progress_command"),
@@ -126,42 +109,15 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("fast", "Toggle fast mode — OpenAI Priority Processing / Anthropic Fast Mode (Normal/Fast)", "Configuration",
                args_hint="[normal|fast|status]",
                subcommands=("normal", "fast", "status", "on", "off")),
-    CommandDef("skin", "Show or change the display skin/theme", "Configuration",
-               cli_only=True, args_hint="[name]"),
-    CommandDef("indicator", "Pick the TUI busy-indicator style", "Configuration",
-               cli_only=True, args_hint="[kaomoji|emoji|unicode|ascii]",
-               subcommands=("kaomoji", "emoji", "unicode", "ascii")),
-    CommandDef("voice", "Toggle voice mode", "Configuration",
-               args_hint="[on|off|tts|status]", subcommands=("on", "off", "tts", "status")),
-    CommandDef("busy", "Control what Enter does while Talaria is working", "Configuration",
-               cli_only=True, args_hint="[queue|steer|interrupt|status]",
-               subcommands=("queue", "steer", "interrupt", "status")),
 
     # Tools & Skills
-    CommandDef("tools", "Manage tools: /tools [list|disable|enable] [name...]", "Tools & Skills",
-               args_hint="[list|disable|enable] [name...]", cli_only=True),
-    CommandDef("toolsets", "List available toolsets", "Tools & Skills",
-               cli_only=True),
-    CommandDef("skills", "Search, install, inspect, or manage skills",
-               "Tools & Skills", cli_only=True,
-               subcommands=("search", "browse", "inspect", "install")),
-    CommandDef("cron", "Manage scheduled tasks", "Tools & Skills",
-               cli_only=True, args_hint="[subcommand]",
-               subcommands=("list", "add", "create", "edit", "pause", "resume", "run", "remove")),
     CommandDef("curator", "Background skill maintenance (status, run, pin, archive)",
                "Tools & Skills", args_hint="[subcommand]",
                subcommands=("status", "run", "pause", "resume", "pin", "unpin", "restore")),
-    CommandDef("reload", "Reload .env variables into the running session", "Tools & Skills",
-               cli_only=True),
     CommandDef("reload-mcp", "Reload MCP servers from config", "Tools & Skills",
                aliases=("reload_mcp",)),
     CommandDef("reload-skills", "Re-scan ~/.talaria/skills/ for newly installed or removed skills",
                "Tools & Skills", aliases=("reload_skills",)),
-    CommandDef("browser", "Connect browser tools to your live Chrome via CDP", "Tools & Skills",
-               cli_only=True, args_hint="[connect|disconnect|status]",
-               subcommands=("connect", "disconnect", "status")),
-    CommandDef("plugins", "List installed plugins and their status",
-               "Tools & Skills", cli_only=True),
 
     # Info
     CommandDef("commands", "Browse all commands and skills (paginated)", "Info",
@@ -172,21 +128,9 @@ COMMAND_REGISTRY: list[CommandDef] = [
     CommandDef("usage", "Show token usage and rate limits for the current session", "Info"),
     CommandDef("insights", "Show usage insights and analytics", "Info",
                args_hint="[days]"),
-    CommandDef("platforms", "Show gateway/messaging platform status", "Info",
-               cli_only=True, aliases=("gateway",)),
-    CommandDef("copy", "Copy the last assistant response to clipboard", "Info",
-               cli_only=True, args_hint="[number]"),
-    CommandDef("paste", "Attach clipboard image from your clipboard", "Info",
-               cli_only=True),
-    CommandDef("image", "Attach a local image file for your next prompt", "Info",
-               cli_only=True, args_hint="<path>"),
     CommandDef("update", "Update Talaria Agent to the latest version", "Info",
                gateway_only=True),
     CommandDef("debug", "Upload debug report (system info + logs) and get shareable links", "Info"),
-
-    # Exit
-    CommandDef("quit", "Exit the CLI", "Exit",
-               cli_only=True, aliases=("exit",)),
 ]
 
 
@@ -331,7 +275,7 @@ def should_bypass_active_session(command_name: str | None) -> bool:
     Queueing is always wrong for a recognized slash command because the
     safety net in gateway.run discards any command text that reaches
     the pending queue — which meant a mid-run /model (or /reasoning,
-    /voice, /insights, /title, /resume, /retry, /undo, /compress,
+    /insights, /title, /resume, /retry, /undo, /compress,
     /usage, /reload-mcp, /sethome, /reset) would silently
     interrupt the agent AND get discarded, producing a zero-char
     response. See issue #5057 / PRs #6252, #10370, #4665.
