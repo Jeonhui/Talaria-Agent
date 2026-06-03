@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install (with dev extras)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Ruff (pyflakes + syntax)
+        run: ruff check .
+
+      - name: Type check (ty)
+        # Informational for now — `ty` is pre-1.0 and the codebase (a fork)
+        # still has type gaps. Surfaces issues in the log without blocking
+        # PRs. Drop continue-on-error once the tree is clean.
+        continue-on-error: true
+        run: ty check
+
+      - name: Pytest
+        env:
+          # Belt-and-suspenders: conftest blanks these too.
+          ANTHROPIC_API_KEY: ""
+          OPENAI_API_KEY: ""
+          TZ: UTC
+          PYTHONHASHSEED: "0"
+        run: pytest -m "not integration"
