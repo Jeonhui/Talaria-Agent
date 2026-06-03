@@ -39,7 +39,10 @@ import threading
 from types import SimpleNamespace
 import urllib.request
 import uuid
-from typing import List, Dict, Any, Optional
+from typing import TYPE_CHECKING, List, Dict, Any, Optional
+
+if TYPE_CHECKING:
+    from agent.rate_limit_tracker import RateLimitState
 from urllib.parse import urlparse, parse_qs, urlunparse
 # NOTE: `from openai import OpenAI` is deliberately NOT at module top — the
 # SDK pulls ~240 ms of imports. We expose `OpenAI` as a thin proxy object
@@ -10910,7 +10913,7 @@ class AIAgent:
                         elif _resp_error_code == 504:
                             _failure_hint = f"upstream gateway timeout (504, {api_duration:.0f}s)"
                         elif _resp_error_code == 429:
-                            _failure_hint = f"rate limited by upstream provider (429)"
+                            _failure_hint = "rate limited by upstream provider (429)"
                         elif _resp_error_code in (500, 502):
                             _failure_hint = f"upstream server error ({_resp_error_code}, {api_duration:.0f}s)"
                         elif _resp_error_code in (503, 529):

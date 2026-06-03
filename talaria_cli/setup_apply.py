@@ -162,11 +162,11 @@ def apply_setup_changes(
     print()
     if action == "reload":
         print(f"  Gateway is running. Detected changes ({summary}).")
-        print(f"  These can be picked up by reloading the gateway.")
+        print("  These can be picked up by reloading the gateway.")
         verb = "reload"
     else:
         print(f"  Gateway is running. Detected changes ({summary}).")
-        print(f"  These require a full restart (bot tokens / ports / platforms).")
+        print("  These require a full restart (bot tokens / ports / platforms).")
         verb = "restart"
 
     if prompt:
@@ -176,7 +176,7 @@ def apply_setup_changes(
             choice = "n"
             print()
         if choice in ("n", "no"):
-            print(f"  Skipped. Run `talaria gateway restart` later to apply.")
+            print("  Skipped. Run `talaria gateway restart` later to apply.")
             return
 
     # Phase 1: both reload and restart map to a real restart for safety.
@@ -187,8 +187,8 @@ def apply_setup_changes(
         result = subprocess.run(cmd, capture_output=False)
     except Exception as exc:
         print(f"  ⚠ Gateway {verb} failed: {exc}")
-        print(f"  Run `talaria gateway restart` manually.")
+        print("  Run `talaria gateway restart` manually.")
         return
     if result.returncode != 0:
         print(f"  ⚠ Gateway {verb} returned exit code {result.returncode}.")
-        print(f"  Run `talaria gateway restart` manually if needed.")
+        print("  Run `talaria gateway restart` manually if needed.")

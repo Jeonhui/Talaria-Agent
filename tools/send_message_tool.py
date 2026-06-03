@@ -1100,7 +1100,7 @@ async def _send_signal(extra, chat_id, message, media_files=None):
             # Return warning for any skipped media files
             result = {"success": True, "platform": "signal", "chat_id": chat_id}
             if len(attachment_paths) < len(valid_media):
-                result["warnings"] = [f"Some media files were skipped (not found on disk)"]
+                result["warnings"] = ["Some media files were skipped (not found on disk)"]
             return result
     except Exception as e:
         return _error(f"Signal send failed: {e}")
@@ -1555,7 +1555,7 @@ async def _send_qqbot(pconfig, chat_id, message):
             token_data = token_resp.json()
             access_token = token_data.get("access_token")
             if not access_token:
-                return _error(f"QQBot: no access_token in response")
+                return _error("QQBot: no access_token in response")
 
             # Step 2: Send message via REST
             headers = {
