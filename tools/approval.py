@@ -766,6 +766,34 @@ Respond with exactly one word: APPROVE, DENY, or ESCALATE"""
         return "escalate"
 
 
+def _docker_has_host_mounts() -> bool:
+    """Return True when the Docker container bind-mounts host directories.
+
+    When host paths are mounted (docker_mount_cwd_to_workspace=true or
+    docker_volumes is non-empty), commands inside the container can
+    modify host files, so the dangerous-command fast-path must NOT skip
+    approval checks.  We detect this via env vars set by the config bridge
+    (terminal_tool reads config.yaml and exports these before spawning the
+    agent; see terminal_tool.py lines 846 and 903).
+    """
+    # TERMINAL_DOCKER_MOUNT_CWD_TO_WORKSPACE=true → cwd is bind-mounted
+    mount_cwd = os.getenv("TERMINAL_DOCKER_MOUNT_CWD_TO_WORKSPACE", "false").lower()
+    if mount_cwd in ("true", "1", "yes"):
+        return True
+    # TERMINAL_DOCKER_VOLUMES is a JSON list; non-empty → host paths mounted
+    volumes_raw = os.getenv("TERMINAL_DOCKER_VOLUMES", "[]").strip()
+    if volumes_raw and volumes_raw not in ("[]", ""):
+        try:
+            import json
+            volumes = json.loads(volumes_raw)
+            if volumes:
+                return True
+        except Exception:
+            # Unparseable → assume mounts present (fail safe)
+            return True
+    return False
+
+
 def check_dangerous_command(command: str, env_type: str,
                             approval_callback=None) -> dict:
     """Check if a command is dangerous and handle approval.
@@ -781,7 +809,11 @@ def check_dangerous_command(command: str, env_type: str,
     Returns:
         {"approved": True/False, "message": str or None, ...}
     """
-    if env_type == "docker":
+    # Fast-path for pure isolated Docker containers (no host bind-mounts).
+    # When host directories are mounted (docker_mount_cwd_to_workspace=true
+    # or docker_volumes is non-empty), commands can reach host files, so we
+    # fall through to normal approval checks instead of auto-approving.
+    if env_type == "docker" and not _docker_has_host_mounts():
         return {"approved": True, "message": None}
 
     # Hardline floor: commands with no recovery path (rm -rf /, mkfs, dd
@@ -905,8 +937,11 @@ def check_all_command_guards(command: str, env_type: str,
     a gateway force=True replay from bypassing one check when only the
     other was shown to the user.
     """
-    # Skip containers for both checks
-    if env_type == "docker":
+    # Fast-path for pure isolated Docker containers (no host bind-mounts).
+    # When host directories are mounted (docker_mount_cwd_to_workspace=true
+    # or docker_volumes is non-empty), commands can reach host files, so we
+    # fall through to normal approval checks instead of auto-approving.
+    if env_type == "docker" and not _docker_has_host_mounts():
         return {"approved": True, "message": None}
 
     # Hardline floor: unconditional block for catastrophic commands

@@ -82,7 +82,22 @@ class SSHEnvironment(BaseEnvironment):
         cmd.extend(["-o", "ControlMaster=auto"])
         cmd.extend(["-o", "ControlPersist=300"])
         cmd.extend(["-o", "BatchMode=yes"])
-        cmd.extend(["-o", "StrictHostKeyChecking=accept-new"])
+        # StrictHostKeyChecking policy — configurable via TERMINAL_SSH_STRICT_HOST_KEY.
+        # Security tradeoff:
+        #   accept-new (default/TOFU): auto-accepts the host key on first connect,
+        #       but rejects changed keys on subsequent connects. Convenient but
+        #       vulnerable to MITM on the very first connection.
+        #   yes: requires the host key to be pre-provisioned in known_hosts.
+        #       Strongest security — MITM-safe from the first connect — but
+        #       requires manual key provisioning before first use.
+        #   no:  never checks — never use in production; allows MITM silently.
+        _ssh_host_key_policy = os.environ.get(
+            "TERMINAL_SSH_STRICT_HOST_KEY", "accept-new"
+        ).strip().lower() or "accept-new"
+        # Restrict to known-safe values; fall back to accept-new on unknown input.
+        if _ssh_host_key_policy not in ("accept-new", "yes", "no"):
+            _ssh_host_key_policy = "accept-new"
+        cmd.extend(["-o", f"StrictHostKeyChecking={_ssh_host_key_policy}"])
         cmd.extend(["-o", "ConnectTimeout=10"])
         if self.port != 22:
             cmd.extend(["-p", str(self.port)])

@@ -352,8 +352,20 @@ def _install_tirith(*, log_failures: bool = True) -> tuple[str | None, str]:
                 if member.name == "tirith" or member.name.endswith("/tirith"):
                     if ".." in member.name:
                         continue
+                    # Reject symlink/hardlink members: a malicious archive
+                    # could ship a "tirith" link pointing outside tmpdir and
+                    # write through it. Only extract a regular file.
+                    if member.issym() or member.islnk() or not member.isfile():
+                        log("tirith archive member is a link/non-file — refusing to extract")
+                        return None, "suspicious_archive"
                     member.name = "tirith"
-                    tar.extract(member, tmpdir)
+                    # filter="data" (Python 3.12+) strips absolute paths,
+                    # traversal and unsafe metadata; degrade gracefully on
+                    # older interpreters that lack the parameter.
+                    try:
+                        tar.extract(member, tmpdir, filter="data")
+                    except TypeError:
+                        tar.extract(member, tmpdir)
                     break
             else:
                 log("tirith binary not found in archive")
