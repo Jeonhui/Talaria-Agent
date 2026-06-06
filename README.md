@@ -4,6 +4,22 @@
 
 Talaria is a slim, opinionated fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) that drops the everything-included framework surface and keeps a small, well-defined assistant. **~71% smaller** than the upstream code base (~29% the original size).
 
+## 3-minute start
+
+```bash
+# 1. Install (Linux/macOS/Termux)
+curl -fsSL https://raw.githubusercontent.com/Jeonhui/Talaria-Agent/main/scripts/install.sh | bash
+
+# 2. Wizard picks provider + API key + default model
+talaria setup
+
+# 3. Try it
+talaria -q "what is 2+2"        # one-shot
+talaria gateway run             # run Discord / Slack / Telegram gateway
+```
+
+Done. Skip to [Common commands](#common-commands) for the day-to-day. The rest of this README is reference.
+
 ```
                        ░████████ 
                ████████████████  
@@ -251,6 +267,8 @@ TERMINAL_ENV=local
 ```
 
 Provider/model live in `~/.talaria/config.yaml` so multi-bot setups don't fight over env vars.
+
+Internal `TALARIA_*` knobs (timeouts, paths, gateway tuning, etc.) are documented in [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md). Every supported `config.yaml` key is listed in [`cli-config.yaml.full.example`](cli-config.yaml.full.example) — only reach for these when overriding a default.
 
 ---
 
