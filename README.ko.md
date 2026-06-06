@@ -4,6 +4,22 @@
 
 Talaria는 [Hermes Agent](https://github.com/NousResearch/hermes-agent)에서 모든 기능을 담은 프레임워크 표면을 덜어내고, 잘 정의된 작은 어시스턴트만 남긴 슬림하고 의견 있는 포크다. 업스트림 코드베이스 대비 **약 71% 작다** (원본의 약 29% 크기).
 
+## 3분 시작
+
+```bash
+# 1. 설치 (Linux/macOS/Termux)
+curl -fsSL https://raw.githubusercontent.com/Jeonhui/Talaria-Agent/main/scripts/install.sh | bash
+
+# 2. 마법사가 프로바이더 + API 키 + 기본 모델 골라줌
+talaria setup
+
+# 3. 실행
+talaria -q "2+2는?"             # 원샷
+talaria gateway run             # Discord / Slack / Telegram 게이트웨이 실행
+```
+
+끝. 일상 사용은 [자주 쓰는 커맨드](#자주-쓰는-커맨드)로 점프. 나머지는 참고용.
+
 ```
                        ░████████ 
                ████████████████  
@@ -240,6 +256,8 @@ TERMINAL_ENV=local
 ```
 
 프로바이더/모델은 `~/.talaria/config.yaml`에 들어가서 멀티 봇 셋업이 환경 변수를 두고 충돌하지 않는다.
+
+내부 `TALARIA_*` 변수(타임아웃·경로·게이트웨이 튜닝 등)는 [`docs/ENVIRONMENT.md`](docs/ENVIRONMENT.md)에 정리. 지원되는 `config.yaml` 키 전체는 [`cli-config.yaml.full.example`](cli-config.yaml.full.example) — 기본값 덮어쓸 때만 손대면 된다.
 
 ---
 
