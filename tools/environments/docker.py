@@ -404,9 +404,9 @@ class DockerEnvironment(BaseEnvironment):
         # Read-only so the container can authenticate but not modify host creds.
         try:
             from tools.credential_files import (
+                get_cache_directory_mounts,
                 get_credential_file_mounts,
                 get_skills_directory_mount,
-                get_cache_directory_mounts,
             )
 
             for mount_entry in get_credential_file_mounts():

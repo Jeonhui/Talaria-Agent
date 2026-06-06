@@ -19,7 +19,6 @@ from typing import Optional
 from talaria_constants import get_talaria_home
 from utils import atomic_replace
 
-
 # ---------------------------------------------------------------------------
 # Paste services — try paste.rs first, dpaste.com as fallback.
 # ---------------------------------------------------------------------------

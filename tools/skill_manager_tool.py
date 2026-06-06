@@ -39,18 +39,18 @@ import re
 import shutil
 import tempfile
 from pathlib import Path
-from talaria_constants import get_talaria_home, display_talaria_home
-from typing import Dict, Any, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
-from utils import atomic_replace
 from talaria_cli.config import cfg_get
+from talaria_constants import display_talaria_home, get_talaria_home
+from utils import atomic_replace
 
 logger = logging.getLogger(__name__)
 
 # Import security scanner — external hub installs always get scanned;
 # agent-created skills only get scanned when skills.guard_agent_created is on.
 try:
-    from tools.skills_guard import scan_skill, should_allow_install, format_scan_report
+    from tools.skills_guard import format_scan_report, scan_skill, should_allow_install
     _GUARD_AVAILABLE = True
 except ImportError:
     _GUARD_AVAILABLE = False
@@ -99,7 +99,6 @@ def _security_scan_skill(skill_dir: Path) -> Optional[str]:
     return None
 
 import yaml
-
 
 # All skills live in ~/.talaria/skills/ (single source of truth)
 TALARIA_HOME = get_talaria_home()

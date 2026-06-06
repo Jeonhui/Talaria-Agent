@@ -356,8 +356,8 @@ class MCPOAuthManager:
 
         # Local imports avoid circular deps at module import time.
         from tools.mcp_oauth import (
-            TalariaTokenStorage,
             _OAUTH_AVAILABLE,
+            TalariaTokenStorage,
             _build_client_metadata,
             _configure_callback_port,
             _is_interactive,

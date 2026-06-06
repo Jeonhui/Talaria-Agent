@@ -32,7 +32,6 @@ from cron.jobs import (
     update_job,
 )
 
-
 # ---------------------------------------------------------------------------
 # Cron prompt scanning — critical-severity patterns only, since cron prompts
 # run in fresh sessions with full tool access.

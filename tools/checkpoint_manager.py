@@ -25,8 +25,9 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from talaria_constants import get_talaria_home
 from typing import Dict, List, Optional, Set
+
+from talaria_constants import get_talaria_home
 
 logger = logging.getLogger(__name__)
 

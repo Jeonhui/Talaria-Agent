@@ -26,15 +26,16 @@ import threading
 import time
 from concurrent.futures import (
     ThreadPoolExecutor,
+)
+from concurrent.futures import (
     TimeoutError as FuturesTimeoutError,
 )
 from typing import Any, Dict, List, Optional
 
-from toolsets import TOOLSETS
 from tools import file_state
 from tools.terminal_tool import set_approval_callback as _set_subagent_approval_cb
+from toolsets import TOOLSETS
 from utils import base_url_hostname, is_truthy_value
-
 
 # Tools that children must never have access to
 DELEGATE_BLOCKED_TOOLS = frozenset(
@@ -862,8 +863,9 @@ def _build_child_agent(
     routing subagents to a different provider:model pair (e.g. cheap/fast
     model on OpenRouter while the parent runs on Anthropic).
     """
-    from run_agent import AIAgent
     import uuid as _uuid
+
+    from run_agent import AIAgent
 
     # ── Role resolution ─────────────────────────────────────────────────
     # Honor the caller's role only when BOTH the kill switch and the
@@ -1114,10 +1116,11 @@ def _dump_subagent_timeout_diagnostic(
     Returns the absolute path to the diagnostic file, or None on failure.
     """
     try:
-        from talaria_constants import get_talaria_home
         import datetime as _dt
         import sys as _sys
         import traceback as _traceback
+
+        from talaria_constants import get_talaria_home
 
         talaria_home = get_talaria_home()
         logs_dir = talaria_home / "logs"
@@ -2015,7 +2018,8 @@ def delegate_task(
                         completed_count += 1
                     break
 
-                from concurrent.futures import wait as _cf_wait, FIRST_COMPLETED
+                from concurrent.futures import FIRST_COMPLETED
+                from concurrent.futures import wait as _cf_wait
 
                 done, pending = _cf_wait(
                     pending, timeout=0.5, return_when=FIRST_COMPLETED

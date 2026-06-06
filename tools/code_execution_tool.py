@@ -437,10 +437,16 @@ def _get_or_create_env(task_id: str):
     Returns ``(env, env_type)`` tuple.
     """
     from tools.terminal_tool import (
-        _active_environments, _env_lock, _create_environment,
-        _get_env_config, _last_activity, _start_cleanup_thread,
-        _creation_locks, _creation_locks_lock, _task_env_overrides,
+        _active_environments,
+        _create_environment,
+        _creation_locks,
+        _creation_locks_lock,
+        _env_lock,
+        _get_env_config,
+        _last_activity,
         _resolve_container_task_id,
+        _start_cleanup_thread,
+        _task_env_overrides,
     )
 
     effective_task_id = _resolve_container_task_id(task_id)

@@ -44,9 +44,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Set, Union
 
+from talaria_cli.config import cfg_get
 from talaria_constants import get_talaria_home
 from utils import env_var_enabled
-from talaria_cli.config import cfg_get
 
 
 def get_bundled_plugins_dir() -> Path:
@@ -498,7 +498,7 @@ class PluginContext:
                 setup_fn=irc_interactive_setup,
             )
         """
-        from gateway.platform_registry import platform_registry, PlatformEntry
+        from gateway.platform_registry import PlatformEntry, platform_registry
 
         entry_kwargs.setdefault("plugin_name", self.manifest.name)
         entry = PlatformEntry(

@@ -286,7 +286,9 @@ def do_browse(page: int = 1, page_size: int = 20, source: str = "all",
     Official skills are always shown first, regardless of source filter.
     """
     from tools.skills_hub import (
-        GitHubAuth, create_source_router, parallel_search_sources,
+        GitHubAuth,
+        create_source_router,
+        parallel_search_sources,
     )
 
     # Clamp page_size to safe range
@@ -418,11 +420,15 @@ def do_install(identifier: str, category: str = "", force: bool = False,
     (so pair it with ``name_override`` when installing from a URL that has
     no frontmatter).
     """
+    from tools.skills_guard import format_scan_report, scan_skill, should_allow_install
     from tools.skills_hub import (
-        GitHubAuth, create_source_router, ensure_hub_dirs,
-        quarantine_bundle, install_from_quarantine, HubLockFile,
+        GitHubAuth,
+        HubLockFile,
+        create_source_router,
+        ensure_hub_dirs,
+        install_from_quarantine,
+        quarantine_bundle,
     )
-    from tools.skills_guard import scan_skill, should_allow_install, format_scan_report
 
     c = console or _console
     ensure_hub_dirs()
@@ -772,10 +778,10 @@ def do_list(source_filter: str = "all",
     ``skills.disabled`` list because ``-p`` swaps ``TALARIA_HOME`` at process
     start.  No explicit profile flag needed here.
     """
+    from agent.skill_utils import get_disabled_skill_names
     from tools.skills_hub import HubLockFile, ensure_hub_dirs
     from tools.skills_sync import _read_manifest
     from tools.skills_tool import _find_all_skills
-    from agent.skill_utils import get_disabled_skill_names
 
     c = console or _console
     ensure_hub_dirs()
@@ -902,8 +908,8 @@ def do_update(name: Optional[str] = None, console: Optional[Console] = None) -> 
 
 def do_audit(name: Optional[str] = None, console: Optional[Console] = None) -> None:
     """Re-run security scan on installed hub skills."""
-    from tools.skills_hub import HubLockFile, SKILLS_DIR
-    from tools.skills_guard import scan_skill, format_scan_report
+    from tools.skills_guard import format_scan_report, scan_skill
+    from tools.skills_hub import SKILLS_DIR, HubLockFile
 
     c = console or _console
     lock = HubLockFile()
@@ -1059,8 +1065,8 @@ def do_tap(action: str, repo: str = "", console: Optional[Console] = None) -> No
 def do_publish(skill_path: str, target: str = "github", repo: str = "",
                console: Optional[Console] = None) -> None:
     """Publish a local skill to a registry (GitHub PR or ClawHub submission)."""
-    from tools.skills_hub import GitHubAuth, SKILLS_DIR
-    from tools.skills_guard import scan_skill, format_scan_report
+    from tools.skills_guard import format_scan_report, scan_skill
+    from tools.skills_hub import SKILLS_DIR, GitHubAuth
 
     c = console or _console
     path = Path(skill_path)

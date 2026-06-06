@@ -23,7 +23,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +54,8 @@ _EXTRA_ENV_KEYS = frozenset({
 })
 import yaml
 
-from talaria_cli.colors import Colors, color
 from talaria_cli.branding import BRAND_EMOJI
-
+from talaria_cli.colors import Colors, color
 
 # =============================================================================
 # Managed mode (NixOS declarative config)
@@ -200,6 +199,7 @@ def get_container_exec_info() -> Optional[dict]:
 # Re-export from talaria_constants — canonical definition lives there.
 from talaria_constants import get_talaria_home  # noqa: F811,E402
 from utils import atomic_replace
+
 
 def get_config_path() -> Path:
     """Get the main config file path."""
@@ -1490,7 +1490,7 @@ def get_missing_skill_config_vars() -> List[Dict[str, Any]]:
     config.yaml.  Returns a list of dicts suitable for prompting.
     """
     try:
-        from agent.skill_utils import discover_all_skill_config_vars, SKILL_CONFIG_PREFIX
+        from agent.skill_utils import SKILL_CONFIG_PREFIX, discover_all_skill_config_vars
     except Exception:
         return []
 
@@ -2811,8 +2811,14 @@ def load_config() -> Dict[str, Any]:
                 user_config.pop("max_turns", None)
 
             config = _deep_merge(config, user_config)
-        except Exception as e:
-            print(f"Warning: Failed to load config: {e}")
+        except (yaml.YAMLError, OSError, ValueError, TypeError) as e:
+            # Malformed/unreadable config — fall back to defaults but make the
+            # failure loud. Goes to stderr (not stdout) so machine-readable CLI
+            # output isn't corrupted, and to the log with a traceback for
+            # debugging. Truly unexpected exceptions propagate instead of being
+            # silently swallowed.
+            print(f"Warning: Failed to load config ({config_path}): {e}", file=sys.stderr)
+            logger.warning("Failed to load config %s: %s", config_path, e, exc_info=True)
 
     normalized = _normalize_root_model_keys(_normalize_max_turns_config(config))
     expanded = _expand_env_vars(normalized)

@@ -45,8 +45,8 @@ import threading
 import time
 from pathlib import Path  # noqa: F401 — used by test mocks
 from types import SimpleNamespace
-from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
-from urllib.parse import urlparse, parse_qs, urlunparse
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from urllib.parse import parse_qs, urlparse, urlunparse
 
 # NOTE: `from openai import OpenAI` is deliberately NOT at module top — the
 # openai SDK pulls a large type tree (~240 ms cold, including responses/*,
@@ -259,6 +259,8 @@ _PROVIDERS_WITHOUT_VISION: frozenset = frozenset({
 # OpenRouter app attribution headers — sourced from theme so a fork rebrands.
 from talaria_cli.branding import (
     DEFAULT_REPO_HTTPS_URL as _OR_HTTP_REFERER,
+)
+from talaria_cli.branding import (
     default_branding as _or_default_branding,
 )
 
@@ -1534,7 +1536,11 @@ def _refresh_provider_credentials(provider: str) -> bool:
             _evict_cached_clients(normalized)
             return True
         if normalized == "anthropic":
-            from agent.anthropic_adapter import read_claude_code_credentials, _refresh_oauth_token, resolve_anthropic_token
+            from agent.anthropic_adapter import (
+                _refresh_oauth_token,
+                read_claude_code_credentials,
+                resolve_anthropic_token,
+            )
 
             creds = read_claude_code_credentials()
             token = _refresh_oauth_token(creds) if isinstance(creds, dict) and creds.get("refreshToken") else None
@@ -1713,7 +1719,7 @@ def _to_async_client(sync_client, model: str, is_vision: bool = False):
     if isinstance(sync_client, AnthropicAuxiliaryClient):
         return AsyncAnthropicAuxiliaryClient(sync_client), model
     try:
-        from agent.gemini_native_adapter import GeminiNativeClient, AsyncGeminiNativeClient
+        from agent.gemini_native_adapter import AsyncGeminiNativeClient, GeminiNativeClient
 
         if isinstance(sync_client, GeminiNativeClient):
             return AsyncGeminiNativeClient(sync_client), model
@@ -2185,8 +2191,8 @@ def resolve_provider_client(
         # AWS SDK providers (Bedrock) — use the Anthropic Bedrock client via
         # boto3's credential chain (IAM roles, SSO, env vars, instance metadata).
         try:
-            from agent.bedrock_adapter import has_aws_credentials, resolve_bedrock_region
             from agent.anthropic_adapter import build_anthropic_bedrock_client
+            from agent.bedrock_adapter import has_aws_credentials, resolve_bedrock_region
         except ImportError:
             logger.warning("resolve_provider_client: bedrock requested but "
                            "boto3 or anthropic SDK not installed")

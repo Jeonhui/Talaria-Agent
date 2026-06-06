@@ -19,8 +19,9 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from talaria_constants import get_talaria_home
 from typing import Any, Optional
+
+from talaria_constants import get_talaria_home
 
 if sys.platform == "win32":
     import msvcrt

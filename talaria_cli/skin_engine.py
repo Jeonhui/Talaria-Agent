@@ -161,7 +161,7 @@ class SkinConfig:
 # Built-in skin definitions
 # =============================================================================
 
-from talaria_cli.branding import DEFAULT_SKIN, ALTERNATE_SKINS
+from talaria_cli.branding import ALTERNATE_SKINS, DEFAULT_SKIN
 
 _BUILTIN_SKINS: Dict[str, Dict[str, Any]] = {
     "default": DEFAULT_SKIN,

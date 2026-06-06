@@ -8,15 +8,16 @@ Output is saved to ~/.talaria/cron/output/{job_id}/{timestamp}.md
 import copy
 import json
 import logging
-import tempfile
-import threading
 import os
 import re
+import tempfile
+import threading
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
+
 from talaria_constants import get_talaria_home
-from typing import Optional, Dict, List, Any, Union
 
 logger = logging.getLogger(__name__)
 

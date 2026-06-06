@@ -17,8 +17,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from talaria_constants import get_talaria_home
 from talaria_cli.config import cfg_get
+from talaria_constants import get_talaria_home
 
 logger = logging.getLogger(__name__)
 
@@ -294,6 +294,7 @@ def cmd_install(
     (True = auto-enable without prompting, False = install disabled).
     """
     import tempfile
+
     from rich.console import Console
 
     console = Console()

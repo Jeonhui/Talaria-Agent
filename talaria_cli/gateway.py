@@ -18,12 +18,14 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
-from gateway.status import terminate_pid
 from gateway.restart import (
     DEFAULT_GATEWAY_RESTART_DRAIN_TIMEOUT,
     GATEWAY_SERVICE_RESTART_EXIT_CODE,
     parse_restart_drain_timeout,
 )
+from gateway.status import terminate_pid
+from talaria_cli.branding import BRAND_EMOJI
+from talaria_cli.colors import Colors, color
 from talaria_cli.config import (
     get_env_value,
     get_talaria_home,
@@ -32,15 +34,19 @@ from talaria_cli.config import (
     read_raw_config,
     save_env_value,
 )
+
 # display_talaria_home is imported lazily at call sites to avoid ImportError
 # when talaria_constants is cached from a pre-update version during `talaria update`.
 from talaria_cli.setup import (
-    print_header, print_info, print_success, print_warning, print_error,
-    prompt, prompt_choice, prompt_yes_no,
+    print_error,
+    print_header,
+    print_info,
+    print_success,
+    print_warning,
+    prompt,
+    prompt_choice,
+    prompt_yes_no,
 )
-from talaria_cli.colors import Colors, color
-from talaria_cli.branding import BRAND_EMOJI
-
 
 # =============================================================================
 # Process Management (for manual gateway runs)
@@ -754,6 +760,7 @@ def _profile_suffix() -> str:
     """
     import hashlib
     import re
+
     from talaria_constants import get_default_talaria_root
     home = get_talaria_home().resolve()
     default = get_default_talaria_root().resolve()
@@ -784,6 +791,7 @@ def _profile_arg(talaria_home: str | None = None) -> str:
             service definition for a different user (e.g. system service).
     """
     import re
+
     from talaria_constants import get_default_talaria_root
     home = Path(talaria_home or str(get_talaria_home())).resolve()
     default = get_default_talaria_root().resolve()
@@ -2242,6 +2250,7 @@ def _wait_for_gateway_exit(timeout: float = 10.0, force_after: float | None = 5.
         force_after: Seconds of graceful waiting before escalating to force-kill.
     """
     import time
+
     from gateway.status import get_running_pid
 
     deadline = time.monotonic() + timeout

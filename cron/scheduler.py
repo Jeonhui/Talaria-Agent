@@ -38,8 +38,8 @@ from typing import List, Optional
 # the module) fail with ModuleNotFoundError for talaria_time et al.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from talaria_constants import get_talaria_home
 from talaria_cli.config import load_config
+from talaria_constants import get_talaria_home
 from talaria_time import now as _talaria_now
 
 logger = logging.getLogger(__name__)
@@ -111,7 +111,7 @@ _LEGACY_HOME_TARGET_ENV_VARS = {
     "QQBOT_HOME_CHANNEL": "QQ_HOME_CHANNEL",
 }
 
-from cron.jobs import get_due_jobs, mark_job_run, save_job_output, advance_next_run
+from cron.jobs import advance_next_run, get_due_jobs, mark_job_run, save_job_output
 
 # Sentinel: when a cron agent has nothing new to report, it can start its
 # response with this marker to suppress delivery.  Output is still saved
@@ -353,8 +353,8 @@ def _deliver_result(job: dict, content: str, adapters=None, loop=None) -> Option
             return msg
         return None  # local-only jobs don't deliver — not a failure
 
+    from gateway.config import Platform, load_gateway_config
     from tools.send_message_tool import _send_to_platform
-    from gateway.config import load_gateway_config, Platform
 
     # Optionally wrap the content with a header/footer so the user knows this
     # is a cron delivery.  Wrapping is on by default; set cron.wrap_response: false
@@ -858,7 +858,7 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
 
     # Use ContextVars for per-job session/delivery state so parallel jobs
     # don't clobber each other's targets (os.environ is process-global).
-    from gateway.session_context import set_session_vars, clear_session_vars, _VAR_MAP
+    from gateway.session_context import _VAR_MAP, clear_session_vars, set_session_vars
 
     _ctx_tokens = set_session_vars(
         platform=origin["platform"] if origin else "",
@@ -972,11 +972,11 @@ def run_job(job: dict) -> tuple[bool, str, str, Optional[str]]:
         # Provider routing
         pr = _cfg.get("provider_routing", {})
 
-        from talaria_cli.runtime_provider import (
-            resolve_runtime_provider,
-            format_runtime_provider_error,
-        )
         from talaria_cli.auth import AuthError
+        from talaria_cli.runtime_provider import (
+            format_runtime_provider_error,
+            resolve_runtime_provider,
+        )
         try:
             runtime_kwargs = {
                 "requested": job.get("provider") or os.getenv("TALARIA_INFERENCE_PROVIDER"),

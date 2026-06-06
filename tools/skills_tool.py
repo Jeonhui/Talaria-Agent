@@ -68,16 +68,15 @@ Usage:
 
 import json
 import logging
-
-from talaria_constants import get_talaria_home, display_talaria_home
 import os
 import re
 from enum import Enum
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from tools.registry import registry, tool_error
 from talaria_cli.config import cfg_get
+from talaria_constants import display_talaria_home, get_talaria_home
+from tools.registry import registry, tool_error
 
 logger = logging.getLogger(__name__)
 
@@ -1069,7 +1068,7 @@ def skill_view(
 
         # If a specific file path is requested, read that instead
         if file_path and skill_dir:
-            from tools.path_security import validate_within_dir, has_traversal_component
+            from tools.path_security import has_traversal_component, validate_within_dir
 
             # Security: Prevent path traversal attacks
             if has_traversal_component(file_path):

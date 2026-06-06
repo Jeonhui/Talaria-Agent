@@ -41,11 +41,11 @@ import time
 import uuid
 
 _IS_WINDOWS = platform.system() == "Windows"
-from tools.environments.local import _find_shell, _sanitize_subprocess_env
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from talaria_cli.config import get_talaria_home
+from tools.environments.local import _find_shell, _sanitize_subprocess_env
 
 logger = logging.getLogger(__name__)
 

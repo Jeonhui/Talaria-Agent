@@ -38,13 +38,15 @@ Usage:
     crawl_data = web_crawl_tool("example.com", "Find contact information")
 """
 
+import asyncio
 import json
 import logging
 import os
 import re
-import asyncio
-from typing import List, Dict, Any, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
+
 import httpx
+
 # NOTE: `from firecrawl import Firecrawl` is deliberately NOT at module top —
 # the SDK pulls ~200 ms of imports (httpcore, firecrawl.v1/v2 type trees) and
 # we only need it when the backend is actually "firecrawl". We expose
@@ -1164,8 +1166,9 @@ async def web_extract_tool(
     """
     # Block URLs containing embedded secrets (exfiltration prevention).
     # URL-decode first so percent-encoded secrets (%73k- = sk-) are caught.
-    from agent.redact import _PREFIX_RE
     from urllib.parse import unquote
+
+    from agent.redact import _PREFIX_RE
     for _url in urls:
         if _PREFIX_RE.search(_url) or _PREFIX_RE.search(unquote(_url)):
             return json.dumps({

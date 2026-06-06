@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 from contextvars import ContextVar
 from typing import Iterable
+
 from talaria_cli.config import cfg_get
 
 logger = logging.getLogger(__name__)

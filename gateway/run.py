@@ -20,15 +20,15 @@ import logging
 import os
 import re
 import shlex
-import sys
 import signal
+import sys
 import threading
 import time
 from collections import OrderedDict
 from contextvars import copy_context
-from pathlib import Path
 from datetime import datetime
-from typing import Dict, Optional, Any, List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # account_usage imports the OpenAI SDK chain (~230 ms). Only needed by
 # /usage; we still import it at module top in the gateway because test
@@ -37,8 +37,8 @@ from typing import Dict, Optional, Any, List
 # gateway is a long-running daemon, so its boot cost matters less than
 # preserving the established test-patch surface.
 from agent.account_usage import fetch_account_usage, render_account_usage_lines
-from talaria_cli.config import cfg_get
 from talaria_cli.branding import BRAND_EMOJI
+from talaria_cli.config import cfg_get
 
 # --- Agent cache tuning ---------------------------------------------------
 # Bounds the per-session AIAgent cache to prevent unbounded growth in
@@ -225,12 +225,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # Resolve Talaria home directory (respects TALARIA_HOME override)
 from talaria_constants import get_talaria_home
 from utils import atomic_yaml_write, base_url_host_matches, is_truthy_value
+
 _talaria_home = get_talaria_home()
 
 # Load environment variables from ~/.talaria/.env first.
 # User-managed env files should override stale shell exports on restart.
 from dotenv import load_dotenv  # backward-compat for tests that monkeypatch this symbol
+
 from talaria_cli.env_loader import load_talaria_dotenv
+
 _env_path = _talaria_home / '.env'
 load_talaria_dotenv(talaria_home=_talaria_home, project_env=Path(__file__).resolve().parents[1] / '.env')
 
@@ -416,19 +419,10 @@ if not _configured_cwd or _configured_cwd in (".", "auto", "cwd"):
     os.environ["TERMINAL_CWD"] = _fallback
 
 from gateway.config import (
-    Platform,
     _BUILTIN_PLATFORM_VALUES,
     GatewayConfig,
+    Platform,
     load_gateway_config,
-)
-from gateway.session import (
-    SessionStore,
-    SessionSource,
-    SessionContext,
-    build_session_context,
-    build_session_context_prompt,
-    build_session_key,
-    is_shared_multi_user_session,
 )
 from gateway.delivery import DeliveryRouter
 from gateway.platforms.base import (
@@ -442,14 +436,24 @@ from gateway.restart import (
     GATEWAY_SERVICE_RESTART_EXIT_CODE,
     parse_restart_drain_timeout,
 )
-
-
+from gateway.session import (
+    SessionContext,
+    SessionSource,
+    SessionStore,
+    build_session_context,
+    build_session_context_prompt,
+    build_session_key,
+    is_shared_multi_user_session,
+)
 from gateway.whatsapp_identity import (
     canonical_whatsapp_identifier as _canonical_whatsapp_identifier,  # noqa: F401
+)
+from gateway.whatsapp_identity import (
     expand_whatsapp_aliases as _expand_whatsapp_auth_aliases,
+)
+from gateway.whatsapp_identity import (
     normalize_whatsapp_identifier as _normalize_whatsapp_identifier,
 )
-
 
 logger = logging.getLogger(__name__)
 
@@ -468,11 +472,11 @@ def _resolve_runtime_agent_kwargs() -> dict:
     resolve credentials using the fallback provider chain from config.yaml
     before giving up.
     """
-    from talaria_cli.runtime_provider import (
-        resolve_runtime_provider,
-        format_runtime_provider_error,
-    )
     from talaria_cli.auth import AuthError
+    from talaria_cli.runtime_provider import (
+        format_runtime_provider_error,
+        resolve_runtime_provider,
+    )
 
     try:
         runtime = resolve_runtime_provider(
@@ -610,8 +614,8 @@ def _check_unavailable_skill(command_name: str) -> str | None:
     # Normalize: command uses hyphens, skill names may use hyphens or underscores
     normalized = command_name.lower().replace("_", "-")
     try:
-        from tools.skills_tool import _get_disabled_skill_names
         from agent.skill_utils import get_all_skills_dirs
+        from tools.skills_tool import _get_disabled_skill_names
         disabled = _get_disabled_skill_names()
 
         # Check disabled skills across all dirs (local + external)
@@ -767,6 +771,7 @@ def _format_gateway_process_notification(evt: dict) -> "str | None":
 # Used by tools (e.g. send_message) that need to route through a live
 # adapter for plugin platforms.  Set in GatewayRunner.__init__().
 import weakref as _weakref
+
 _gateway_runner_ref: _weakref.ref = lambda: None
 
 
@@ -2319,8 +2324,8 @@ class GatewayRunner:
         # hooks_auto_accept here would just duplicate that lookup.
         # Failures are logged but must never block gateway startup.
         try:
-            from talaria_cli.config import load_config
             from agent.shell_hooks import register_from_config
+            from talaria_cli.config import load_config
             register_from_config(load_config(), accept_hooks=False)
         except Exception:
             logger.debug(
@@ -3084,7 +3089,7 @@ class GatewayRunner:
                 except Exception as _e:
                     logger.debug("SessionDB close error: %s", _e)
 
-            from gateway.status import remove_pid_file, release_gateway_runtime_lock
+            from gateway.status import release_gateway_runtime_lock, remove_pid_file
             remove_pid_file()
             release_gateway_runtime_lock()
 
@@ -3750,6 +3755,8 @@ class GatewayRunner:
             # Resolve the command once for all early-intercept checks below.
             from talaria_cli.commands import (
                 ACTIVE_SESSION_BYPASS_COMMANDS as _DEDICATED_HANDLERS,
+            )
+            from talaria_cli.commands import (
                 resolve_command as _resolve_cmd_inner,
             )
             _evt_cmd = event.get_command()
@@ -4024,6 +4031,8 @@ class GatewayRunner:
         from talaria_cli.commands import (
             GATEWAY_KNOWN_COMMANDS,
             is_gateway_known_command,
+        )
+        from talaria_cli.commands import (
             resolve_command as _resolve_cmd,
         )
 
@@ -4267,8 +4276,8 @@ class GatewayRunner:
         if command:
             try:
                 from agent.skill_commands import (
-                    get_skill_commands,
                     build_skill_invocation_message,
+                    get_skill_commands,
                     resolve_skill_command_key,
                 )
                 skill_cmds = get_skill_commands()
@@ -4621,7 +4630,7 @@ class GatewayRunner:
         if _is_new_session and _auto:
             _skill_names = [_auto] if isinstance(_auto, str) else list(_auto)
             try:
-                from agent.skill_commands import _load_skill_payload, _build_skill_message
+                from agent.skill_commands import _build_skill_message, _load_skill_payload
                 _combined_parts: list[str] = []
                 _loaded_names: list[str] = []
                 for _sname in _skill_names:
@@ -5435,7 +5444,7 @@ class GatewayRunner:
         users can immediately see if context detection went wrong (e.g.
         local models falling to the 128K default).
         """
-        from agent.model_metadata import get_model_context_length, DEFAULT_FALLBACK_CONTEXT
+        from agent.model_metadata import DEFAULT_FALLBACK_CONTEXT, get_model_context_length
 
         model = _resolve_gateway_model()
         config_context_length = None
@@ -5627,8 +5636,8 @@ class GatewayRunner:
 
     async def _handle_profile_command(self, event: MessageEvent) -> str:
         """Handle /profile — show active profile name and home directory."""
-        from talaria_constants import display_talaria_home
         from talaria_cli.profiles import get_active_profile_name
+        from talaria_constants import display_talaria_home
 
         display = display_talaria_home()
         profile_name = get_active_profile_name()
@@ -6025,9 +6034,13 @@ class GatewayRunner:
           /model --provider <provider>        — switch to provider, auto-detect model
         """
         import yaml
+
         from talaria_cli.model_switch import (
-            switch_model as _switch_model, parse_model_flags,
             list_authenticated_providers,
+            parse_model_flags,
+        )
+        from talaria_cli.model_switch import (
+            switch_model as _switch_model,
         )
         from talaria_cli.providers import get_label
 
@@ -6940,6 +6953,7 @@ class GatewayRunner:
     async def _handle_fast_command(self, event: MessageEvent) -> str:
         """Handle /fast — mirror the CLI Priority Processing toggle in gateway chats."""
         import yaml
+
         from talaria_cli.models import model_supports_fast_mode
 
         args = event.get_command_args().strip().lower()
@@ -7183,9 +7197,9 @@ class GatewayRunner:
         focus_topic = (event.get_command_args() or "").strip() or None
 
         try:
-            from run_agent import AIAgent
             from agent.manual_compression_feedback import summarize_manual_compression
             from agent.model_metadata import estimate_messages_tokens_rough
+            from run_agent import AIAgent
 
             session_key = self._session_key_for_source(source)
             model, runtime_kwargs = self._resolve_session_agent_runtime(
@@ -7671,8 +7685,8 @@ class GatewayRunner:
                     i += 1
 
         try:
-            from talaria_state import SessionDB
             from agent.insights import InsightsEngine
+            from talaria_state import SessionDB
 
             loop = asyncio.get_running_loop()
 
@@ -7776,7 +7790,7 @@ class GatewayRunner:
         """
         loop = asyncio.get_running_loop()
         try:
-            from tools.mcp_tool import shutdown_mcp_servers, discover_mcp_tools, _servers, _lock
+            from tools.mcp_tool import _lock, _servers, discover_mcp_tools, shutdown_mcp_servers
 
             # Capture old server names before shutdown
             with _lock:
@@ -8041,7 +8055,8 @@ class GatewayRunner:
         session_key = self._session_key_for_source(source)
 
         from tools.approval import (
-            resolve_gateway_approval, has_blocking_approval,
+            has_blocking_approval,
+            resolve_gateway_approval,
         )
 
         if not has_blocking_approval(session_key):
@@ -8090,7 +8105,8 @@ class GatewayRunner:
         session_key = self._session_key_for_source(source)
 
         from tools.approval import (
-            resolve_gateway_approval, has_blocking_approval,
+            has_blocking_approval,
+            resolve_gateway_approval,
         )
 
         if not has_blocking_approval(session_key):
@@ -8132,10 +8148,14 @@ class GatewayRunner:
         full log uploads should use ``talaria debug share`` from the CLI.
         """
         import asyncio
+
         from talaria_cli.debug import (
-            _capture_dump, collect_debug_report,
-            upload_to_pastebin, _schedule_auto_delete,
-            _GATEWAY_PRIVACY_NOTICE, _best_effort_sweep_expired_pastes,
+            _GATEWAY_PRIVACY_NOTICE,
+            _best_effort_sweep_expired_pastes,
+            _capture_dump,
+            _schedule_auto_delete,
+            collect_debug_report,
+            upload_to_pastebin,
         )
 
         loop = asyncio.get_running_loop()
@@ -8180,7 +8200,8 @@ class GatewayRunner:
         import shutil
         import subprocess
         from datetime import datetime
-        from talaria_cli.config import is_managed, format_managed_message
+
+        from talaria_cli.config import format_managed_message, is_managed
 
         # Block non-messaging platforms (API server, webhooks, ACP)
         platform = event.source.platform
@@ -8647,6 +8668,7 @@ class GatewayRunner:
         """
         try:
             from agent.image_routing import decide_image_input_mode
+
             from agent.auxiliary_client import _read_main_model, _read_main_provider
             from talaria_cli.config import load_config
 
@@ -8679,8 +8701,8 @@ class GatewayRunner:
         Returns:
             The enriched message string with vision descriptions prepended.
         """
-        from tools.vision_tools import vision_analyze_tool
         from agent.memory_manager import sanitize_context
+        from tools.vision_tools import vision_analyze_tool
 
         analysis_prompt = (
             "Describe everything visible in this image in thorough detail. "
@@ -9054,7 +9076,8 @@ class GatewayRunner:
         edits to model.context_length / compression.* in config.yaml are
         picked up on the next gateway message without a manual restart.
         """
-        import hashlib, json as _j
+        import hashlib
+        import json as _j
 
         # Fingerprint the FULL credential string instead of using a short
         # prefix. OAuth/JWT-style tokens frequently share a common prefix
@@ -9471,7 +9494,8 @@ class GatewayRunner:
         skills, and a unified session store.
         """
         try:
-            from aiohttp import ClientSession as _AioClientSession, ClientTimeout
+            from aiohttp import ClientSession as _AioClientSession
+            from aiohttp import ClientTimeout
         except ImportError:
             return {
                 "final_response": "⚠️ Proxy mode requires aiohttp. Install with: pip install aiohttp",
@@ -9771,8 +9795,9 @@ class GatewayRunner:
                 event_message_id=event_message_id,
             )
 
-        from run_agent import AIAgent
         import queue
+
+        from run_agent import AIAgent
 
         def _run_still_current() -> bool:
             if run_generation is None or not session_key:
@@ -11553,7 +11578,7 @@ def _start_cron_ticker(stop_event: threading.Event, adapters=None, loop=None, in
     once per hour.
     """
     from cron.scheduler import tick as cron_tick
-    from gateway.platforms.base import cleanup_image_cache, cleanup_document_cache
+    from gateway.platforms.base import cleanup_document_cache, cleanup_image_cache
     from talaria_cli.debug import _sweep_expired_pastes
 
     IMAGE_CACHE_EVERY = 60   # ticks — once per hour at default 60s interval
@@ -11651,8 +11676,8 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
     # allow concurrent instances without tripping this guard.
     from gateway.status import (
         acquire_gateway_runtime_lock,
-        get_running_pid,
         get_process_start_time,
+        get_running_pid,
         release_gateway_runtime_lock,
         remove_pid_file,
         terminate_pid,
@@ -11865,7 +11890,8 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
     # Telegram polling, Discord gateway sockets, etc. The loser exits
     # cleanly before touching any external service.
     import atexit
-    from gateway.status import write_pid_file, remove_pid_file, get_running_pid
+
+    from gateway.status import get_running_pid, remove_pid_file, write_pid_file
     _current_pid = get_running_pid()
     if _current_pid is not None and _current_pid != os.getpid():
         logger.error(

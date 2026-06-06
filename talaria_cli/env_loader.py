@@ -7,8 +7,8 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from utils import atomic_replace
 
+from utils import atomic_replace
 
 # Env var name suffixes that indicate credential values.  These are the
 # only env vars whose values we sanitize on load — we must not silently

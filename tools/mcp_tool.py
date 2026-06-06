@@ -208,10 +208,10 @@ try:
     # Notification types for dynamic tool discovery (tools/list_changed)
     try:
         from mcp.types import (
-            ServerNotification,
-            ToolListChangedNotification,
             PromptListChangedNotification,
             ResourceListChangedNotification,
+            ServerNotification,
+            ToolListChangedNotification,
         )
         _MCP_NOTIFICATION_TYPES = True
     except ImportError:

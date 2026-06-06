@@ -34,6 +34,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+
 def _add_accept_hooks_flag(parser) -> None:
     """Attach the ``--accept-hooks`` flag.  Shared across every agent
     subparser so the flag works regardless of CLI position."""
@@ -150,14 +151,14 @@ _apply_profile_override()
 
 # Load .env from ~/.talaria/.env first, then project root as dev fallback.
 # User-managed env files should override stale shell exports on restart.
-from talaria_cli.config import get_talaria_home
-from talaria_cli.env_loader import load_talaria_dotenv
 from talaria_cli.branding import (
     BRAND_EMOJI,
     DEFAULT_INSTALL_SCRIPT_URL,
     DEFAULT_REPO_HTTPS_URL,
     default_branding,
 )
+from talaria_cli.config import get_talaria_home
+from talaria_cli.env_loader import load_talaria_dotenv
 
 load_talaria_dotenv(project_env=PROJECT_ROOT / ".env")
 
@@ -208,7 +209,7 @@ import logging
 import time as _time
 from datetime import datetime
 
-from talaria_cli import __version__, __release_date__
+from talaria_cli import __release_date__, __version__
 
 logger = logging.getLogger(__name__)
 
@@ -233,14 +234,13 @@ def _relative_time(ts) -> str:
 
 def _has_any_provider_configured() -> bool:
     """Check if at least one inference provider is usable."""
-    from talaria_cli.config import get_env_path, get_talaria_home, load_config
     from talaria_cli.auth import get_auth_status
 
     # Determine whether Talaria itself has been explicitly configured (model
     # in config that isn't the hardcoded default). Used below to gate external
     # tool credentials (Claude Code, Codex CLI) that shouldn't silently skip
     # the setup wizard on a fresh install.
-    from talaria_cli.config import DEFAULT_CONFIG
+    from talaria_cli.config import DEFAULT_CONFIG, get_env_path, get_talaria_home, load_config
 
     _DEFAULT_MODEL = DEFAULT_CONFIG.get("model", "")
     cfg = load_config()
@@ -330,8 +330,8 @@ def _has_any_provider_configured() -> bool:
     if _has_talaria_config:
         try:
             from agent.anthropic_adapter import (
-                read_claude_code_credentials,
                 is_claude_code_token_valid,
+                read_claude_code_credentials,
             )
 
             creds = read_claude_code_credentials()
@@ -610,6 +610,7 @@ def _resolve_last_session(source: str = "cli") -> Optional[str]:
 
 from talaria_cli.container_exec import _exec_in_container
 
+
 def _resolve_session_by_name_or_id(name_or_id: str) -> Optional[str]:
     """Resolve a session name (title) or ID to a session ID.
 
@@ -696,7 +697,7 @@ def cmd_gateway(args):
 def cmd_setup(args):
     """Interactive setup wizard."""
     from talaria_cli.setup import run_setup_wizard
-    from talaria_cli.setup_apply import snapshot_setup_state, apply_setup_changes
+    from talaria_cli.setup_apply import apply_setup_changes, snapshot_setup_state
 
     before = snapshot_setup_state()
     try:
@@ -708,7 +709,7 @@ def cmd_setup(args):
 def cmd_model(args):
     """Select default model — starts with provider selection, then model picker."""
     _require_tty("model")
-    from talaria_cli.setup_apply import snapshot_setup_state, apply_setup_changes
+    from talaria_cli.setup_apply import apply_setup_changes, snapshot_setup_state
 
     before = snapshot_setup_state()
     try:
@@ -726,14 +727,14 @@ def select_provider_and_model(args=None):
     persistence.
     """
     from talaria_cli.auth import (
-        resolve_provider,
         AuthError,
         format_auth_error,
+        resolve_provider,
     )
     from talaria_cli.config import (
         get_compatible_custom_providers,
-        load_config,
         get_env_value,
+        load_config,
     )
     from talaria_cli.providers import resolve_provider_full
 
@@ -783,7 +784,7 @@ def select_provider_and_model(args=None):
     if active == "openrouter" and get_env_value("OPENAI_BASE_URL"):
         active = "custom"
 
-    from talaria_cli.models import CANONICAL_PROVIDERS, _PROVIDER_LABELS
+    from talaria_cli.models import _PROVIDER_LABELS, CANONICAL_PROVIDERS
 
     provider_labels = dict(_PROVIDER_LABELS)  # derive from canonical list
     active_label = provider_labels.get(active, active) if active else "none"
@@ -992,7 +993,7 @@ def _clear_stale_openai_base_url():
     requests to the old custom endpoint instead of the newly selected
     provider.  See issue #5161.
     """
-    from talaria_cli.config import get_env_value, save_env_value, load_config
+    from talaria_cli.config import get_env_value, load_config, save_env_value
 
     cfg = load_config()
     model_cfg = cfg.get("model", {})
@@ -1381,13 +1382,13 @@ def _prompt_provider_choice(choices, *, default=0):
 def _model_flow_openai_codex(config, current_model=""):
     """OpenAI Codex provider: ensure logged in, then pick model."""
     from talaria_cli.auth import (
-        get_codex_auth_status,
+        DEFAULT_CODEX_BASE_URL,
+        PROVIDER_REGISTRY,
+        _login_openai_codex,
         _prompt_model_selection,
         _save_model_choice,
         _update_config_for_provider,
-        _login_openai_codex,
-        PROVIDER_REGISTRY,
-        DEFAULT_CODEX_BASE_URL,
+        get_codex_auth_status,
     )
     from talaria_cli.codex_models import get_codex_model_ids
 
@@ -2114,14 +2115,14 @@ def _model_flow_api_key_provider(config, provider_id, current_model=""):
     )
     from talaria_cli.config import (
         get_env_value,
-        save_env_value,
         load_config,
         save_config,
+        save_env_value,
     )
     from talaria_cli.models import (
         fetch_api_models,
-        opencode_model_api_mode,
         normalize_opencode_model_id,
+        opencode_model_api_mode,
     )
 
     pconfig = PROVIDER_REGISTRY[provider_id]
@@ -2399,9 +2400,9 @@ def _model_flow_api_key_provider(config, provider_id, current_model=""):
 def _run_anthropic_oauth_flow(save_env_value):
     """Run the Claude OAuth setup-token flow. Returns True if credentials were saved."""
     from agent.anthropic_adapter import (
-        run_oauth_setup_token,
-        read_claude_code_credentials,
         is_claude_code_token_valid,
+        read_claude_code_credentials,
+        run_oauth_setup_token,
     )
     from talaria_cli.config import (
         save_anthropic_oauth_token,
@@ -2491,29 +2492,28 @@ def _run_anthropic_oauth_flow(save_env_value):
 
 def _model_flow_anthropic(config, current_model=""):
     """Flow for Anthropic provider — OAuth subscription, API key, or Claude Code creds."""
+    # Check ALL credential sources
     from talaria_cli.auth import (
         _prompt_model_selection,
         _save_model_choice,
         deactivate_provider,
+        get_anthropic_key,
     )
     from talaria_cli.config import (
-        save_env_value,
         load_config,
-        save_config,
         save_anthropic_api_key,
+        save_config,
+        save_env_value,
     )
     from talaria_cli.models import _PROVIDER_MODELS
-
-    # Check ALL credential sources
-    from talaria_cli.auth import get_anthropic_key
 
     existing_key = get_anthropic_key()
     cc_available = False
     try:
         from agent.anthropic_adapter import (
-            read_claude_code_credentials,
-            is_claude_code_token_valid,
             _is_oauth_token,
+            is_claude_code_token_valid,
+            read_claude_code_credentials,
         )
 
         cc_creds = read_claude_code_credentials()
@@ -2828,6 +2828,7 @@ def _gateway_prompt(prompt_text: str, default: str = "", timeout: float = 300.0)
     """
     import json as _json
     import uuid as _uuid
+
     from talaria_constants import get_talaria_home
 
     home = get_talaria_home()
@@ -4001,7 +4002,7 @@ def _run_pre_update_backup(args) -> None:
 
     # Render path using display_talaria_home so the user sees ~/.talaria/...
     try:
-        from talaria_constants import get_talaria_home, display_talaria_home
+        from talaria_constants import display_talaria_home, get_talaria_home
         home = get_talaria_home()
         try:
             display_path = f"{display_talaria_home()}/{out_path.relative_to(home)}"
@@ -4334,6 +4335,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
         # attributes like display_talaria_home() added since the last release.
         try:
             import importlib
+
             import talaria_constants as _hc
 
             importlib.reload(_hc)
@@ -4365,8 +4367,8 @@ def _cmd_update_impl(args, gateway_mode: bool):
         # Sync bundled skills to all other profiles
         try:
             from talaria_cli.profiles import (
-                list_profiles,
                 get_active_profile_name,
+                list_profiles,
                 seed_profile_skills,
             )
 
@@ -4403,9 +4405,9 @@ def _cmd_update_impl(args, gateway_mode: bool):
         print("→ Checking configuration for new options...")
 
         from talaria_cli.config import (
-            get_missing_env_vars,
-            get_missing_config_fields,
             check_config_version,
+            get_missing_config_fields,
+            get_missing_env_vars,
             migrate_config,
         )
 
@@ -4503,15 +4505,16 @@ def _cmd_update_impl(args, gateway_mode: bool):
         # The code update (git pull) is shared across all profiles, so every
         # running gateway needs restarting to pick up the new code.
         try:
+            import signal as _signal
+
             from talaria_cli.gateway import (
-                is_macos,
-                supports_systemd_services,
                 _ensure_user_systemd_env,
-                find_gateway_pids,
                 _get_service_pids,
                 _graceful_restart_via_sigusr1,
+                find_gateway_pids,
+                is_macos,
+                supports_systemd_services,
             )
-            import signal as _signal
 
             def _wait_for_service_active(
                 scope_cmd_: list, svc_name_: str, timeout: float = 10.0,
@@ -4769,9 +4772,9 @@ def _cmd_update_impl(args, gateway_mode: bool):
             if is_macos():
                 try:
                     from talaria_cli.gateway import (
-                        launchd_restart,
                         get_launchd_label,
                         get_launchd_plist_path,
+                        launchd_restart,
                     )
 
                     plist_path = get_launchd_plist_path()
@@ -4834,8 +4837,8 @@ def _cmd_update_impl(args, gateway_mode: bool):
         # every `talaria update` surfaces the issue until the user migrates.
         try:
             from talaria_cli.gateway import (
-                has_legacy_talaria_units,
                 _find_legacy_talaria_units,
+                has_legacy_talaria_units,
                 supports_systemd_services,
             )
 
@@ -4951,17 +4954,17 @@ def _coalesce_session_name_args(argv: list) -> list:
 def cmd_profile(args):
     """Profile management — create, delete, list, switch, alias."""
     from talaria_cli.profiles import (
-        list_profiles,
+        _get_wrapper_dir,
+        _is_wrapper_dir_in_path,
+        check_alias_collision,
         create_profile,
+        create_wrapper_script,
         delete_profile,
+        get_active_profile_name,
+        list_profiles,
+        remove_wrapper_script,
         seed_profile_skills,
         set_active_profile,
-        get_active_profile_name,
-        check_alias_collision,
-        create_wrapper_script,
-        remove_wrapper_script,
-        _is_wrapper_dir_in_path,
-        _get_wrapper_dir,
     )
     from talaria_constants import display_talaria_home
 
@@ -5129,11 +5132,11 @@ def cmd_profile(args):
     elif action == "show":
         name = args.profile_name
         from talaria_cli.profiles import (
-            get_profile_dir,
-            profile_exists,
-            _read_config_model,
             _check_gateway_running,
             _count_skills,
+            _read_config_model,
+            get_profile_dir,
+            profile_exists,
         )
 
         if not profile_exists(name):
@@ -5238,7 +5241,7 @@ def cmd_profile(args):
             sys.exit(1)
 def cmd_completion(args, parser=None):
     """Print shell completion script."""
-    from talaria_cli.completion import generate_bash, generate_zsh, generate_fish
+    from talaria_cli.completion import generate_bash, generate_fish, generate_zsh
 
     shell = getattr(args, "shell", "bash")
     if shell == "zsh":
@@ -5251,7 +5254,7 @@ def cmd_completion(args, parser=None):
 
 def cmd_logs(args):
     """View and filter Talaria log files."""
-    from talaria_cli.logs import tail_log, list_logs
+    from talaria_cli.logs import list_logs, tail_log
 
     log_name = getattr(args, "log_name", "agent") or "agent"
 
@@ -6471,7 +6474,7 @@ Examples:
             print("\n  ✓ Memory provider: built-in only")
             print("  Saved to config.yaml\n")
         elif sub == "reset":
-            from talaria_constants import get_talaria_home, display_talaria_home
+            from talaria_constants import display_talaria_home, get_talaria_home
 
             mem_dir = get_talaria_home() / "memories"
             target = getattr(args, "target", "all")
@@ -7014,8 +7017,8 @@ Examples:
 
     def cmd_insights(args):
         try:
-            from talaria_state import SessionDB
             from agent.insights import InsightsEngine
+            from talaria_state import SessionDB
 
             db = SessionDB()
             engine = InsightsEngine(db)
@@ -7454,8 +7457,8 @@ Examples:
                 "MCP tool discovery failed at CLI startup", exc_info=True,
             )
         try:
-            from talaria_cli.config import load_config
             from agent.shell_hooks import register_from_config
+            from talaria_cli.config import load_config
             register_from_config(load_config(), accept_hooks=_accept_hooks)
         except Exception:
             logger.debug(

@@ -14,7 +14,6 @@ from typing import Optional
 
 from talaria_cli.config import get_talaria_home
 
-
 CACHE_PATH = get_talaria_home() / "sticker_cache.json"
 
 # Vision prompt for describing stickers -- kept concise to save tokens

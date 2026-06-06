@@ -13,8 +13,8 @@ Config stored in ~/.talaria/config.yaml under:
 """
 from typing import List, Optional, Set
 
-from talaria_cli.config import cfg_get, load_config, save_config
 from talaria_cli.colors import Colors, color
+from talaria_cli.config import cfg_get, load_config, save_config
 from talaria_cli.platforms import PLATFORMS as _PLATFORMS
 
 # Backward-compatible view: {key: label_string} so existing code that

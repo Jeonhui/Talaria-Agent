@@ -13,7 +13,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from talaria_cli.config import get_talaria_home, get_env_path, get_project_root, load_config
+from talaria_cli.config import get_env_path, get_project_root, get_talaria_home, load_config
 from talaria_constants import display_talaria_home
 
 
@@ -209,7 +209,7 @@ def run_dump(args):
     talaria_home = get_talaria_home()
 
     try:
-        from talaria_cli import __version__, __release_date__
+        from talaria_cli import __release_date__, __version__
     except ImportError:
         __version__ = "(unknown)"
         __release_date__ = ""

@@ -17,9 +17,9 @@ import os
 import platform
 import subprocess
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 from talaria_constants import get_talaria_home
-from typing import Any, Dict, List, Optional, Tuple
 from utils import base_url_host_matches, normalize_proxy_env_vars
 
 # NOTE: `import anthropic` is deliberately NOT at module top — the SDK pulls

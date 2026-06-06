@@ -17,10 +17,9 @@ import time
 from pathlib import Path
 from typing import Dict
 
+from talaria_cli.config import cfg_get
 from talaria_constants import display_talaria_home
 from utils import atomic_replace
-from talaria_cli.config import cfg_get
-
 
 _SUBSCRIPTIONS_FILENAME = "webhook_subscriptions.json"
 
@@ -247,8 +246,8 @@ def _cmd_test(args):
 
     payload = args.payload or '{"test": true, "event_type": "test", "message": "Hello from talaria webhook test"}'
 
-    import hmac
     import hashlib
+    import hmac
     sig = "sha256=" + hmac.new(
         secret.encode(), payload.encode(), hashlib.sha256
     ).hexdigest()

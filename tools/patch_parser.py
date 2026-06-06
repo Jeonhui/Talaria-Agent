@@ -31,7 +31,7 @@ Usage:
 import difflib
 import re
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, List, Optional, Tuple, Any
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 if TYPE_CHECKING:
     from tools.file_operations import PatchResult

@@ -5,19 +5,20 @@ Shows the status of all Talaria Agent components.
 """
 
 import os
-import sys
 import subprocess  # noqa: F401 — re-exported for tests that monkeypatch status.subprocess to guard against regressions
+import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent.resolve()
 
 from talaria_cli.auth import AuthError, resolve_provider
-from talaria_cli.colors import Colors, color
 from talaria_cli.branding import BRAND_EMOJI
+from talaria_cli.colors import Colors, color
 from talaria_cli.config import get_env_path, get_env_value, get_talaria_home, load_config
 from talaria_cli.models import provider_label
 from talaria_cli.runtime_provider import resolve_requested_provider
 from talaria_constants import OPENROUTER_MODELS_URL
+
 
 def check_mark(ok: bool) -> str:
     if ok:
@@ -266,7 +267,7 @@ def show_status(args):
     print(color("◆ Gateway Service", Colors.CYAN, Colors.BOLD))
 
     try:
-        from talaria_cli.gateway import get_gateway_runtime_snapshot, _format_gateway_pids
+        from talaria_cli.gateway import _format_gateway_pids, get_gateway_runtime_snapshot
 
         snapshot = get_gateway_runtime_snapshot()
         is_running = snapshot.running
