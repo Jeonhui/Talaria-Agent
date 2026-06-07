@@ -341,3 +341,5 @@ def _coalesce_session_name_args(argv: list) -> list:
                 result.append(" ".join(parts))
         else:
             result.append(token)
+            i += 1
+    return result
