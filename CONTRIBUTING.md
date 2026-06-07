@@ -56,7 +56,7 @@ If your skill is specialized, community-contributed, or niche, it's better suite
 | **Git** | With `--recurse-submodules` support, and the `git-lfs` extension installed |
 | **Python 3.11+** | uv will install it if missing |
 | **uv** | Fast Python package manager ([install](https://docs.astral.sh/uv/)) |
-| **Node.js 20+** | Optional — needed for browser tools and WhatsApp bridge (matches root `package.json` engines) |
+| **Node.js 20+** | Optional — needed for browser tools (matches root `package.json` engines) |
 
 ### Clone and install
 
@@ -615,12 +615,12 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 | `refactor` | Code restructuring (no behavior change) |
 | `chore` | Build, CI, dependency updates |
 
-Scopes: `cli`, `gateway`, `tools`, `skills`, `agent`, `install`, `whatsapp`, `security`, etc.
+Scopes: `cli`, `gateway`, `tools`, `skills`, `agent`, `install`, `security`, etc.
 
 Examples:
 ```
 fix(cli_config): prevent crash in save_config_value when model is a string
-feat(gateway): add WhatsApp multi-user session isolation
+feat(gateway): add Slack thread isolation
 fix(security): prevent shell injection in sudo password piping
 test(tools): add unit tests for file_operations
 ```

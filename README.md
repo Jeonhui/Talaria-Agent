@@ -75,7 +75,7 @@ Whole subsystems dropped to keep the assistant focused:
 
 - **Voice & TTS** — speech-to-text, text-to-speech, push-to-talk, Discord voice channels, ElevenLabs/Edge/MiniMax/NeuTTS providers
 - **Web dashboard & ink/React TUI frontend** — no graphical surface ships
-- **Interactive terminal chat** — the `talaria chat` REPL was removed; Talaria now runs headless. Use the messaging gateway (Discord/Slack/Telegram), one-shot `talaria -q "..."`, or the ACP editor integration
+- **Interactive terminal chat** — the `talaria chat` REPL was removed; Talaria now runs headless. Use the messaging gateway (Discord/Slack/Telegram) or one-shot `talaria -q "..."`
 - **Aggregator paths** — Vercel AI Gateway and Nous Portal subscription system (OpenRouter is now a first-class provider with its own key)
 - **Auth flows** — Nous Portal device-code login, OpenClaw migration, the `talaria login` subcommand
 - **Backends** — Modal, Daytona, Singularity sandbox executors (only local / Docker / SSH remain)

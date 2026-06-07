@@ -17,19 +17,19 @@ import pytest
 # Top-level names that belong to this repo. An ImportError whose missing module
 # is rooted here is a REAL failure; anything else is an absent optional dep.
 FIRST_PARTY_TOP = {
-    "talaria_cli", "agent", "tools", "gateway", "cron", "acp_adapter", "plugins",
+    "talaria_cli", "agent", "tools", "gateway", "cron", "plugins",
     "cli_config", "run_agent", "model_tools", "toolsets", "talaria_state",
     "talaria_constants", "talaria_time", "talaria_logging", "utils",
 }
 
-PACKAGES = ["talaria_cli", "agent", "tools", "gateway", "cron", "acp_adapter", "plugins"]
+PACKAGES = ["talaria_cli", "agent", "tools", "gateway", "cron", "plugins"]
 ROOT_MODULES = [
     "cli_config", "run_agent", "model_tools", "toolsets", "talaria_state",
     "talaria_constants", "talaria_time", "talaria_logging", "utils",
 ]
 
 # Entry-point / side-effectful modules to skip (they run servers or __main__).
-SKIP = {"acp_adapter.__main__", "acp_adapter.entry"}
+SKIP: set[str] = set()
 
 
 def _all_module_names():

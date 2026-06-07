@@ -3,9 +3,8 @@
 Talaria CLI - Main entry point.
 
 Usage:
-    talaria                     # Interactive chat (default)
-    talaria chat                # Interactive chat
-    talaria gateway             # Run gateway in foreground
+    talaria -q "..."            # One-shot answer
+    talaria gateway run         # Run gateway in foreground
     talaria gateway start       # Start gateway as service
     talaria gateway stop        # Stop gateway service
     talaria gateway status      # Show gateway status
@@ -18,12 +17,28 @@ Usage:
     talaria cron list           # List cron jobs
     talaria cron status         # Check if cron scheduler is running
     talaria doctor              # Check configuration and dependencies
-    talaria version             Show version
-    talaria update              Update to latest version
-    talaria uninstall           Uninstall Talaria Agent
-    talaria acp                 Run as an ACP server for editor integration
-    talaria sessions browse     Interactive session picker with search
+    talaria version             # Show version
+    talaria update              # Update to latest version
+    talaria uninstall           # Uninstall Talaria Agent
+    talaria sessions browse     # Interactive session picker with search
 
+NAVIGATION (file is ~7.5K lines — line numbers approximate)
+  L38-235     parser helpers, profile override, time / provider checks
+  L348-651    session pickers (curses) + session_id resolvers
+  L654        cmd_chat              — interactive (removed) → redirect printer
+  L688        cmd_gateway           — gateway subcommands
+  L696        cmd_setup             — first-run setup
+  L708        cmd_model             — model selection
+  L720-2628   provider / model flows (_aux_*, _model_flow_*, OAuth flows)
+  L2629-2782  small handlers: logout / auth / status / cron / webhook / slack /
+              hooks / doctor / dump / debug / config / backup / import / version / uninstall
+  L2790-3930  update infrastructure (npm install, fork detect, stash, hangup)
+  L4020       cmd_update            — `talaria update`
+  L4882       _coalesce_session_name_args
+  L4952       cmd_profile           — profile management
+  L5240       cmd_completion        — shell completion
+  L5253       cmd_logs              — log viewer
+  L5274       def main() — argparse build + dispatch
 """
 
 import argparse
@@ -680,7 +695,6 @@ def cmd_chat(args):
     print("Use one of:")
     print('  talaria -q "your question"     One-shot answer (also: --oneshot / -z)')
     print("  talaria gateway run            Chat via Discord / Slack / Telegram")
-    print("  talaria-acp                    Agent Client Protocol (editor integration)")
     print()
     print("Run 'talaria --help' for all commands.")
     sys.exit(0)
@@ -4896,7 +4910,6 @@ def _coalesce_session_name_args(argv: list) -> list:
         "model",
         "gateway",
         "setup",
-        "whatsapp",
         "logout",
         "auth",
         "status",
@@ -5366,7 +5379,7 @@ def main():
     gateway_parser = subparsers.add_parser(
         "gateway",
         help="Messaging gateway management",
-        description="Manage the messaging gateway (Telegram, Discord, WhatsApp)",
+        description="Manage the messaging gateway (Telegram, Discord, Slack)",
     )
     gateway_subparsers = gateway_parser.add_subparsers(dest="gateway_command")
 
@@ -6106,7 +6119,7 @@ Examples:
         "approve", help="Approve a pairing code"
     )
     pairing_approve_parser.add_argument(
-        "platform", help="Platform name (telegram, discord, slack, whatsapp)"
+        "platform", help="Platform name (telegram, discord, slack)"
     )
     pairing_approve_parser.add_argument("code", help="Pairing code to approve")
 
@@ -6984,7 +6997,7 @@ Examples:
             msgs = db.message_count()
             print(f"Total sessions: {total}")
             print(f"Total messages: {msgs}")
-            for src in ["cli", "telegram", "discord", "whatsapp", "slack"]:
+            for src in ["cli", "telegram", "discord", "slack"]:
                 c = db.session_count(source=src)
                 if c > 0:
                     print(f"  {src}: {c} sessions")
@@ -7088,29 +7101,6 @@ Examples:
         "--yes", "-y", action="store_true", help="Skip confirmation prompts"
     )
     uninstall_parser.set_defaults(func=cmd_uninstall)
-
-    # =========================================================================
-    # acp command
-    # =========================================================================
-    acp_parser = subparsers.add_parser(
-        "acp",
-        help="Run Talaria Agent as an ACP (Agent Client Protocol) server",
-        description="Start Talaria Agent in ACP mode for editor integration (VS Code, Zed, JetBrains)",
-    )
-    _add_accept_hooks_flag(acp_parser)
-
-    def cmd_acp(args):
-        """Launch Talaria Agent as an ACP server."""
-        try:
-            from acp_adapter.entry import main as acp_main
-
-            acp_main()
-        except ImportError:
-            print("ACP dependencies not installed.")
-            print("Install them with:  pip install -e '.[acp]'")
-            sys.exit(1)
-
-    acp_parser.set_defaults(func=cmd_acp)
 
     # =========================================================================
     # profile command

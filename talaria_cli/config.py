@@ -917,14 +917,6 @@ DEFAULT_CONFIG = {
         "server_actions": "",
     },
 
-    # WhatsApp platform settings (gateway mode)
-    "whatsapp": {
-        # Reply prefix prepended to every outgoing WhatsApp message.
-        # Default (None) uses the built-in "🪽 *Talaria Agent*" header.
-        # Set to "" (empty string) to disable the header entirely.
-        # Supports \n for newlines, e.g. "🤖 *My Bot*\n──────\n"
-    },
-
     # Telegram platform settings (gateway mode)
     "telegram": {
         "reactions": False,            # Add 👀/✅/❌ reactions to messages during processing
@@ -933,11 +925,6 @@ DEFAULT_CONFIG = {
 
     # Slack platform settings (gateway mode)
     "slack": {
-        "channel_prompts": {},         # Per-channel ephemeral system prompts
-    },
-
-    # Mattermost platform settings (gateway mode)
-    "mattermost": {
         "channel_prompts": {},         # Per-channel ephemeral system prompts
     },
 

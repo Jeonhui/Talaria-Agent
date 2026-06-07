@@ -73,7 +73,7 @@ Hermes는 모든 기능을 담은 풀스택 프레임워크라, 개인 용도에
 
 - **음성 & TTS** — speech-to-text, text-to-speech, push-to-talk, Discord 보이스 채널, ElevenLabs/Edge/MiniMax/NeuTTS 프로바이더
 - **웹 대시보드 & ink/React TUI 프론트엔드** — 그래픽 표면 없음
-- **인터랙티브 터미널 채팅** — `talaria chat` REPL 제거됨. 이제 헤드리스로 동작 — 메시징 게이트웨이(Discord/Slack/Telegram), 일회성 `talaria -q "..."`, 또는 ACP 에디터 연동 사용
+- **인터랙티브 터미널 채팅** — `talaria chat` REPL 제거됨. 이제 헤드리스로 동작 — 메시징 게이트웨이(Discord/Slack/Telegram) 또는 일회성 `talaria -q "..."` 사용
 - **애그리게이터 경로** — Vercel AI Gateway 및 Nous Portal 구독 시스템 (OpenRouter는 이제 자체 키를 갖는 1급 프로바이더)
 - **인증 플로우** — Nous Portal 디바이스 코드 로그인, OpenClaw 마이그레이션, `talaria login` 서브커맨드
 - **백엔드** — Modal, Daytona, Singularity 샌드박스 실행기 (local / Docker / SSH만 잔존)

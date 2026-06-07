@@ -15,9 +15,30 @@ Features:
 
 Usage:
     from run_agent import AIAgent
-    
+
     agent = AIAgent(base_url="http://localhost:30000/v1", model="claude-opus-4-20250514")
     response = agent.run_conversation("Tell me about the latest Python updates")
+
+NAVIGATION (file is ~13K lines — line numbers approximate)
+  L64-291     module helpers: OpenAI lazy proxy, _SafeWriter, proxy resolve
+  L294        class IterationBudget — per-turn API call quota
+  L387-481    tool-batching heuristics (parallelize / path overlap)
+  L495-540    provider-specific headers (Routermint, Qwen Portal)
+  L542        class AIAgent  ◀── main class
+    L565      __init__
+    L1786     reset_session_state
+    L1858     switch_model
+    L2041     _safe_print / status / warning emitters
+    L2449     _anthropic_prompt_cache_policy
+    L2827     _extract_reasoning
+    L2894     _cleanup_task_resources
+    L3133     _spawn_background_review (curator)
+    L3309     _persist_session
+    L3424     _convert_to_trajectory_format
+    L3589     _save_trajectory
+    L9673     run_conversation  ◀── per-turn entry
+    L10039    agent loop  ◀── while (api_calls < max_iter AND budget.remaining) OR grace_call
+  L13022      def main() — CLI entry
 """
 
 import asyncio

@@ -372,7 +372,7 @@ def redact_sensitive_text(text: str, *, force: bool = False) -> str:
     # Discord user/role mentions (<@snowflake_id>)
     text = _DISCORD_MENTION_RE.sub(lambda m: f"<@{'!' if '!' in m.group(0) else ''}***>", text)
 
-    # E.164 phone numbers (Signal, WhatsApp)
+    # E.164 phone numbers
     def _redact_phone(m):
         phone = m.group(1)
         if len(phone) <= 8:

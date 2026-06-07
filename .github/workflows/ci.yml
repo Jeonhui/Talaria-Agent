@@ -48,7 +48,7 @@ jobs:
         run: >-
           pytest -m "not integration"
           --cov=agent --cov=gateway --cov=talaria_cli --cov=tools
-          --cov=acp_adapter --cov=cron --cov-report=term-missing
+          --cov=cron --cov-report=term-missing
 
       - name: Dependency audit (pip-audit)
         # Informational for now — surfaces known-vuln dependencies in the log
