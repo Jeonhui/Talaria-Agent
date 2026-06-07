@@ -47,11 +47,8 @@ Modules pulled out for clarity:
 
 import argparse
 import os
-import shutil
-import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 # Re-exported for backward compatibility with callers that import from
 # ``talaria_cli.main`` (talaria_cli/setup.py, talaria_cli/fallback_cmd.py).
@@ -61,6 +58,7 @@ from talaria_cli.sessions import (
     _relative_time,
     _session_browse_picker,
 )
+
 # ``cmd_update`` lives in update_runtime.py; re-imported so argparse can
 # wire it as the handler for ``talaria update`` without main.py owning
 # the (~2K LOC) update implementation.
@@ -184,8 +182,6 @@ _apply_profile_override()
 # Load .env from ~/.talaria/.env first, then project root as dev fallback.
 # User-managed env files should override stale shell exports on restart.
 from talaria_cli.branding import (
-    BRAND_EMOJI,
-    DEFAULT_INSTALL_SCRIPT_URL,
     DEFAULT_REPO_HTTPS_URL,
     default_branding,
 )
@@ -238,8 +234,6 @@ except Exception:
     pass  # best-effort — don't crash if config isn't available yet
 
 import logging
-import time as _time
-from datetime import datetime
 
 from talaria_cli import __release_date__, __version__
 
