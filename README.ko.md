@@ -74,10 +74,11 @@ Hermes는 모든 기능을 담은 풀스택 프레임워크라, 개인 용도에
 - **음성 & TTS** — speech-to-text, text-to-speech, push-to-talk, Discord 보이스 채널, ElevenLabs/Edge/MiniMax/NeuTTS 프로바이더
 - **웹 대시보드 & ink/React TUI 프론트엔드** — 그래픽 표면 없음
 - **인터랙티브 터미널 채팅** — `talaria chat` REPL 제거됨. 이제 헤드리스로 동작 — 메시징 게이트웨이(Discord/Slack/Telegram) 또는 일회성 `talaria -q "..."` 사용
+- **ACP 에디터 어댑터** — Zed / VS Code / JetBrains 연동용 Agent Client Protocol 서버 제거됨. Talaria는 메시징 우선
 - **애그리게이터 경로** — Vercel AI Gateway 및 Nous Portal 구독 시스템 (OpenRouter는 이제 자체 키를 갖는 1급 프로바이더)
 - **인증 플로우** — Nous Portal 디바이스 코드 로그인, OpenClaw 마이그레이션, `talaria login` 서브커맨드
 - **백엔드** — Modal, Daytona, Singularity 샌드박스 실행기 (local / Docker / SSH만 잔존)
-- **메시징** — Discord / Slack / Telegram 외 모든 플랫폼 (DingTalk, BlueBubbles, WhatsApp, Matrix, Signal 등)
+- **메시징** — Discord / Slack / Telegram 외 모든 플랫폼 (DingTalk, BlueBubbles, WhatsApp, Matrix, Signal 등). `Platform` enum은 이제 6개 멤버 (LOCAL, TELEGRAM, DISCORD, SLACK, API_SERVER, WEBHOOK)이며 플러그인 플랫폼은 여전히 `Platform._missing_()`을 통해 동적 등록됨
 - **기타** — RL/eval 하니스, 서드파티 메모리 플러그인 (Honcho / Mem0 / Hindsight), 공식 `optional-skills/` 레지스트리, 약 2200줄의 사장된 프로바이더 카탈로그 및 미사용 디텍터
 
 순감: 업스트림 Hermes의 **1,340 파일 약 649k Python LOC**에서 **218 파일 약 186k LOC**로.
@@ -265,17 +266,27 @@ TERMINAL_ENV=local
 
 ```
 talaria_cli/         CLI 진입점, 셋업 위저드, 모델 피커, 게이트웨이 커맨드
+  ├─ main.py             argparse 빌드 + 작은 cmd_ 핸들러 + 디스패치
+  ├─ provider_flows.py   select_provider_and_model + _model_flow_* / _aux_* / OAuth
+  ├─ sessions.py         인터랙티브 세션 피커 + 세션 이름 argv 결합기
+  ├─ commands.py         슬래시 명령 레지스트리 (CLI / 게이트웨이 / 어댑터 공유)
+  └─ auth.py / config.py 셋업 상태 + 프로바이더 자격증명
 agent/               에이전트 루프, 프롬프트 빌더, 트랜스포트 (anthropic / chat_completions / codex)
 tools/               빌트인 툴: terminal, file, web, browser, memory, todo, vision, MCP, skills
 gateway/             메시징 게이트웨이 (Discord / Slack / Telegram 어댑터 + 세션 스토어)
+  ├─ run.py              GatewayRunner — 어댑터 라이프사이클, 메시지 디스패치
+  ├─ auth.py             사용자 권한 정책 (allowlist + pairing)
+  ├─ session.py          SessionSource / SessionStore + session_key 빌더
+  └─ platforms/          플랫폼별 어댑터 (discord, slack, telegram)
 plugins/             사용자 확장 가능 플러그인 호스트
 cron/                크론 스케줄러
-skills/              번들 스킬 (devops, software-development)
+skills/              번들 스킬 (configuration, devops, software-development)
 docker/              Docker 진입점
 scripts/             설치 / 제거 / 빌드 헬퍼
+docs/                ENVIRONMENT.md (환경 변수 레퍼런스) 및 REFACTOR-ROADMAP.md
 ```
 
-`run_agent.py`(에이전트 코어), `talaria_cli/main.py`(CLI 커맨드), `gateway/run.py`(메시징 게이트웨이)가 큰 진입 표면이고 나머지는 거기서 갈라진다.
+세 개의 큰 진입 표면 (`run_agent.py` 에이전트 코어 / `talaria_cli/main.py` CLI / `gateway/run.py` 게이트웨이) 상단에 NAVIGATION docstring이 있어 grep 없이 원하는 영역으로 점프 가능. 모놀리스 분할 진행 상황은 [`docs/REFACTOR-ROADMAP.md`](docs/REFACTOR-ROADMAP.md)에서 추적.
 
 ---
 
@@ -283,7 +294,7 @@ scripts/             설치 / 제거 / 빌드 헬퍼
 
 - **버전:** v0.1.0 (2026-05-05) — 슬림 리팩터 후 첫 클린 Talaria 릴리스.
 - **안정성:** 도그푸드 등급. 개인적으로 사용 중; 마주친 이슈는 리포트 환영.
-- **테스트:** `tests/` 디렉터리는 현재 스모크 체크만 보유 — 기여 환영.
+- **테스트:** `pytest` 현재 **403 테스트** 통과 (모든 1급 모듈에 대한 import-smoke + 에이전트 루프 결정 로직 / 메시지 sanitizer / budget 회계 / config 로더 유닛 커버리지). 게이트웨이 메시지 파이프라인 통합 커버리지는 아직 얇음 — 깊은 모놀리스 분할을 막는 테스트 갭은 [`docs/REFACTOR-ROADMAP.md`](docs/REFACTOR-ROADMAP.md) 참고. 기여 환영.
 
 ---
 

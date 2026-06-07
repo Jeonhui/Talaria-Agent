@@ -76,10 +76,11 @@ Whole subsystems dropped to keep the assistant focused:
 - **Voice & TTS** — speech-to-text, text-to-speech, push-to-talk, Discord voice channels, ElevenLabs/Edge/MiniMax/NeuTTS providers
 - **Web dashboard & ink/React TUI frontend** — no graphical surface ships
 - **Interactive terminal chat** — the `talaria chat` REPL was removed; Talaria now runs headless. Use the messaging gateway (Discord/Slack/Telegram) or one-shot `talaria -q "..."`
+- **ACP editor adapter** — the Agent Client Protocol server for Zed / VS Code / JetBrains integration was removed; Talaria is messaging-first
 - **Aggregator paths** — Vercel AI Gateway and Nous Portal subscription system (OpenRouter is now a first-class provider with its own key)
 - **Auth flows** — Nous Portal device-code login, OpenClaw migration, the `talaria login` subcommand
 - **Backends** — Modal, Daytona, Singularity sandbox executors (only local / Docker / SSH remain)
-- **Messaging** — every platform other than Discord / Slack / Telegram (DingTalk, BlueBubbles, WhatsApp, Matrix, Signal, etc.)
+- **Messaging** — every platform other than Discord / Slack / Telegram (DingTalk, BlueBubbles, WhatsApp, Matrix, Signal, etc.); the `Platform` enum is now 6 members (LOCAL, TELEGRAM, DISCORD, SLACK, API_SERVER, WEBHOOK) and plugin platforms still register dynamically via `Platform._missing_()`
 - **Other** — RL/eval harnesses, third-party memory plugins (Honcho / Mem0 / Hindsight), the official `optional-skills/` registry, ~2200 lines of dead provider catalogs and unused detectors
 
 Net: **~186k Python LOC** in **218 files**, down from **~649k LOC** in **1,340 files** in upstream Hermes.
@@ -317,17 +318,27 @@ systemd/launchd service name (`talaria-gateway-work` vs
 
 ```
 talaria_cli/         CLI entrypoint, setup wizard, model picker, gateway commands
+  ├─ main.py             argparse build + small cmd_ handlers + dispatch
+  ├─ provider_flows.py   select_provider_and_model + _model_flow_* / _aux_* / OAuth
+  ├─ sessions.py         interactive session picker + session-name argv coalescer
+  ├─ commands.py         slash-command registry (shared by CLI / gateway / adapters)
+  └─ auth.py / config.py setup state + provider credentials
 agent/               agent loop, prompt builder, transports (anthropic / chat_completions / codex)
 tools/               built-in tools: terminal, file, web, browser, memory, todo, vision, MCP, skills
 gateway/             messaging gateway (Discord / Slack / Telegram adapters + session store)
+  ├─ run.py              GatewayRunner — adapter lifecycle, message dispatch
+  ├─ auth.py             user-authorization policy (allowlists + pairing)
+  ├─ session.py          SessionSource / SessionStore + session_key builder
+  └─ platforms/          per-platform adapters (discord, slack, telegram)
 plugins/             user-extensible plugin host
 cron/                cron scheduler
-skills/              bundled skills (devops, software-development)
+skills/              bundled skills (configuration, devops, software-development)
 docker/              Docker entrypoint
 scripts/             install / uninstall / build helpers
+docs/                ENVIRONMENT.md (env-var reference) and REFACTOR-ROADMAP.md
 ```
 
-`run_agent.py` (agent core), `talaria_cli/main.py` (CLI commands), and `gateway/run.py` (messaging gateway) are the big entry surfaces; everything else fans out from there.
+The three big entry surfaces are `run_agent.py` (agent core), `talaria_cli/main.py` (CLI), and `gateway/run.py` (messaging gateway); each carries a NAVIGATION docstring at the top so you can jump to the right region without grepping. Progress on splitting them into smaller modules is tracked in [`docs/REFACTOR-ROADMAP.md`](docs/REFACTOR-ROADMAP.md).
 
 ---
 
@@ -335,7 +346,7 @@ scripts/             install / uninstall / build helpers
 
 - **Version:** v0.1.0 (2026-05-05) — first clean Talaria release after the lean refactor.
 - **Stability:** dogfood-grade. Used personally; report issues you hit.
-- **Tests:** the `tests/` directory currently holds smoke checks only — contributions welcome.
+- **Tests:** `pytest` currently reports **403 tests** (import-smoke across every first-party module + unit coverage for the agent loop's decision logic, message sanitizers, budget accounting, and config loaders). Integration coverage for the gateway message pipeline is still light — see [`docs/REFACTOR-ROADMAP.md`](docs/REFACTOR-ROADMAP.md) for the test gaps that block the deeper monolith splits. Contributions welcome.
 
 ---
 
