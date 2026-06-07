@@ -42,7 +42,6 @@ talaria-agent/
 │   ├── context_engine/   # Context-engine plugins
 │   └── <others>/         # Dashboard, image-gen, disk-cleanup, examples, ...
 ├── skills/               # Built-in skills bundled with the repo
-├── acp_adapter/          # ACP server (VS Code / Zed / JetBrains integration)
 ├── cron/                 # Scheduler — jobs.py, scheduler.py
 ├── scripts/              # run_tests.sh, release.py, auxiliary scripts
 └── tests/                # Pytest suite

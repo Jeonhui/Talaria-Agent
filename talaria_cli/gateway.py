@@ -2546,46 +2546,6 @@ def _platform_status(platform: dict) -> str:
     if not token_var:
         return "not configured"
     val = get_env_value(token_var)
-    if token_var == "WHATSAPP_ENABLED":
-        if val and val.lower() == "true":
-            session_file = get_talaria_home() / "whatsapp" / "session" / "creds.json"
-            if session_file.exists():
-                return "configured + paired"
-            return "enabled, not paired"
-        return "not configured"
-    if platform.get("key") == "signal":
-        account = get_env_value("SIGNAL_ACCOUNT")
-        if val and account:
-            return "configured"
-        if val or account:
-            return "partially configured"
-        return "not configured"
-    if platform.get("key") == "email":
-        pwd = get_env_value("EMAIL_PASSWORD")
-        imap = get_env_value("EMAIL_IMAP_HOST")
-        smtp = get_env_value("EMAIL_SMTP_HOST")
-        if all([val, pwd, imap, smtp]):
-            return "configured"
-        if any([val, pwd, imap, smtp]):
-            return "partially configured"
-        return "not configured"
-    if platform.get("key") == "matrix":
-        homeserver = get_env_value("MATRIX_HOMESERVER")
-        password = get_env_value("MATRIX_PASSWORD")
-        if (val or password) and homeserver:
-            e2ee = get_env_value("MATRIX_ENCRYPTION")
-            suffix = " + E2EE" if e2ee and e2ee.lower() in ("true", "1", "yes") else ""
-            return f"configured{suffix}"
-        if val or password or homeserver:
-            return "partially configured"
-        return "not configured"
-    if platform.get("key") == "weixin":
-        token = get_env_value("WEIXIN_TOKEN")
-        if val and token:
-            return "configured"
-        if val or token:
-            return "partially configured"
-        return "not configured"
     if val:
         return "configured"
     return "not configured"
@@ -2899,8 +2859,7 @@ def gateway_setup():
     # ── Post-setup: offer to install/restart gateway ──
     # Consider any platform (built-in or plugin) where the user has made
     # meaningful progress.  ``_platform_status`` already handles plugin
-    # entries via their check_fn and per-platform dual-states like
-    # WhatsApp's "enabled, not paired".
+    # entries via their check_fn.
     def _is_progress(status: str) -> bool:
         s = status.lower()
         return not (

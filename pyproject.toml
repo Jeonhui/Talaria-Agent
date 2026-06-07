@@ -48,32 +48,28 @@ pty = [
   "pywinpty>=2.0.0,<3; sys_platform == 'win32'",
 ]
 mcp = ["mcp>=1.2.0,<2"]
-acp = ["agent-client-protocol>=0.9.0,<1.0"]
 termux = [
   "python-telegram-bot[webhooks]>=22.6,<23",
   "talaria-agent[cli]",
   "talaria-agent[pty]",
   "talaria-agent[mcp]",
-  "talaria-agent[acp]",
 ]
 all = [
   "talaria-agent[messaging]",
   "talaria-agent[cli]",
   "talaria-agent[pty]",
   "talaria-agent[mcp]",
-  "talaria-agent[acp]",
 ]
 
 [project.scripts]
 talaria = "talaria_cli.main:main"
 talaria-agent = "run_agent:main"
-talaria-acp = "acp_adapter.entry:main"
 
 [tool.setuptools]
 py-modules = ["run_agent", "model_tools", "toolsets", "cli_config", "talaria_constants", "talaria_state", "talaria_time", "talaria_logging", "utils"]
 
 [tool.setuptools.packages.find]
-include = ["agent", "agent.*", "tools", "tools.*", "talaria_cli", "gateway", "gateway.*", "cron", "acp_adapter"]
+include = ["agent", "agent.*", "tools", "tools.*", "talaria_cli", "gateway", "gateway.*", "cron"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
