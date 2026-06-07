@@ -37,7 +37,6 @@ from gateway.platforms.base import MessageEvent  # noqa: E402
 from gateway.run import GatewayRunner  # noqa: E402
 from gateway.session import SessionSource  # noqa: E402
 
-
 # ── Fakes ──────────────────────────────────────────────────────────────────
 
 
