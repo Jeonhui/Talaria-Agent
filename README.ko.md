@@ -2,7 +2,7 @@
 
 > Discord, Slack, Telegram, CLI, 그리고 선택적 MCP를 위한 가벼운 개인 어시스턴트.
 
-Talaria는 [Hermes Agent](https://github.com/NousResearch/hermes-agent)에서 모든 기능을 담은 프레임워크 표면을 덜어내고, 잘 정의된 작은 어시스턴트만 남긴 슬림하고 의견 있는 포크다. 업스트림 코드베이스 대비 **약 71% 작다** (원본의 약 29% 크기).
+Talaria는 [Hermes Agent](https://github.com/NousResearch/hermes-agent)에서 모든 기능을 담은 프레임워크 표면을 덜어내고, 잘 정의된 작은 어시스턴트만 남긴 슬림하고 의견 있는 포크다. 이 리포에 포함된 [`ref/hermes-agent`](ref/hermes-agent) 스냅샷 기준, Talaria는 Python 프로덕션 코드(테스트 제외) 기준 **약 61% 작다** — **약 173k LOC / 212 파일**, Hermes는 **약 448k LOC / 630 파일**. 테스트 포함 시 격차는 더 커진다 (**약 175k vs 약 900k** LOC, **약 80% 감축 / 5배 축소**). 통째로 제거된 디렉터리 15개 이상 (`acp_adapter/`, `tui_gateway/`, `web/`, `optional-skills/`, `locales/`, `providers/`, 플러그인 마켓플레이스 티어 등).
 
 ## 3분 시작
 
@@ -46,7 +46,7 @@ Hermes는 모든 기능을 담은 풀스택 프레임워크라, 개인 용도에
 - **커스터마이징 용이** — 추상화 계층이 적고 호출 경로가 짧다.
   optional-skill 레지스트리나 플러그인 마켓플레이스 같은 중간 레이어가
   없어, 툴을 추가하거나 프롬프트를 교체하거나 에이전트 루프를 바꾸는
-  작업이 약 649k LOC를 헤집는 일이 아니라 약 186k LOC에 대한 작은 diff로
+  작업이 약 448k Python LOC를 헤집는 일이 아니라 약 173k LOC에 대한 작은 diff로
   끝난다.
 - **자원 효율성** — 설치 용량이 작고 콜드 스타트가 빠르며 메모리
   베이스라인이 낮고 백그라운드 서비스도 적다. 워크스테이션뿐 아니라
@@ -81,7 +81,7 @@ Hermes는 모든 기능을 담은 풀스택 프레임워크라, 개인 용도에
 - **메시징** — Discord / Slack / Telegram 외 모든 플랫폼 (DingTalk, BlueBubbles, WhatsApp, Matrix, Signal 등). `Platform` enum은 이제 6개 멤버 (LOCAL, TELEGRAM, DISCORD, SLACK, API_SERVER, WEBHOOK)이며 플러그인 플랫폼은 여전히 `Platform._missing_()`을 통해 동적 등록됨
 - **기타** — RL/eval 하니스, 서드파티 메모리 플러그인 (Honcho / Mem0 / Hindsight), 공식 `optional-skills/` 레지스트리, 약 2200줄의 사장된 프로바이더 카탈로그 및 미사용 디텍터
 
-순감: 업스트림 Hermes의 **1,340 파일 약 649k Python LOC**에서 **218 파일 약 186k LOC**로.
+순감 (테스트 제외 프로덕션 코드): `ref/hermes-agent` 스냅샷 기준 **약 448k Python LOC / 630 파일**에서 **약 173k Python LOC / 212 파일**로. 테스트 포함 시 **약 175k vs 약 900k LOC** (Hermes는 테스트 파일만 약 1,238개, Talaria는 20개). 가장 결정적인 컷: `plugins/`가 124 → 3 파일 (Hermes 플러그인 마켓플레이스 티어 통째 제거), `providers/` / `tui_gateway/` / `web/` / `acp_adapter/` 사라짐, 메시징 어댑터 15+ → 3 (Discord / Slack / Telegram).
 
 ---
 
