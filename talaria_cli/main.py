@@ -57,6 +57,7 @@ from typing import Optional
 from talaria_cli.provider_flows import select_provider_and_model  # noqa: F401
 from talaria_cli.sessions import (
     _coalesce_session_name_args,
+    _relative_time,
     _session_browse_picker,
 )
 
@@ -238,24 +239,6 @@ from datetime import datetime
 from talaria_cli import __release_date__, __version__
 
 logger = logging.getLogger(__name__)
-
-
-def _relative_time(ts) -> str:
-    """Format a timestamp as relative time (e.g., '2h ago', 'yesterday')."""
-    if not ts:
-        return "?"
-    delta = _time.time() - ts
-    if delta < 60:
-        return "just now"
-    if delta < 3600:
-        return f"{int(delta / 60)}m ago"
-    if delta < 86400:
-        return f"{int(delta / 3600)}h ago"
-    if delta < 172800:
-        return "yesterday"
-    if delta < 604800:
-        return f"{int(delta / 86400)}d ago"
-    return datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
 
 
 def _has_any_provider_configured() -> bool:
@@ -880,7 +863,7 @@ def _stash_local_changes_if_needed(git_cmd: list[str], cwd: Path) -> Optional[st
         print("→ Clearing unmerged index entries from a previous conflict...")
         subprocess.run(git_cmd + ["reset"], cwd=cwd, capture_output=True)
 
-    from datetime import datetime, timezone
+    from datetime import timezone
 
     stash_name = datetime.now(timezone.utc).strftime(
         "talaria-update-autostash-%Y%m%d-%H%M%S"
@@ -2690,10 +2673,6 @@ def _cmd_update_impl(args, gateway_mode: bool):
         else:
             print(f"✗ Update failed: {e}")
             sys.exit(1)
-
-
-            i += 1
-    return result
 
 
 def cmd_profile(args):
@@ -5085,6 +5064,7 @@ Examples:
     # --help, unrecognised flags, and every subcommand are forwarded
     # transparently instead of being intercepted by argparse on the host.
     from talaria_cli.config import get_container_exec_info
+    from talaria_cli.container_exec import _exec_in_container
 
     container_info = get_container_exec_info()
     if container_info:

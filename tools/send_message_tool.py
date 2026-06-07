@@ -10,8 +10,6 @@ import json
 import logging
 import os
 import re
-import ssl
-import time
 from typing import Dict, Optional
 
 from agent.redact import redact_sensitive_text

@@ -11,7 +11,6 @@ the `platform_toolsets` key.
 
 import json as _json
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Set
