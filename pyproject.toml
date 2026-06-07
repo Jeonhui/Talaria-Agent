@@ -14,7 +14,7 @@ dependencies = [
   # Core — pinned to known-good ranges to limit supply chain attack surface
   "openai>=2.21.0,<3",
   "anthropic>=0.39.0,<1",
-  "python-dotenv>=1.2.1,<2",
+  "python-dotenv>=1.2.2,<2",  # CVE-2026-28684
   "fire>=0.7.1,<1",
   "httpx[socks]>=0.28.1,<1",
   "rich>=14.3.3,<15",
@@ -29,7 +29,7 @@ dependencies = [
   # Cron scheduler (built-in feature — scheduled cron/interval jobs use croniter).
   "croniter>=6.0.0,<7",
   # Skills Hub (GitHub App JWT auth — optional, only needed for bot identity)
-  "PyJWT[crypto]>=2.12.0,<3",  # CVE-2026-32597
+  "PyJWT[crypto]>=2.13.0,<3",  # CVE-2026-32597 + PYSEC-2026-{175,177,178,179}
 ]
 
 [project.optional-dependencies]

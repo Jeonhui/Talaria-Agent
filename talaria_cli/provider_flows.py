@@ -13,11 +13,10 @@ with anyone importing from ``talaria_cli.main``.
 from __future__ import annotations
 
 import argparse
-import getpass
 import os
-import re
 import subprocess
 
+from talaria_cli.branding import default_branding
 from talaria_cli.models import _PROVIDER_MODELS
 
 
@@ -1301,7 +1300,6 @@ def _model_flow_named_custom(config, provider_info):
 
 
 # Curated model lists for direct API-key providers — single source in models.py
-from talaria_cli.models import _PROVIDER_MODELS
 
 
 def _current_reasoning_effort(config) -> str:
