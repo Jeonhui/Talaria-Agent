@@ -2,7 +2,7 @@
 
 > A lean personal assistant for Discord, Slack, Telegram, CLI, and optional MCP.
 
-Talaria is a slim, opinionated fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) that drops the everything-included framework surface and keeps a small, well-defined assistant. **~71% smaller** than the upstream code base (~29% the original size).
+Talaria is a slim, opinionated fork of [Hermes Agent](https://github.com/NousResearch/hermes-agent) that drops the everything-included framework surface and keeps a small, well-defined assistant. Against the [`ref/hermes-agent`](ref/hermes-agent) snapshot in this repo, Talaria is **~61% smaller** by Python production code (excluding tests) — **~173k LOC across 212 files**, down from **~448k LOC across 630 files**. With tests included the gap is even wider (**~175k vs ~900k** LOC; **~80% smaller / 5× reduction**), driven by 15+ whole directories that were removed wholesale (`acp_adapter/`, `tui_gateway/`, `web/`, `optional-skills/`, `locales/`, `providers/`, `plugins/` Marketplace tier, etc.).
 
 ## 3-minute start
 
@@ -47,7 +47,7 @@ three goals:
 - **Easier to customize** — fewer abstractions, shorter call paths, no
   optional-skill registry or plugin marketplace layers to thread through.
   Adding a tool, swapping a prompt, or changing the agent loop is a small
-  diff against ~186k LOC, not a hunt across ~649k.
+  diff against ~173k Python LOC, not a hunt across ~448k.
 - **Resource efficiency** — smaller install footprint, faster cold start,
   lower memory baseline, fewer background services. Runs comfortably on a
   Termux phone or a tiny VPS, not just a workstation. No optional extras
@@ -83,7 +83,7 @@ Whole subsystems dropped to keep the assistant focused:
 - **Messaging** — every platform other than Discord / Slack / Telegram (DingTalk, BlueBubbles, WhatsApp, Matrix, Signal, etc.); the `Platform` enum is now 6 members (LOCAL, TELEGRAM, DISCORD, SLACK, API_SERVER, WEBHOOK) and plugin platforms still register dynamically via `Platform._missing_()`
 - **Other** — RL/eval harnesses, third-party memory plugins (Honcho / Mem0 / Hindsight), the official `optional-skills/` registry, ~2200 lines of dead provider catalogs and unused detectors
 
-Net: **~186k Python LOC** in **218 files**, down from **~649k LOC** in **1,340 files** in upstream Hermes.
+Net (production code, tests excluded): **~173k Python LOC in 212 files**, down from **~448k Python LOC in 630 files** in the `ref/hermes-agent` snapshot. Including tests/, the comparison widens to **~175k vs ~900k LOC** (Hermes carries ~1,238 test files versus Talaria's 20). Specific killer cuts: `plugins/` went from 124 files to 3 (Hermes's plugin marketplace tier was dropped entirely), `providers/` and `tui_gateway/` and `web/` and `acp_adapter/` are gone, and the messaging-adapter set was cut from 15+ down to 3 (Discord / Slack / Telegram).
 
 ---
 
