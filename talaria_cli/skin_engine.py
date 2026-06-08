@@ -97,11 +97,10 @@ BUILT-IN SKINS
 ==============
 
 - ``default`` — Sky Messenger (Hermes crossing the sky, blue/cloud-white)
-- ``ares``    — Crimson/bronze war-god theme with custom spinner wings
 - ``mono``    — Clean grayscale monochrome
-- ``slate``   — Cool blue developer-focused theme
-- ``daylight`` — Light background theme with dark text and blue accents
-- ``warm-lightmode`` — Warm brown/gold text for light terminal backgrounds
+
+Add more by dropping YAML in ``~/.talaria/skins/`` — scaffold one with
+``talaria skin new <name>``.
 
 USER SKINS
 ==========
