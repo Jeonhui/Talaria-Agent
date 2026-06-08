@@ -376,6 +376,23 @@ memory:
   flush_min_turns: 6        # Min user turns to trigger flush on exit/reset (0 = disabled)
 
 # =============================================================================
+# Integration module
+# =============================================================================
+# One swappable unit that owns identity/authorization, MCP endpoint + key,
+# per-user tool gating, per-user context files, per-user skills, and message
+# logging. Modules live in integrations/<name>/ (or ~/.talaria/integrations/).
+# A worked reference ships at integrations/example/.
+#
+# Configure interactively with `talaria integration setup`. Leave `module`
+# empty (or omit this block) to run with no module — everything degrades to
+# the built-in behavior.
+integration:
+  module: ""                # active module name, e.g. "example" ("" = disabled)
+  # Per-module config is stored under its own key, e.g.:
+  # example:
+  #   identity_url: "https://id.example.com/authz"
+
+# =============================================================================
 # Session Reset Policy (Messaging Platforms)
 # =============================================================================
 # Controls when messaging sessions (Telegram, Discord, WhatsApp, Slack) are

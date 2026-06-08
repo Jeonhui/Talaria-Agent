@@ -69,7 +69,7 @@ talaria-agent = "run_agent:main"
 py-modules = ["run_agent", "model_tools", "toolsets", "cli_config", "talaria_constants", "talaria_state", "talaria_time", "talaria_logging", "utils"]
 
 [tool.setuptools.packages.find]
-include = ["agent", "agent.*", "tools", "tools.*", "talaria_cli", "gateway", "gateway.*", "cron"]
+include = ["agent", "agent.*", "tools", "tools.*", "talaria_cli", "gateway", "gateway.*", "cron", "integrations", "integrations.*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

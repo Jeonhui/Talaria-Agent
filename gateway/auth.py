@@ -102,6 +102,19 @@ def is_user_authorized(source: SessionSource, pairing_store) -> bool:
     if not user_id:
         return False
 
+    # Integration-module override: when an integration module is active it
+    # owns authorization (its resolve_user().authorized verdict). The env
+    # allowlists / pairing store below remain the fallback used only when no
+    # module is configured (verdict is None).
+    try:
+        from gateway.integration_bridge import is_authorized as _integ_authorized
+
+        verdict = _integ_authorized(source)
+        if verdict is not None:
+            return verdict
+    except Exception:
+        pass
+
     platform_env_map = dict(_BUILTIN_PLATFORM_ENV_MAP)
     platform_group_user_env_map = dict(_BUILTIN_PLATFORM_GROUP_USER_ENV_MAP)
     platform_group_chat_env_map = dict(_BUILTIN_PLATFORM_GROUP_CHAT_ENV_MAP)

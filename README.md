@@ -66,8 +66,10 @@ opinionated subset for one developer's daily driver.
 | **Providers** | Anthropic (Claude), OpenAI (GPT), OpenAI Codex, Xiaomi MiMo, OpenRouter (200+ models), local (LM Studio / Ollama / vLLM), custom (any OpenAI-compatible endpoint) |
 | **Messaging** | Discord, Slack, Telegram |
 | **Terminal backends** | local, Docker, SSH |
-| **MCP** | Supported. Zero servers shipped — add your own with `talaria mcp add`. |
+| **MCP** | Supported, with automatic reconnection (infinite retry + backoff by default). Zero servers shipped — add your own with `talaria mcp add`. |
 | **Skills** | Bundled `configuration` + `devops` + `software-development`; install more with `talaria skills install <repo>` |
+| **Integration modules** | One swappable unit for identity, MCP wiring, per-user tools, context, skills, and logging — `talaria integration setup` |
+| **Skins** | Icon / branding / colors as YAML; scaffold + switch with `talaria skin new` / `talaria skin set` |
 
 ## What's been removed
 
@@ -215,6 +217,13 @@ talaria logs --follow              # tail gateway logs
 talaria mcp add <name> <url-or-cmd>  # connect a Model Context Protocol server
 talaria mcp list
 
+talaria integration setup          # pick + configure the active integration module
+talaria integration status         # show active module + what's installed
+
+talaria skin list                  # list skins (★ = active)
+talaria skin new mybrand           # scaffold a skin YAML (icon / name / colors)
+talaria skin set mybrand           # activate it
+
 talaria skills browse              # browse available skills
 talaria skills install <repo>      # install from GitHub
 
@@ -235,6 +244,60 @@ talaria status                     # health summary (now includes session recap)
 talaria doctor                     # detailed diagnostics
 talaria uninstall [--full]         # remove (--full also wipes ~/.talaria)
 ```
+
+---
+
+## Integration modules
+
+An **integration module** is one swappable unit that owns every external-service
+concern for a deployment: identity/authorization, MCP endpoint + key, the set of
+MCP tools each user may call, per-user context files, per-user skills, and message
+logging. Swap the whole backend (e.g. a different tenant/service) by changing one
+config line — running with **no module is fully supported** (everything degrades
+to the built-in behavior).
+
+```bash
+talaria integration setup     # pick a module, walk its config schema
+talaria integration status    # active module + what's installed
+talaria integration off       # disable
+```
+
+A module is a directory under `integrations/<name>/` implementing the
+`IntegrationModule` ABC (`agent/integration_module.py`). One is active at a time,
+selected by `integration.module` in config.yaml. A worked reference ships at
+`integrations/example/`.
+
+What a module does, per user, on every message:
+
+| Capability | Method | Effect |
+|---|---|---|
+| **Identity / auth** | `resolve_user()` | Network-backed allow/deny — owns authorization when active; the env allowlist is the fallback. Approvals/bans take effect immediately (denied verdicts aren't cached). |
+| **MCP wiring** | `mcp_url()` / `mcp_key()` | Registers the module's MCP server (inherits auto-reconnect). |
+| **Tool gating** | `available_tools()` | The agent sees only the **intersection** of the user's allowed tools and the registered MCP tools. Built-in tools are never gated. |
+| **Context** | `context_files()` | Per-user files injected on each new session. |
+| **Skills** | `skills()` | Per-user skills auto-loaded on each new session. |
+| **Memory** | `log_message()` / `log_response()` | Capture turns per user; recall them on the next session (the `example` module ships a working per-user memory store). |
+
+Drop a directory in `~/.talaria/integrations/<name>/` to install your own without
+touching the source tree.
+
+## Skins & branding
+
+Icon, agent name, colors, prompt symbol, and spinner are all driven by **skin**
+YAML — no code changes to rebrand. Scaffold one, edit it, switch to it:
+
+```bash
+talaria skin new mybrand          # writes ~/.talaria/skins/mybrand.yaml (icon/name/colors prefilled)
+talaria skin set mybrand          # activate (persists to display.skin in config.yaml)
+
+talaria skin list                 # built-in + user skins (★ = active)
+talaria skin show                 # the active skin's branding + key colors
+talaria skin path mybrand         # YAML path, for your editor
+```
+
+The scaffolded YAML leads with the quick wins — `brand_emoji`, `agent_name`,
+`response_label`, and the main colors — with everything else inheriting from the
+default skin. Built-in skins: `default`, `mono`.
 
 ---
 
@@ -327,9 +390,13 @@ agent/               agent loop, prompt builder, transports (anthropic / chat_co
 tools/               built-in tools: terminal, file, web, browser, memory, todo, vision, MCP, skills
 gateway/             messaging gateway (Discord / Slack / Telegram adapters + session store)
   ├─ run.py              GatewayRunner — adapter lifecycle, message dispatch
-  ├─ auth.py             user-authorization policy (allowlists + pairing)
+  ├─ auth.py             user-authorization policy (allowlists + pairing + integration override)
+  ├─ integration_bridge.py  runtime facade for the active integration module
   ├─ session.py          SessionSource / SessionStore + session_key builder
   └─ platforms/          per-platform adapters (discord, slack, telegram)
+integrations/        swappable integration modules (identity + MCP + context + skills + logging)
+  ├─ __init__.py         loader (discover / load / active)
+  └─ example/            worked reference module
 plugins/             user-extensible plugin host
 cron/                cron scheduler
 skills/              bundled skills (configuration, devops, software-development)

@@ -1,0 +1,2 @@
+name: example
+description: Reference integration module (HTTP identity backend + local demo) bundling identity, MCP, tools, context files, skills, and logging

@@ -408,6 +408,56 @@ def _qwen_portal_headers() -> dict:
     }
 
 
+def _filter_mcp_tools_by_allowlist(tools: list, allowlist: list) -> list:
+    """Keep all built-in tools; keep MCP tools only if allowed.
+
+    MCP tools are registered as ``mcp_{server}_{tool}`` (see
+    ``tools.mcp_tool.sanitize_mcp_name_component``). An allowlist entry may be
+    the bare MCP tool name (``search``), the hyphen/space variant, or the full
+    prefixed name (``mcp_example_search``). The effective set of usable MCP
+    tools is therefore the intersection of *allowlist* and the MCP tools that
+    are actually registered — anything the module lists but MCP doesn't expose
+    simply isn't present, and any registered MCP tool not on the list is
+    dropped.
+
+    Non-MCP (built-in) tools are never filtered. An empty *allowlist* returns
+    *tools* unchanged (handled by the caller).
+    """
+    import re
+
+    def _sanitize(value: str) -> str:
+        return re.sub(r"[^A-Za-z0-9_]", "_", str(value or ""))
+
+    # Pre-compute the allowed forms: full prefixed names and sanitized bare
+    # suffixes ("search" -> match any "mcp_<server>_search").
+    allowed_full = set()
+    allowed_suffixes = set()
+    for entry in allowlist:
+        s = _sanitize(entry)
+        if not s:
+            continue
+        if s.startswith("mcp_"):
+            allowed_full.add(s)
+        else:
+            allowed_suffixes.add(s)
+
+    filtered = []
+    for tool in tools:
+        try:
+            name = tool["function"]["name"]
+        except (KeyError, TypeError):
+            filtered.append(tool)
+            continue
+        if not name.startswith("mcp_"):
+            filtered.append(tool)  # built-in tool — never gated
+            continue
+        if name in allowed_full or any(
+            name.endswith(f"_{suffix}") for suffix in allowed_suffixes
+        ):
+            filtered.append(tool)
+    return filtered
+
+
 class AIAgent:
     """
     AI Agent with tool calling capabilities.
@@ -446,6 +496,7 @@ class AIAgent:
         tool_delay: float = 1.0,
         enabled_toolsets: List[str] = None,
         disabled_toolsets: List[str] = None,
+        mcp_tool_allowlist: List[str] = None,
         save_trajectories: bool = False,
         verbose_logging: bool = False,
         quiet_mode: bool = False,
@@ -1077,7 +1128,17 @@ class AIAgent:
             disabled_toolsets=disabled_toolsets,
             quiet_mode=self.quiet_mode,
         )
-        
+
+        # Integration-module MCP tool gating: when an allowlist is supplied,
+        # restrict MCP tools (mcp_*) to those the user is permitted to call —
+        # i.e. the intersection of the module's available_tools and the MCP
+        # tools actually registered. Non-MCP (built-in) tools are untouched.
+        # A None/empty allowlist means "no restriction".
+        # None = no restriction; [] = drop all MCP tools; [names] = keep those.
+        self.mcp_tool_allowlist = mcp_tool_allowlist
+        if mcp_tool_allowlist is not None and self.tools:
+            self.tools = _filter_mcp_tools_by_allowlist(self.tools, mcp_tool_allowlist)
+
         # Show tool configuration and store valid tool names for validation
         self.valid_tool_names = set()
         if self.tools:

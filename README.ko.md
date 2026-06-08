@@ -64,8 +64,10 @@ Hermes는 모든 기능을 담은 풀스택 프레임워크라, 개인 용도에
 | **프로바이더** | Anthropic (Claude), OpenAI (GPT), OpenAI Codex, Xiaomi MiMo, OpenRouter (200+ 모델), 로컬 (LM Studio / Ollama / vLLM), 커스텀 (OpenAI 호환 엔드포인트 전체) |
 | **메시징** | Discord, Slack, Telegram |
 | **터미널 백엔드** | local, Docker, SSH |
-| **MCP** | 지원. 기본 서버는 0개 — `talaria mcp add`로 직접 추가 |
+| **MCP** | 지원 + 자동 재연결(기본 무한 재시도 + 백오프). 기본 서버는 0개 — `talaria mcp add`로 직접 추가 |
 | **Skills** | 번들 `configuration` + `devops` + `software-development`; `talaria skills install <repo>`로 추가 |
+| **통합 모듈** | 신원·MCP 연결·사용자별 도구·컨텍스트·스킬·로깅을 묶은 교체형 단위 — `talaria integration setup` |
+| **스킨** | 아이콘 / 브랜딩 / 색상을 YAML로 — `talaria skin new` / `talaria skin set`로 스캐폴드·전환 |
 
 ## 제거된 것
 
@@ -213,6 +215,13 @@ talaria logs --follow              # 게이트웨이 로그 tail
 talaria mcp add <name> <url-or-cmd>  # Model Context Protocol 서버 연결
 talaria mcp list
 
+talaria integration setup          # 활성 통합 모듈 선택 + 설정
+talaria integration status         # 활성 모듈 + 설치 목록
+
+talaria skin list                  # 스킨 목록 (★ = 활성)
+talaria skin new mybrand           # 스킨 YAML 스캐폴드 (아이콘 / 이름 / 색상)
+talaria skin set mybrand           # 활성화
+
 talaria skills browse              # 스킬 둘러보기
 talaria skills install <repo>      # GitHub에서 설치
 
@@ -224,6 +233,55 @@ talaria status                     # 헬스 요약
 talaria doctor                     # 상세 진단
 talaria uninstall [--full]         # 제거 (--full은 ~/.talaria도 삭제)
 ```
+
+---
+
+## 통합 모듈
+
+**통합 모듈**은 한 배포의 외부 서비스 관련 사항을 전부 묶은 교체형 단위다: 신원/인증,
+MCP 엔드포인트·키, 사용자별 사용 가능 MCP 도구, 사용자별 컨텍스트 파일, 사용자별 스킬,
+메시지 로깅. config 한 줄로 백엔드(예: 다른 테넌트/서비스) 통째 교체. **모듈 없이 실행도
+완전 지원** — 전부 빌트인 동작으로 폴백된다.
+
+```bash
+talaria integration setup     # 모듈 선택, 설정 스키마 따라 입력
+talaria integration status    # 활성 모듈 + 설치 목록
+talaria integration off       # 비활성화
+```
+
+모듈은 `integrations/<이름>/` 디렉터리로, `IntegrationModule` ABC
+(`agent/integration_module.py`)를 구현한다. 한 번에 하나만 활성이며 config.yaml의
+`integration.module`로 선택. 동작하는 레퍼런스가 `integrations/example/`에 있다.
+
+모듈이 메시지마다 사용자별로 하는 일:
+
+| 능력 | 메서드 | 효과 |
+|---|---|---|
+| **신원 / 인증** | `resolve_user()` | 네트워크 기반 허용/거부 — 활성 시 인증을 소유, env 허용목록은 폴백. 승인/차단 즉시 반영(거부는 캐시 안 함). |
+| **MCP 연결** | `mcp_url()` / `mcp_key()` | 모듈 MCP 서버 등록(자동 재연결 상속). |
+| **도구 게이팅** | `available_tools()` | 에이전트는 사용자 허용 도구 ∩ 등록 MCP 도구의 **교집합**만 본다. 빌트인 도구는 제한 안 함. |
+| **컨텍스트** | `context_files()` | 새 세션마다 사용자별 파일 주입. |
+| **스킬** | `skills()` | 새 세션마다 사용자별 스킬 자동 로드. |
+| **메모리** | `log_message()` / `log_response()` | 사용자별 턴 저장, 다음 세션에서 회상(`example` 모듈에 동작하는 사용자별 메모리 내장). |
+
+`~/.talaria/integrations/<이름>/`에 디렉터리를 두면 소스 수정 없이 직접 만든 모듈 설치 가능.
+
+## 스킨 & 브랜딩
+
+아이콘, 에이전트 이름, 색상, 프롬프트 기호, 스피너가 전부 **스킨** YAML로 제어된다 —
+리브랜딩에 코드 수정 불필요. 스캐폴드 → 편집 → 전환:
+
+```bash
+talaria skin new mybrand          # ~/.talaria/skins/mybrand.yaml 생성 (아이콘/이름/색상 채워짐)
+talaria skin set mybrand          # 활성화 (config.yaml의 display.skin에 영속)
+
+talaria skin list                 # 빌트인 + 유저 스킨 (★ = 활성)
+talaria skin show                 # 활성 스킨의 브랜딩 + 주요 색상
+talaria skin path mybrand         # YAML 경로 (에디터용)
+```
+
+스캐폴드 YAML은 핵심부터 — `brand_emoji`, `agent_name`, `response_label`, 주요 색상 —
+채워주고 나머지는 default 스킨에서 상속한다. 빌트인 스킨: `default`, `mono`.
 
 ---
 
@@ -275,9 +333,13 @@ agent/               에이전트 루프, 프롬프트 빌더, 트랜스포트 (
 tools/               빌트인 툴: terminal, file, web, browser, memory, todo, vision, MCP, skills
 gateway/             메시징 게이트웨이 (Discord / Slack / Telegram 어댑터 + 세션 스토어)
   ├─ run.py              GatewayRunner — 어댑터 라이프사이클, 메시지 디스패치
-  ├─ auth.py             사용자 권한 정책 (allowlist + pairing)
+  ├─ auth.py             사용자 권한 정책 (allowlist + pairing + 통합 모듈 오버라이드)
+  ├─ integration_bridge.py  활성 통합 모듈 런타임 facade
   ├─ session.py          SessionSource / SessionStore + session_key 빌더
   └─ platforms/          플랫폼별 어댑터 (discord, slack, telegram)
+integrations/        교체형 통합 모듈 (신원 + MCP + 컨텍스트 + 스킬 + 로깅)
+  ├─ __init__.py         로더 (발견 / 로드 / 활성)
+  └─ example/            동작하는 레퍼런스 모듈
 plugins/             사용자 확장 가능 플러그인 호스트
 cron/                크론 스케줄러
 skills/              번들 스킬 (configuration, devops, software-development)

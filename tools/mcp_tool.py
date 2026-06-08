@@ -244,9 +244,31 @@ if _MCP_AVAILABLE and not _MCP_MESSAGE_HANDLER_SUPPORTED:
 
 _DEFAULT_TOOL_TIMEOUT = 120      # seconds for tool calls
 _DEFAULT_CONNECT_TIMEOUT = 60    # seconds for initial connection per server
-_MAX_RECONNECT_RETRIES = 5
-_MAX_INITIAL_CONNECT_RETRIES = 3 # retries for the very first connection attempt
-_MAX_BACKOFF_SECONDS = 60
+
+
+def _env_int(name: str, default: int) -> int:
+    """Read a non-negative int from env, falling back to *default*."""
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        val = int(raw)
+    except ValueError:
+        return default
+    return val if val >= 0 else default
+
+
+# Reconnection budget for an already-established server that drops. For a
+# long-lived gateway, exhausting a small fixed budget would permanently kill
+# the server, so the default is unbounded (0 = retry forever). Override via
+# TALARIA_MCP_MAX_RECONNECT_RETRIES (0 = infinite, N = give up after N).
+_MAX_RECONNECT_RETRIES = _env_int("TALARIA_MCP_MAX_RECONNECT_RETRIES", 0)
+_MAX_INITIAL_CONNECT_RETRIES = _env_int("TALARIA_MCP_MAX_INITIAL_CONNECT_RETRIES", 3)
+_MAX_BACKOFF_SECONDS = _env_int("TALARIA_MCP_MAX_BACKOFF_SECONDS", 60)
+# A connection that stayed up at least this long before dropping is treated
+# as healthy: its next disconnect starts a FRESH retry budget + backoff,
+# so a server that flaps once an hour never accumulates toward the cap.
+_RECONNECT_RESET_AFTER_SECONDS = _env_int("TALARIA_MCP_RECONNECT_RESET_AFTER", 60)
 
 # Environment variables that are safe to pass to stdio subprocesses
 _SAFE_ENV_KEYS = frozenset({
@@ -1292,6 +1314,7 @@ class MCPServerTask:
         backoff = 1.0
 
         while True:
+            attempt_started = time.monotonic()
             try:
                 if self._is_http():
                     await self._run_http(config)
@@ -1359,8 +1382,19 @@ class MCPServerTask:
                     )
                     return
 
+                # A connection that stayed up long enough to be considered
+                # healthy gets a fresh retry budget + backoff on its next
+                # drop, so an occasional flap never accumulates toward the
+                # cap. Only rapid back-to-back failures grow the backoff.
+                uptime = time.monotonic() - attempt_started
+                if uptime >= _RECONNECT_RESET_AFTER_SECONDS:
+                    retries = 0
+                    backoff = 1.0
+
                 retries += 1
-                if retries > _MAX_RECONNECT_RETRIES:
+                # _MAX_RECONNECT_RETRIES == 0 means retry forever (default),
+                # which is what a long-lived gateway wants.
+                if _MAX_RECONNECT_RETRIES and retries > _MAX_RECONNECT_RETRIES:
                     logger.warning(
                         "MCP server '%s' failed after %d reconnection attempts, "
                         "giving up: %s",
@@ -1368,10 +1402,11 @@ class MCPServerTask:
                     )
                     return
 
+                cap = _MAX_RECONNECT_RETRIES if _MAX_RECONNECT_RETRIES else "∞"
                 logger.warning(
-                    "MCP server '%s' connection lost (attempt %d/%d), "
+                    "MCP server '%s' connection lost (attempt %d/%s), "
                     "reconnecting in %.0fs: %s",
-                    self.name, retries, _MAX_RECONNECT_RETRIES,
+                    self.name, retries, cap,
                     backoff, exc,
                 )
                 await asyncio.sleep(backoff)
