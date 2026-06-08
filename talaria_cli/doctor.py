@@ -632,6 +632,32 @@ def run_doctor(args):
             check_ok(f"Created {_DHH}/memories/")
             fixed_count += 1
     
+    # Check the active integration module (if configured)
+    try:
+        from talaria_cli.config import cfg_get, load_config
+
+        _active = cfg_get(load_config(), "integration", "module")
+        if _active:
+            from integrations import load_integration_module
+
+            _mod = load_integration_module(_active)
+            if _mod is None:
+                check_warn(
+                    f"integration module '{_active}' not found",
+                    "check integrations/<name>/ or ~/.talaria/integrations/",
+                )
+            elif _mod.is_available():
+                check_ok(f"integration module '{_active}' available")
+            else:
+                check_warn(
+                    f"integration module '{_active}' configured but not available",
+                    "missing config/creds — run: talaria integration setup",
+                )
+        else:
+            check_info("No integration module active (built-in behavior)")
+    except Exception as _exc:
+        check_info(f"Integration module check skipped: {_exc}")
+
     # Check SQLite session store
     state_db_path = talaria_home / "state.db"
     if state_db_path.exists():

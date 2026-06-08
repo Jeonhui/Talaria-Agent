@@ -2159,6 +2159,66 @@ Examples:
     memory_parser.set_defaults(func=cmd_memory)
 
     # =========================================================================
+    # integration command
+    # =========================================================================
+    integration_parser = subparsers.add_parser(
+        "integration",
+        help="Configure the active integration module",
+        description=(
+            "Set up and manage the active integration module.\n\n"
+            "A module bundles identity, MCP info, available tools, context\n"
+            "files, skills, and logging into one swappable unit. Only one is\n"
+            "active at a time. Running with none is fully supported."
+        ),
+    )
+    integration_sub = integration_parser.add_subparsers(dest="integration_command")
+    integration_sub.add_parser(
+        "setup", help="Interactive module selection and configuration"
+    )
+    integration_sub.add_parser("status", help="Show the active integration module")
+    integration_sub.add_parser("off", help="Disable the integration module")
+
+    def cmd_integration(args):
+        from talaria_cli.integration_setup import integration_command
+
+        integration_command(args)
+
+    integration_parser.set_defaults(func=cmd_integration)
+
+    # =========================================================================
+    # skin command — icon / branding / colors
+    # =========================================================================
+    skin_parser = subparsers.add_parser(
+        "skin",
+        help="Manage icon / branding / colors (skins)",
+        description=(
+            "List, switch, inspect, and scaffold skins.\n\n"
+            "A skin is a YAML file controlling the icon/emoji, agent name,\n"
+            "colors, prompt symbol, and spinner. Scaffold one with\n"
+            "'talaria skin new <name>', edit it, then 'talaria skin set <name>'."
+        ),
+    )
+    skin_sub = skin_parser.add_subparsers(dest="skin_action")
+    skin_sub.add_parser("list", help="List built-in and user skins")
+    skin_sub.add_parser("show", help="Show the active skin's branding and colors")
+    _skin_set = skin_sub.add_parser("set", help="Activate a skin (persists to config)")
+    _skin_set.add_argument("name", help="Skin name")
+    _skin_new = skin_sub.add_parser("new", help="Scaffold a new skin YAML")
+    _skin_new.add_argument("name", help="New skin name (lowercase/hyphens)")
+    _skin_new.add_argument("--from", dest="from_skin", default=None,
+                           help="Seed from an existing skin (default: default)")
+    _skin_new.add_argument("--force", action="store_true", help="Overwrite if it exists")
+    _skin_path = skin_sub.add_parser("path", help="Print a skin's YAML path")
+    _skin_path.add_argument("name", nargs="?", default=None, help="Skin name (default: active)")
+
+    def cmd_skin(args):
+        from talaria_cli.skin_cli import skin_command
+
+        skin_command(args)
+
+    skin_parser.set_defaults(func=cmd_skin)
+
+    # =========================================================================
     # tools command
     # =========================================================================
     tools_parser = subparsers.add_parser(
