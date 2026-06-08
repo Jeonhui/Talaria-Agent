@@ -3305,7 +3305,17 @@ class GatewayRunner:
                     # Record rate limit so subsequent messages are silently ignored
                     self.pairing_store._record_rate_limit(platform_name, source.user_id)
             return None
-        
+
+        # Integration module: log the inbound user message (null-safe; no-op
+        # when no module is active).
+        if not is_internal:
+            try:
+                from gateway.integration_bridge import log_message as _integ_log_msg
+
+                _integ_log_msg(source, event.text or "")
+            except Exception:
+                pass
+
         # Intercept messages that are responses to a pending /update prompt.
         # The update process (detached) wrote .update_prompt.json; the watcher
         # forwarded it to the user; now the user's reply goes back via
@@ -4361,6 +4371,17 @@ class GatewayRunner:
         # Only inject on NEW sessions — ongoing conversations already have the
         # skill content in their conversation history from the first message.
         _auto = getattr(event, "auto_skill", None)
+        # Integration module: merge per-user skills into the auto-load set so
+        # they are injected alongside any channel/topic bindings.
+        try:
+            from gateway.integration_bridge import skills as _integ_skills
+
+            _module_skills = _integ_skills(source)
+            if _module_skills:
+                _existing = ([_auto] if isinstance(_auto, str) else list(_auto)) if _auto else []
+                _auto = _existing + [s for s in _module_skills if s not in _existing]
+        except Exception:
+            pass
         if _is_new_session and _auto:
             _skill_names = [_auto] if isinstance(_auto, str) else list(_auto)
             try:
@@ -4391,6 +4412,36 @@ class GatewayRunner:
                     )
             except Exception as e:
                 logger.warning("[Gateway] Failed to auto-load skill(s) %s: %s", _skill_names, e)
+
+        # Integration module: inject per-user context files on new sessions
+        # (same lifecycle as auto-skills — ongoing conversations already carry
+        # the content in their history).
+        if _is_new_session:
+            try:
+                from gateway.integration_bridge import context_files as _integ_ctx
+
+                _ctx_paths = _integ_ctx(source)
+                if _ctx_paths:
+                    import os as _os
+
+                    _ctx_parts: list[str] = []
+                    for _p in _ctx_paths:
+                        try:
+                            with open(_p, encoding="utf-8", errors="replace") as _f:
+                                _body = _f.read().strip()
+                            if _body:
+                                _ctx_parts.append(f"[Context file: {_os.path.basename(_p)}]\n{_body}")
+                        except Exception as _e:
+                            logger.warning("[Gateway] Context file '%s' unreadable: %s", _p, _e)
+                    if _ctx_parts:
+                        _ctx_parts.append(event.text)
+                        event.text = "\n\n".join(_ctx_parts)
+                        logger.info(
+                            "[Gateway] Injected %d context file(s) for session %s",
+                            len(_ctx_parts) - 1, session_key,
+                        )
+            except Exception as e:
+                logger.debug("Integration context_files injection failed: %s", e)
 
         # Load conversation history from transcript
         history = self.session_store.load_transcript(session_entry.session_id)
@@ -4813,6 +4864,16 @@ class GatewayRunner:
                 return None
 
             response = agent_result.get("final_response") or ""
+
+            # Integration module: log the outbound agent response (null-safe;
+            # no-op when no module is active).
+            if response:
+                try:
+                    from gateway.integration_bridge import log_response as _integ_log_resp
+
+                    _integ_log_resp(source, response)
+                except Exception:
+                    pass
 
             # Convert the agent's internal "(empty)" sentinel into a
             # user-friendly message.  "(empty)" means the model failed to
@@ -10077,6 +10138,16 @@ class GatewayRunner:
                         logger.debug("Reusing cached agent for session %s", session_key)
 
             if agent is None:
+                # Integration module: per-user MCP tool allowlist. None = no
+                # restriction; a list makes the agent expose only the
+                # intersection of that list and the registered MCP tools.
+                try:
+                    from gateway.integration_bridge import available_tools as _integ_tools
+
+                    _mcp_allow = _integ_tools(source)
+                except Exception:
+                    _mcp_allow = None
+
                 # Config changed or first message — create fresh agent
                 agent = AIAgent(
                     model=turn_route["model"],
@@ -10085,6 +10156,7 @@ class GatewayRunner:
                     quiet_mode=True,
                     verbose_logging=False,
                     enabled_toolsets=enabled_toolsets,
+                    mcp_tool_allowlist=_mcp_allow,
                     ephemeral_system_prompt=combined_ephemeral or None,
                     prefill_messages=self._prefill_messages or None,
                     reasoning_config=reasoning_config,
@@ -11486,6 +11558,22 @@ async def start_gateway(config: Optional[GatewayConfig] = None, replace: bool = 
         await _loop.run_in_executor(None, discover_mcp_tools)
     except Exception as e:
         logger.debug("MCP tool discovery failed: %s", e)
+
+    # Integration module: register its MCP server too. It plugs into the same
+    # register_mcp_servers machinery, so it inherits automatic reconnection
+    # with backoff (retries forever by default — see tools/mcp_tool.py).
+    try:
+        from gateway.integration_bridge import mcp_server_config
+
+        _integ_mcp = mcp_server_config()
+        if _integ_mcp:
+            from tools.mcp_tool import register_mcp_servers
+
+            _loop = asyncio.get_running_loop()
+            await _loop.run_in_executor(None, register_mcp_servers, _integ_mcp)
+            logger.info("Integration MCP server registered: %s", list(_integ_mcp))
+    except Exception as e:
+        logger.debug("Integration MCP registration failed: %s", e)
 
     # Start the gateway
     success = await runner.start()
