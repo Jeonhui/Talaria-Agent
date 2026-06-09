@@ -303,6 +303,126 @@ def test_auth_falls_back_to_env_without_module(fake_module, monkeypatch):
     assert auth.is_user_authorized(_src_real("mallory"), _FakePairing()) is False
 
 
+# ---------------------------------------------------------------------------
+# Bundle hooks: extra_mcp_servers()
+# ---------------------------------------------------------------------------
+
+class _FakeModule(IntegrationModule):
+    """Minimal IntegrationModule used by the bridge merge tests."""
+
+    def __init__(self, *, url="", key="", extras=None):
+        self._url = url
+        self._key = key
+        self._extras = extras or {}
+
+    @property
+    def name(self) -> str:
+        return "fake"
+
+    def is_available(self) -> bool:
+        return True
+
+    def mcp_url(self) -> str:
+        return self._url
+
+    def mcp_key(self) -> str:
+        return self._key
+
+    def extra_mcp_servers(self):
+        return dict(self._extras)
+
+    def resolve_user(self, *, mcp_key, platform, user_id, user_name="", **kw):
+        return UserInfo(user_id=user_id, platform=platform, name=user_name,
+                        authorized=True)
+
+    def available_tools(self, user):
+        return None
+
+
+def test_abc_extra_mcp_servers_defaults_empty():
+    """Modules that don't override extra_mcp_servers() see {}."""
+    from integrations import load_integration_module
+
+    mod = load_integration_module("example")
+    assert mod is not None
+    assert mod.extra_mcp_servers() == {}
+
+
+def test_bridge_merges_extras_with_primary(monkeypatch):
+    """Primary + extras both land in the merged dict."""
+    from gateway import integration_bridge as br
+
+    fake = _FakeModule(
+        url="https://primary.example/mcp",
+        key="sk-primary",
+        extras={
+            "filesystem": {"command": "npx", "args": ["-y", "fs-mcp"]},
+            "billing": {"url": "https://billing.example/mcp"},
+        },
+    )
+    monkeypatch.setattr(br, "active_module", lambda: fake)
+
+    cfg = br.mcp_server_config()
+    assert set(cfg.keys()) == {"fake", "filesystem", "billing"}
+    assert cfg["fake"]["url"] == "https://primary.example/mcp"
+    assert cfg["fake"]["headers"]["Authorization"] == "Bearer sk-primary"
+    assert cfg["filesystem"]["command"] == "npx"
+    assert cfg["billing"]["url"] == "https://billing.example/mcp"
+
+
+def test_bridge_primary_wins_on_name_collision(monkeypatch):
+    """An extra under the same key as ``module.name`` is overridden by the primary."""
+    from gateway import integration_bridge as br
+
+    fake = _FakeModule(
+        url="https://primary.example/mcp",
+        key="sk-primary",
+        extras={
+            "fake": {"url": "https://override-me.example/mcp"},  # collides
+            "other": {"url": "https://other.example/mcp"},
+        },
+    )
+    monkeypatch.setattr(br, "active_module", lambda: fake)
+
+    cfg = br.mcp_server_config()
+    assert cfg["fake"]["url"] == "https://primary.example/mcp"
+    assert cfg["other"]["url"] == "https://other.example/mcp"
+
+
+def test_bridge_extras_only_when_no_primary(monkeypatch):
+    """No mcp_url() → extras still register on their own."""
+    from gateway import integration_bridge as br
+
+    fake = _FakeModule(
+        url="",
+        extras={"filesystem": {"command": "npx", "args": ["fs-mcp"]}},
+    )
+    monkeypatch.setattr(br, "active_module", lambda: fake)
+
+    cfg = br.mcp_server_config()
+    assert cfg == {"filesystem": {"command": "npx", "args": ["fs-mcp"]}}
+
+
+def test_bridge_rejects_malformed_extras(monkeypatch):
+    """Non-dict / empty-string entries are dropped, not raised."""
+    from gateway import integration_bridge as br
+
+    fake = _FakeModule(
+        url="https://primary.example/mcp",
+        extras={
+            "ok": {"url": "https://ok.example/mcp"},
+            "": {"url": "https://no-name.example/mcp"},   # empty name → drop
+            "bad": "not-a-dict",                             # non-dict → drop
+        },
+    )
+    monkeypatch.setattr(br, "active_module", lambda: fake)
+
+    cfg = br.mcp_server_config()
+    assert "ok" in cfg
+    assert "" not in cfg
+    assert "bad" not in cfg
+
+
 def test_filter_mcp_tools_intersection():
     from run_agent import _filter_mcp_tools_by_allowlist as f
 

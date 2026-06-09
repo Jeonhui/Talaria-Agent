@@ -102,6 +102,23 @@ class IntegrationModule(ABC):
     def mcp_key(self) -> str:
         """Return the MCP auth key/token (typically read from an env var)."""
 
+    def extra_mcp_servers(self) -> Dict[str, Dict[str, Any]]:
+        """Return additional MCP server configs to register alongside the primary.
+
+        Lets a module ship more than one MCP server as part of its bundle
+        (e.g. a domain-specific service + a generic filesystem server) without
+        forcing the operator to also declare them under ``mcp_servers:`` in
+        config.yaml.
+
+        Each value follows the same schema as ``mcp_servers.<name>``:
+        ``url`` + ``headers`` for HTTP transport, or ``command`` + ``args``
+        + ``env`` for stdio. The primary entry returned by ``mcp_url()`` /
+        ``mcp_key()`` wins on name collision (it is registered last).
+
+        Default: no extras.
+        """
+        return {}
+
     # -- Identity gateway ----------------------------------------------------
 
     @abstractmethod

@@ -177,27 +177,54 @@ def log_response(source: "SessionSource", text: str, **ctx) -> None:
 # ---------------------------------------------------------------------------
 
 def mcp_server_config() -> dict:
-    """Return ``{name: server_config}`` for the module's MCP server, or {}.
+    """Return ``{name: server_config}`` for the module's MCP server(s), or {}.
 
-    The returned entry plugs straight into
-    ``tools.mcp_tool.register_mcp_servers`` — it inherits that module's
+    The returned entries plug straight into
+    ``tools.mcp_tool.register_mcp_servers`` — they inherit that module's
     automatic reconnect/backoff machinery.
+
+    Includes:
+      - ``module.extra_mcp_servers()`` first (bundle extras)
+      - the primary ``mcp_url()`` / ``mcp_key()`` entry last, so the primary
+        wins on name collision with an extra.
     """
     module = active_module()
     if module is None:
         return {}
+
+    merged: dict = {}
+
+    try:
+        extras = module.extra_mcp_servers() or {}
+    except Exception as exc:
+        logger.debug("Integration extra_mcp_servers failed: %s", exc)
+        extras = {}
+    if isinstance(extras, dict):
+        for name, cfg in extras.items():
+            if not isinstance(name, str) or not name.strip():
+                continue
+            if not isinstance(cfg, dict):
+                logger.warning(
+                    "Integration extra MCP %r ignored: config must be a dict",
+                    name,
+                )
+                continue
+            merged[name] = dict(cfg)
+
     try:
         url = module.mcp_url()
         key = module.mcp_key()
     except Exception as exc:
         logger.debug("Integration mcp_server_config failed: %s", exc)
-        return {}
-    if not url:
-        return {}
-    cfg: dict = {"url": url, "enabled": True}
-    if key:
-        cfg["headers"] = {"Authorization": f"Bearer {key}"}
-    return {module.name: cfg}
+        return merged
+
+    if url:
+        primary: dict = {"url": url, "enabled": True}
+        if key:
+            primary["headers"] = {"Authorization": f"Bearer {key}"}
+        merged[module.name] = primary
+
+    return merged
 
 
 # ---------------------------------------------------------------------------
