@@ -11,6 +11,7 @@ Talaria의 **모듈**은 외부 서비스 연동을 한 단위로 묶은 swappab
   - [2.4 `register(ctx)` 진입점](#24-registerctx-진입점)
   - [2.5 활성화](#25-활성화)
   - [2.6 환경변수와 `get_config_schema`](#26-환경변수와-get_config_schema)
+  - [2.7 한 모듈에 MCP 여러 개 묶기](#27-한-모듈에-mcp-여러-개-묶기)
 - [3. 식별 백엔드(HTTP) 계약](#3-식별-백엔드http-계약)
 - [4. Memory provider plugin 만들기](#4-memory-provider-plugin-만들기)
 - [5. 사용자 설치 경로](#5-사용자-설치-경로)
@@ -70,7 +71,8 @@ description: COCSO(코쏘) 정산 서비스 — identity + MCP + 사용자별 �
 | `is_available()` | 활성화 결정 시 | 네트워크 호출 금지. env/config/deps 존재 여부만 |
 | `get_config_schema()` | `talaria integration setup` | wizard용 필드 목록 |
 | `save_config(values, talaria_home)` | wizard 저장 시 | secret은 `.env`, 일반값은 `config.yaml` |
-| `mcp_url()` / `mcp_key()` | 시작 시 1회 + MCP 재연결 시 | 모듈 레벨 단일 자격증명 |
+| `mcp_url()` / `mcp_key()` | 시작 시 1회 + MCP 재연결 시 | 주(primary) MCP 1개. 모듈 이름으로 등록됨 |
+| `extra_mcp_servers()` | 시작 시 1회 | 추가 MCP 서버를 함께 묶음. 기본 `{}`. [2.7](#27-한-모듈에-mcp-여러-개-묶기) 참고 |
 | `resolve_user(...)` | 인바운드 메시지마다 (캐시 가능) | **fail-closed** 권장 |
 | `available_tools(user)` | 에이전트 부트 시 | `None`=전부, `[]`=MCP 차단, `[...]`=화이트리스트 |
 | `context_files(user)` | 새 세션 생성 시 | 절대경로 리스트 반환 |
@@ -198,6 +200,48 @@ integration:
 | `description` | 한 줄 설명 |
 
 `is_available()`은 wizard와 무관하게 **모듈이 동작 가능한지**만 빠르게 검사해야 한다. 네트워크/DB 호출 금지.
+
+---
+
+### 2.7 한 모듈에 MCP 여러 개 묶기
+
+ABC가 노출하는 `mcp_url()` / `mcp_key()`는 **주(primary) MCP 한 개**다. 그 외 MCP를 모듈에 같이 묶으려면 `extra_mcp_servers()`를 오버라이드한다 (기본 `{}`). 운영자가 `config.yaml`의 `mcp_servers:` 블록에 따로 적지 않아도 모듈이 활성화되면 자동으로 함께 등록된다.
+
+반환 형식은 `mcp_servers.<name>` 스키마와 동일하다. HTTP면 `url`/`headers`, stdio면 `command`/`args`/`env`.
+
+```python
+class CocsoModule(IntegrationModule):
+    @property
+    def name(self) -> str:
+        return "cocso"
+
+    def mcp_url(self) -> str:           # 주 MCP — 모듈 이름으로 등록됨
+        return os.getenv("COCSO_MCP_URL", "")
+
+    def mcp_key(self) -> str:
+        return os.getenv("COCSO_MCP_KEY", "")
+
+    def extra_mcp_servers(self) -> dict:
+        return {
+            "cocso_billing": {
+                "url": os.getenv("COCSO_BILLING_URL", ""),
+                "headers": {"Authorization": f"Bearer {os.getenv('COCSO_BILLING_KEY', '')}"},
+                "timeout": 180,
+            },
+            "filesystem": {                           # stdio MCP도 가능
+                "command": "npx",
+                "args": ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
+            },
+        }
+```
+
+규칙:
+- 등록 순서는 **extras 먼저, 주(primary) 마지막**. 따라서 extras에 모듈 이름(`name` property)과 같은 키를 넣으면 주에 의해 덮어쓰여진다.
+- 빈 문자열 키 / dict 가 아닌 값은 silent drop (경고 로그만 남김).
+- 주 MCP가 비어 있어도(`mcp_url()`이 ""을 반환) extras는 그대로 등록된다 — 즉 "주 MCP 없이 보조 MCP만 묶는" 모듈도 가능.
+- 각 entry는 `tools.mcp_tool.register_mcp_servers`로 흘러가므로 자동 reconnect/backoff 그대로 받음.
+
+> 주의: `extra_mcp_servers()` 안에 자격증명을 평문으로 박지 말 것. 반드시 환경변수 (`os.getenv`)로 읽고, 운영 시에는 `~/.talaria/.env`에서 주입.
 
 ---
 
